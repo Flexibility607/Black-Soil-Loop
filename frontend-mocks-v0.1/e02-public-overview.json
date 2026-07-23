@@ -1,0 +1,20 @@
+{
+  "status": "PROCESSED",
+  "code": "OK",
+  "data": {
+    "park_id": "PARK-001",
+    "enterprise_count": 12,
+    "capacity_remaining_total": 1800,
+    "capacity_unit": "kg",
+    "preorder_quantity_total": 620,
+    "preorder_unit": "kg",
+    "transport_task_counts": {
+      "DRAFT": 2,
+      "CONFIRMED": 5,
+      "CANCELLED": 0
+    }
+  },
+  "errors": [],
+  "trace_id": "TRACE-PUBLIC-001",
+  "data_cutoff": "2026-07-23T10:00:00+08:00"
+}

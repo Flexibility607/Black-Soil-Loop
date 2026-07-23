@@ -1,0 +1,21 @@
+{
+  "status": "PROCESSED",
+  "code": "OK",
+  "data": {
+    "calculation_status": "OK",
+    "missing_fields": [],
+    "calc_results": {
+      "material_id": "MATERIAL-001",
+      "material_name": "示例原料",
+      "demand_quantity": 1200,
+      "unit": "kg",
+      "basis_plan_ids": [
+        "PLAN-001",
+        "PLAN-002"
+      ]
+    }
+  },
+  "errors": [],
+  "trace_id": "TRACE-CALC-001",
+  "data_cutoff": "2026-07-23T10:00:00+08:00"
+}

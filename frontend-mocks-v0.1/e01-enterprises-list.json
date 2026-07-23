@@ -1,0 +1,29 @@
+{
+  "status": "PROCESSED",
+  "code": "OK",
+  "data": {
+    "items": [
+      {
+        "enterprise_id": "ENT-001",
+        "park_id": "PARK-001",
+        "enterprise_name": "示例食品企业",
+        "industry": "食品加工",
+        "enterprise_contact_name": "张示例",
+        "enterprise_phone": "13800000000",
+        "enterprise_address": "园区内部示例地址",
+        "status": "ACTIVE",
+        "source_system": "DEMO_SIMULATION",
+        "source_record_id": "ENT-SRC-001",
+        "source_updated_at": "2026-07-23T09:30:00+08:00",
+        "remark": null,
+        "object_version": 1
+      }
+    ],
+    "total": 1,
+    "page": 1,
+    "page_size": 20
+  },
+  "errors": [],
+  "trace_id": "TRACE-E01-001",
+  "data_cutoff": "2026-07-23T10:00:00+08:00"
+}

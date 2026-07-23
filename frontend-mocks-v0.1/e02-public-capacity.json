@@ -1,0 +1,16 @@
+{
+  "status": "PROCESSED",
+  "code": "OK",
+  "data": [
+    {
+      "enterprise_display_name": "园区企业 01",
+      "category": "冷冻食品",
+      "capacity_remaining": 800,
+      "unit": "kg",
+      "statistic_at": "2026-07-23T10:00:00+08:00"
+    }
+  ],
+  "errors": [],
+  "trace_id": "TRACE-PUBLIC-002",
+  "data_cutoff": "2026-07-23T10:00:00+08:00"
+}

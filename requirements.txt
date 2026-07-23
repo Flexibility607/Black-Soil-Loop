@@ -1,0 +1,18 @@
+# B01 网页后端直接依赖；Python 3.13 + PostgreSQL
+fastapi>=0.115,<1
+uvicorn[standard]>=0.34,<1
+pydantic>=2.10,<3
+pydantic-settings>=2.7,<3
+sqlalchemy>=2.0,<3
+alembic>=1.14,<2
+psycopg[binary]>=3.2,<4
+python-multipart>=0.0.20,<1
+openpyxl>=3.1,<4
+PyJWT>=2.10,<3
+pwdlib[argon2]>=0.2,<1
+
+# 测试与本地质量检查
+pytest>=8.3,<9
+pytest-asyncio>=0.25,<1
+httpx>=0.28,<1
+ruff>=0.9,<1

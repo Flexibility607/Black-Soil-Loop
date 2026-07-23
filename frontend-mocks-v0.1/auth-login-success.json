@@ -1,0 +1,14 @@
+{
+  "status": "PROCESSED",
+  "code": "OK",
+  "data": {
+    "access_token": "mock-access-token",
+    "refresh_token": "mock-refresh-token",
+    "token_type": "bearer",
+    "expires_in": 7200,
+    "refresh_expires_in": 604800
+  },
+  "errors": [],
+  "trace_id": "TRACE-AUTH-001",
+  "data_cutoff": "2026-07-23T10:00:00+08:00"
+}

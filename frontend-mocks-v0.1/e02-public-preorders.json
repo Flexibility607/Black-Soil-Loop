@@ -1,0 +1,17 @@
+{
+  "status": "PROCESSED",
+  "code": "OK",
+  "data": [
+    {
+      "partner_display_name": "合作方 01",
+      "category": "冷冻食品",
+      "quantity": 300,
+      "unit": "kg",
+      "required_start_at": "2026-07-24T08:00:00+08:00",
+      "required_end_at": "2026-07-24T12:00:00+08:00"
+    }
+  ],
+  "errors": [],
+  "trace_id": "TRACE-PUBLIC-003",
+  "data_cutoff": "2026-07-23T10:00:00+08:00"
+}

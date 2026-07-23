@@ -1,0 +1,15 @@
+{
+  "status": "PROCESSED",
+  "code": "OK",
+  "data": [
+    {
+      "task_id": "TASK-001",
+      "status": "CONFIRMED",
+      "planned_depart_at": "2026-07-24T08:30:00+08:00",
+      "planned_arrive_at": "2026-07-24T10:00:00+08:00"
+    }
+  ],
+  "errors": [],
+  "trace_id": "TRACE-PUBLIC-004",
+  "data_cutoff": "2026-07-23T10:00:00+08:00"
+}

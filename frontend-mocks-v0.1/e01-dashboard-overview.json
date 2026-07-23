@@ -1,0 +1,15 @@
+{
+  "status": "PROCESSED",
+  "code": "OK",
+  "data": {
+    "enterprise_count": 12,
+    "production_plan_count": 24,
+    "inventory_record_count": 86,
+    "preorder_count": 18,
+    "transport_task_count": 7,
+    "freezer_count": 3
+  },
+  "errors": [],
+  "trace_id": "TRACE-DASH-001",
+  "data_cutoff": "2026-07-23T10:00:00+08:00"
+}
