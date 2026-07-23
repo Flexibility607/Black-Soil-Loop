@@ -1,6 +1,6 @@
 # B01 网页后端
 
-当前实现是第一阶段基础切片：FastAPI 应用、统一响应、JWT 登录/刷新/`me`/登出、健康检查、元数据字典，以及认证表 Alembic 迁移。
+当前实现覆盖 B01 网页后端 v0.1：FastAPI 应用、统一响应、JWT 认证、18 类业务资源、XLSX 两阶段导入、E01 看板与计算接口、E02 公开只读接口，以及完整 Alembic 迁移链。
 
 ## 本机启动
 
@@ -8,7 +8,7 @@
 
 ```powershell
 Copy-Item backend/.env.example backend/.env
-# 编辑 backend/.env，至少填写真实 DATABASE_URL 和长度不少于 32 字节的 JWT_SECRET
+# 编辑 backend/.env，填写非 superuser 的 DATABASE_URL 和长度不少于 32 字节的随机 JWT_SECRET
 
 .\backend\.venv\Scripts\alembic.exe -c backend\alembic.ini upgrade head
 .\backend\.venv\Scripts\uvicorn.exe app.main:app --app-dir backend --reload --host 127.0.0.1 --port 8000
@@ -19,6 +19,8 @@ Copy-Item backend/.env.example backend/.env
 接口文档：`http://127.0.0.1:8000/docs`
 
 健康检查：`http://127.0.0.1:8000/healthz`
+
+`DATABASE_URL` 是必填配置；代码没有数据库连接回退值，缺少 `backend/.env` 时会直接启动失败。建议使用 `b01_app` 等非 superuser 账号，不要让后端使用 `postgres`。密码如果包含 `#`、`@`、`:` 等 URL 特殊字符，必须进行 percent-encoding；也可以使用 PostgreSQL 用户密码文件把密码从项目配置中移出。
 
 ## 测试与质量检查
 
@@ -61,7 +63,7 @@ Copy-Item backend/.env.example backend/.env
 - `POST /api/v1/procurements/aggregate-preview`、`/transport-matches/preview`、`/routes/estimate`、`/policies/match`
 - E02 公开只读：`GET /api/v1/public/dashboard/overview`、`/capacity`、`/preorders`、`/transport`
 
-18 类 B01 业务资源已实现基础 CRUD、企业/园区范围权限、来源事件幂等保护和 `object_version` 乐观锁；批量导入、看板、计算和 E02 公开接口也已接通。
+18 类 B01 业务资源已实现基础 CRUD、企业/园区范围权限、来源事件幂等保护和 `object_version` 乐观锁；批量导入、看板、计算和 E02 公开接口也已接通。真实 PostgreSQL 已使用非 superuser 完成 `0001`～`0007` 迁移并通过连接冒烟。
 
 导入接口接收已确认的多工作表 XLSX：先整本预检，再由 E01 以 `{"confirmed": true}` 确认；确认按固定依赖顺序在一个事务中写入。批次会保存规范化行，支持 `SKIPPED_STALE`、`DUPLICATE` 和 `IDEMPOTENCY_CONFLICT` 规则。
 
