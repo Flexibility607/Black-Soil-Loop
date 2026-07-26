@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
@@ -35,5 +36,15 @@ def get_current_user(
     user = db.scalar(select(User).where(User.user_id == payload["sub"], User.is_active.is_(True)))
     if user is None:
         raise authentication_error()
+    if payload.get("session_version") != user.session_version:
+        raise authentication_error()
+    now = datetime.now(timezone.utc)
+    if user.last_activity_at is not None:
+        last_activity = user.last_activity_at
+        if last_activity.tzinfo is None:
+            last_activity = last_activity.replace(tzinfo=timezone.utc)
+        if now - last_activity > timedelta(minutes=settings.idle_timeout_minutes):
+            raise authentication_error()
+    user.last_activity_at = now
+    db.commit()
     return user
-

@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="黑土闭环 B01 网页后端的 E01 管理台与 E02 公开大屏" />
+  <title>黑土闭环 · E01 / E02</title>
+  <link rel="stylesheet" href="styles.css?v=20260727-kpi-trend-hover-7" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark">土</span><span>黑土闭环</span></div>
+      <div class="scope-note">B01 网页端 · E01 / E02</div>
+      <nav aria-label="功能导航">
+        <button type="button" data-section="overview" class="active">总览</button>
+        <button type="button" data-section="enterprise">主数据与企业</button>
+        <button type="button" data-section="production">生产计划与订单</button>
+        <button type="button" data-section="inventory">库存、销售与冻库</button>
+        <button type="button" data-section="transport">运输任务与资源</button>
+        <button type="button" data-section="import">B01 批量导入</button>
+        <button type="button" data-section="analytics">B01 计算与建议</button>
+        <button type="button" data-section="public">E02 公开大屏</button>
+      </nav>
+      <div class="sidebar-foot">B02 小程序不在本维护范围</div>
+    </aside>
+
+    <main class="main-content">
+      <header class="page-header">
+        <div>
+          <p class="eyebrow">BLACK SOIL LOOP / WEB</p>
+          <h1 id="page-title">E01 管理总览</h1>
+          <p class="subtitle">以统一接口契约维护园区主数据、业务协同和公开展示。</p>
+        </div>
+        <div class="header-actions">
+          <label class="switch-row"><input id="toggle-mock" type="checkbox" checked /><span>Mock 数据</span></label>
+          <span id="auth-state" class="auth-state">Mock E01 会话</span>
+          <button id="open-login" class="button secondary" type="button">E01 登录</button>
+          <button id="logout-button" class="button secondary" type="button" hidden>退出</button>
+        </div>
+      </header>
+
+      <div id="global-message" class="message info" role="status">准备加载数据…</div>
+
+      <section id="auth-panel" class="auth-panel" hidden>
+        <div>
+          <p class="eyebrow">E01 AUTH</p>
+          <h2>登录管理端</h2>
+          <p class="muted">Mock 模式会读取示例会话；Live 模式使用后端 `/api/v1/auth/login`。</p>
+        </div>
+        <form id="login-form" class="login-form">
+          <label>用户名<input id="login-username" autocomplete="username" required /></label>
+          <label>密码<input id="login-password" type="password" autocomplete="current-password" required /></label>
+          <div class="form-actions"><button class="button primary" type="submit">登录</button><button id="close-login" class="button ghost" type="button">关闭</button></div>
+          <p id="login-message" class="form-message" role="alert"></p>
+        </form>
+      </section>
+
+      <section id="overview" class="page-section active">
+        <div class="section-heading"><div><p class="eyebrow">E01 DASHBOARD</p><h2>园区协同总览</h2></div><span class="data-cutoff">数据时刻：<strong id="data-cutoff">—</strong></span></div>
+        <div class="card-grid six">
+          <div class="metric-card detail-card" role="button" tabindex="0" aria-expanded="false" aria-controls="overview-detail-popover" data-detail="企业档案与企业负责人权限范围" data-target-section="enterprise" data-target-resource="enterprises"><span>企业</span><strong id="kpi-enterprise-count">—</strong><small>悬停提示，点击打开详情</small></div>
+          <div class="metric-card detail-card" role="button" tabindex="0" aria-expanded="false" aria-controls="overview-detail-popover" data-detail="生产计划与日产能超限标记" data-target-section="production" data-target-resource="production-plans"><span>生产计划</span><strong id="kpi-production-count">—</strong><small>悬停提示，点击打开详情</small></div>
+          <div class="metric-card detail-card" role="button" tabindex="0" aria-expanded="false" aria-controls="overview-detail-popover" data-detail="企业库存、库存阈值和未处理预警" data-target-section="inventory" data-target-resource="inventories"><span>库存记录</span><strong id="kpi-inventory-count">—</strong><small>悬停提示，点击打开详情</small></div>
+          <div class="metric-card detail-card" role="button" tabindex="0" aria-expanded="false" aria-controls="overview-detail-popover" data-detail="预计订单与已承担订单分开统计" data-target-section="production" data-target-resource="preorders"><span>预订单</span><strong id="kpi-preorder-count">—</strong><small>悬停提示，点击打开详情</small></div>
+          <div class="metric-card detail-card" role="button" tabindex="0" aria-expanded="false" aria-controls="overview-detail-popover" data-detail="运输任务、车型、车辆数量、费用与监控异常" data-target-section="transport" data-target-resource="transport-task-summaries"><span>运输任务</span><strong id="kpi-transport-count">—</strong><small>悬停提示，点击打开详情</small></div>
+          <div class="metric-card detail-card" role="button" tabindex="0" aria-expanded="false" aria-controls="overview-detail-popover" data-detail="冻货 kg 与冻库容量 m³ 分开统计" data-target-section="inventory" data-target-resource="freezer-records"><span>冻库记录</span><strong id="kpi-freezer-count">—</strong><small>悬停提示，点击打开详情</small></div>
+        </div>
+        <div id="overview-detail-popover" class="detail-popover" hidden></div>
+        <div id="overview-body" class="notice-card">加载中…</div>
+        <div class="table-card detail-table"><div class="table-title"><h3>企业订单与销售明细</h3><span>点击总览卡片后仍可进入业务列表</span></div><div id="overview-enterprise-details"></div></div>
+      </section>
+
+      <section id="enterprise" class="page-section">
+        <div class="section-heading"><div><p class="eyebrow">E01 MASTER DATA</p><h2>主数据与企业</h2></div><span id="enterprise-total" class="data-count">—</span></div>
+        <div class="toolbar"><label>资源<select id="enterprise-resource"></select></label><button id="enterprise-refresh" class="button secondary" type="button">刷新</button></div>
+        <div id="enterprise-table" class="table-card"></div>
+      </section>
+
+      <section id="production" class="page-section">
+        <div class="section-heading"><div><p class="eyebrow">B01 PRODUCTION</p><h2>生产计划与订单</h2></div><span id="production-total" class="data-count">—</span></div>
+        <div class="toolbar"><label>资源<select id="production-resource"></select></label><button id="production-refresh" class="button secondary" type="button">刷新</button></div>
+        <div id="production-table" class="table-card"></div>
+      </section>
+
+      <section id="inventory" class="page-section">
+        <div class="section-heading"><div><p class="eyebrow">B01 RECORDS</p><h2>库存、销售与冻库</h2></div><span id="inventory-total" class="data-count">—</span></div>
+        <div class="toolbar"><label>资源<select id="inventory-resource"></select></label><button id="inventory-refresh" class="button secondary" type="button">刷新</button></div>
+        <div id="inventory-table" class="table-card"></div>
+        <div id="inventory-alerts" class="notice-card operation-note">库存预警会在企业阈值审批通过后按当前库存自动计算。</div>
+      </section>
+
+      <section id="transport" class="page-section">
+        <div class="section-heading"><div><p class="eyebrow">B01 TRANSPORT</p><h2>运输任务与资源</h2></div><span id="transport-total" class="data-count">—</span></div>
+        <div class="toolbar"><label>资源<select id="transport-resource"></select></label><button id="transport-refresh" class="button secondary" type="button">刷新</button></div>
+        <div id="transport-table" class="table-card"></div>
+        <div id="transport-monitoring" class="notice-card operation-note">运输监控展示路径点、温湿度和异常状态；外部接入前可使用 DEMO_SIMULATION。</div>
+      </section>
+
+      <section id="import" class="page-section">
+        <div class="section-heading"><div><p class="eyebrow">B01 IMPORT</p><h2>整本 XLSX 导入</h2></div><span class="data-count">预检 → 确认 → 整本事务</span></div>
+        <div class="two-column">
+          <div class="notice-card"><h3>导入规则</h3><p>使用 `source_system + source_record_id` 去重，业务主键定位实体，`source_updated_at` 控制新旧覆盖。任一错误都不会写入半本数据。</p><a href="../backend/web-import-template-v0.1.xlsx">下载通用模板</a></div>
+          <form id="import-form" class="upload-card"><label for="import-file">选择 XLSX 文件</label><input id="import-file" type="file" accept=".xlsx" required /><button class="button primary" type="submit">开始预检</button></form>
+        </div>
+        <div class="result-card"><div class="result-heading"><h3>批次结果</h3><button id="confirm-import" class="button primary" type="button" hidden>确认整本写入</button></div><pre id="import-result">尚未上传文件。</pre></div>
+      </section>
+
+      <section id="analytics" class="page-section">
+        <div class="section-heading"><div><p class="eyebrow">B01 ANALYTICS</p><h2>计算与建议</h2></div><span class="data-count">不补造缺失输入</span></div>
+        <div class="toolbar analytics-toolbar"><label>计算<select id="calc-kind"><option value="material-demand">物料需求</option><option value="routes/estimate">路线估算</option><option value="transport-matches/preview">运输匹配预览</option><option value="procurements/aggregate-preview">集中采购预览</option></select></label><label id="route-fields" hidden>起点<input id="calc-origin" placeholder="园区或地址" /></label><label id="route-fields-destination" hidden>终点<input id="calc-destination" placeholder="园区或地址" /></label><button id="run-calculation" class="button primary" type="button">运行</button></div>
+        <div class="result-card"><h3>计算结果</h3><pre id="calculation-result">选择计算类型后运行。</pre></div>
+      </section>
+
+      <section id="public" class="page-section public-screen-stage" aria-label="E02 公开数字化大屏">
+        <div id="public-screen-canvas" class="public-screen-canvas">
+          <header class="screen-header">
+            <div class="screen-brand-block"><span class="screen-brand-mark">土</span><div><strong>黑土闭环</strong><span>BLACK SOIL LOOP</span></div></div>
+            <div class="screen-title-block"><div><span>长春市服务辐射 · 生产 · 采购 · 物流</span><h2>新安食品产业园产销协同大屏</h2></div><b>长春市 · DEMO</b></div>
+            <div class="screen-control-block"><div class="screen-clock"><strong id="public-clock">--:--:--</strong><span id="public-date">----</span></div><button id="public-refresh" class="screen-button" type="button">刷新数据</button><button id="public-fullscreen" class="screen-button" type="button">全屏</button><button id="public-exit" class="screen-button muted" type="button">返回 E01</button></div>
+          </header>
+
+          <div class="screen-kpi-grid">
+            <article class="screen-kpi" tabindex="0" title="已纳入长春市服务范围公开统计的企业数量"><span>服务企业</span><strong id="public-enterprise-count">—</strong><small>家 · 长春市脱敏汇总</small></article>
+            <article class="screen-kpi" tabindex="0" title="园区企业当前日产能占用率"><span>产能占用率</span><strong id="public-capacity-total">—</strong><small>按品类滚动采集</small></article>
+            <article class="screen-kpi" tabindex="0" title="未来 72 小时预计订单数量"><span>订单笔数</span><strong id="public-order-count">—</strong><small>预计与已承担汇总</small></article>
+            <article class="screen-kpi" tabindex="0" title="园区集中采购分析金额"><span>采购金额</span><strong id="public-procurement-total">—</strong><small>近 7 日 · CNY</small></article>
+            <article class="screen-kpi" tabindex="0" title="当前公开运输任务及异常路径"><span>运输任务</span><strong id="public-transport-total">—</strong><small id="public-transport-kpi-note">运行状态正常</small></article>
+            <article class="screen-kpi accent" tabindex="0" title="近 7 日已结算或已完成销售额"><span>近 7 日销售额</span><strong id="public-sales-total">—</strong><small>CNY · 已结算</small></article>
+          </div>
+
+          <div class="screen-body-grid">
+            <div class="screen-column screen-left-column">
+              <section class="screen-panel capacity-panel"><div class="screen-panel-title"><div><span>CAPACITY MONITOR</span><h3>园区企业产能监控</h3></div><em id="public-capacity-occupancy">—</em></div><div id="public-capacity" class="capacity-list"></div></section>
+              <section class="screen-panel enterprise-panel"><div class="screen-panel-title"><div><span>ENTERPRISE ORDERS</span><h3>企业订单明细</h3></div><button id="public-enterprise-toggle" class="screen-panel-action" type="button">轮播明细</button></div><div id="public-enterprise-orders" class="enterprise-order-list"></div></section>
+            </div>
+
+            <div class="screen-column screen-center-column">
+              <section class="screen-panel trend-panel"><div class="screen-panel-title"><div><span>SEVEN-DAY TREND</span><h3>订单与销售趋势</h3></div><em id="public-trend-range">近 7 日 · 分图</em></div><div class="trend-caption"><span>已承担订单量与销售额分别展示 · 悬停查看点位</span></div><div id="public-order-sales-chart" class="trend-chart-grid"></div></section>
+              <section class="screen-panel route-panel"><div class="screen-panel-title"><div><span>CHANGCHUN LOGISTICS MAP</span><h3>长春市服务辐射与物流路径</h3></div><em>2D 平面 · 演示路线</em></div><div class="map-legend"><span><i class="map-dot green"></i>正常</span><span><i class="map-dot red"></i>异常</span><small>中心：新安食品产业园</small><div class="map-zoom-controls" aria-label="地图缩放"><button id="public-map-zoom-out" type="button" title="缩小地图">−</button><span id="public-map-zoom-level">100%</span><button id="public-map-zoom-in" type="button" title="放大地图">＋</button><button id="public-map-zoom-reset" type="button" title="重置地图视角">重置</button></div></div><div class="screen-map-shell"><div id="public-route-map" class="screen-route-map"></div><div id="public-transport" class="transport-summary screen-map-summary"></div></div></section>
+            </div>
+
+            <div class="screen-column screen-right-column">
+              <section class="screen-panel procurement-panel"><div class="screen-panel-title"><div><span>CENTRAL PROCUREMENT</span><h3>集中采购结构</h3></div><em>历史批量导入汇总</em></div><div id="public-procurement-chart" class="procurement-chart"></div></section>
+              <section class="screen-panel policy-panel"><div class="screen-panel-title"><div><span>POLICY &amp; NEWS AGENT</span><h3>政策与园区动态</h3></div><em>点击查看来源</em></div><div class="news-tabs"><button type="button" class="active" data-feed="policies">政策词条</button><button type="button" data-feed="news">园区动态</button></div><div class="policy-window"><div id="public-policies" class="screen-policy-feed"></div><div id="public-news" class="screen-news-feed" hidden></div></div></section>
+              <section class="screen-panel assistant-panel"><div class="screen-panel-title"><div><span>RULE AGENT PREVIEW</span><h3>协同助手</h3></div><em>规则演示 · AI接口预留</em></div><div id="public-assistant" class="assistant-content"></div></section>
+            </div>
+          </div>
+
+          <footer class="screen-footer"><span><i></i><b id="public-sync-state">数据同步正常</b></span><span>数据时刻：<b id="public-data-cutoff">—</b></span><span>本页含脱敏 DEMO_EXAMPLE 与 DEMO_SIMULATION 数据，仅用于系统演示</span></footer>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="api.js?v=20260726-rich-mocks-2"></script>
+  <script src="scripts.js?v=20260727-kpi-trend-hover-7"></script>
+</body>
+</html>

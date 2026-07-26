@@ -11,6 +11,7 @@ class Preorder(SourceTrackedMixin, Base):
     __tablename__ = "preorders"
 
     preorder_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    enterprise_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     partner_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     store_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     product_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
@@ -73,5 +74,6 @@ class Policy(SourceTrackedMixin, Base):
     summary: Mapped[str] = mapped_column(Text, nullable=False)
     conditions: Mapped[str | None] = mapped_column(Text, nullable=True)
     source_url: Mapped[str] = mapped_column(String(1000), nullable=False)
+    source_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
     attachment_path: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     status: Mapped[str] = mapped_column(String(32), nullable=False)

@@ -6,7 +6,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.routes import analytics, auth, business_records, health, imports, master_data, meta, planning_records, production, transport
+from app.api.routes import analytics, auth, business_records, health, imports, master_data, meta, operations, planning_records, production, transport
 from app.core.config import Settings, get_settings
 from app.schemas.common import ErrorItem, response_envelope
 
@@ -73,6 +73,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(planning_records.router, prefix="/api/v1")
     app.include_router(imports.router, prefix="/api/v1")
     app.include_router(analytics.router, prefix="/api/v1")
+    app.include_router(operations.router, prefix="/api/v1")
     app.include_router(analytics.public_router, prefix="/api/v1")
     return app
 

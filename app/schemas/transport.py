@@ -21,6 +21,11 @@ class TransportTaskSummaryCreate(PatchModel):
     destination: str = Field(min_length=1, max_length=500)
     vehicle_id: str | None = Field(default=None, max_length=64)
     driver_id: str | None = Field(default=None, max_length=64)
+    vehicle_type_id: str | None = Field(default=None, max_length=64)
+    vehicle_type_name: str | None = Field(default=None, max_length=128)
+    required_vehicle_count: int | None = Field(default=None, ge=0)
+    estimated_fee: Decimal | None = Field(default=None, ge=0)
+    currency: Literal["CNY"] | None = None
     remark: str | None = None
 
 
@@ -37,6 +42,11 @@ class TransportTaskSummaryPatch(PatchModel):
     destination: str | None = Field(default=None, min_length=1, max_length=500)
     vehicle_id: str | None = Field(default=None, max_length=64)
     driver_id: str | None = Field(default=None, max_length=64)
+    vehicle_type_id: str | None = Field(default=None, max_length=64)
+    vehicle_type_name: str | None = Field(default=None, max_length=128)
+    required_vehicle_count: int | None = Field(default=None, ge=0)
+    estimated_fee: Decimal | None = Field(default=None, ge=0)
+    currency: Literal["CNY"] | None = None
     remark: str | None = None
 
 
@@ -45,11 +55,15 @@ class TransportResourceCreate(PatchModel):
     driver_name: str = Field(min_length=1, max_length=128)
     driver_phone: str | None = Field(default=None, max_length=64)
     vehicle_id: str = Field(min_length=1, max_length=64)
+    vehicle_type_id: str | None = Field(default=None, max_length=64)
+    vehicle_type_name: str | None = Field(default=None, max_length=128)
     plate_no: str | None = Field(default=None, max_length=64)
     mass_capacity_kg: Decimal | None = Field(default=None, ge=0)
     volume_capacity_m3: Decimal | None = Field(default=None, ge=0)
     temperature_min_celsius: Decimal | None = None
     temperature_max_celsius: Decimal | None = None
+    humidity_min_percent: Decimal | None = Field(default=None, ge=0, le=100)
+    humidity_max_percent: Decimal | None = Field(default=None, ge=0, le=100)
     on_duty: bool
     status: Literal["ACTIVE", "INACTIVE"]
     remark: str | None = None
@@ -59,10 +73,14 @@ class TransportResourcePatch(PatchModel):
     driver_name: str | None = Field(default=None, min_length=1, max_length=128)
     driver_phone: str | None = Field(default=None, max_length=64)
     plate_no: str | None = Field(default=None, max_length=64)
+    vehicle_type_id: str | None = Field(default=None, max_length=64)
+    vehicle_type_name: str | None = Field(default=None, max_length=128)
     mass_capacity_kg: Decimal | None = Field(default=None, ge=0)
     volume_capacity_m3: Decimal | None = Field(default=None, ge=0)
     temperature_min_celsius: Decimal | None = None
     temperature_max_celsius: Decimal | None = None
+    humidity_min_percent: Decimal | None = Field(default=None, ge=0, le=100)
+    humidity_max_percent: Decimal | None = Field(default=None, ge=0, le=100)
     on_duty: bool | None = None
     status: Literal["ACTIVE", "INACTIVE"] | None = None
     remark: str | None = None

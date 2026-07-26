@@ -3,18 +3,51 @@
   "code": "OK",
   "data": {
     "park_id": "PARK-001",
-    "enterprise_count": 12,
-    "capacity_remaining_total": 1800,
+    "enterprise_count": 18,
+    "capacity_remaining_total": 8730,
     "capacity_unit": "kg",
-    "preorder_quantity_total": 620,
+    "preorder_quantity_total": 4480,
     "preorder_unit": "kg",
     "transport_task_counts": {
       "DRAFT": 2,
-      "CONFIRMED": 5,
+      "CONFIRMED": 6,
       "CANCELLED": 0
-    }
+    },
+    "committed_order_quantity_total": 11180,
+    "sales_amount_total": 486320,
+    "enterprise_order_pie": [
+      {"enterprise_label": "企业-A01", "committed_order_quantity": 1850},
+      {"enterprise_label": "企业-A02", "committed_order_quantity": 1620},
+      {"enterprise_label": "企业-A03", "committed_order_quantity": 1480},
+      {"enterprise_label": "企业-A04", "committed_order_quantity": 1320},
+      {"enterprise_label": "企业-A05", "committed_order_quantity": 1170},
+      {"enterprise_label": "企业-A06", "committed_order_quantity": 980},
+      {"enterprise_label": "企业-A07", "committed_order_quantity": 840},
+      {"enterprise_label": "企业-A08", "committed_order_quantity": 760},
+      {"enterprise_label": "企业-A09", "committed_order_quantity": 640},
+      {"enterprise_label": "企业-A10", "committed_order_quantity": 520}
+    ],
+    "order_trend": [
+      {"date": "2026-07-19", "quantity": 1370},
+      {"date": "2026-07-20", "quantity": 1490},
+      {"date": "2026-07-21", "quantity": 1420},
+      {"date": "2026-07-22", "quantity": 1660},
+      {"date": "2026-07-23", "quantity": 1580},
+      {"date": "2026-07-24", "quantity": 1760},
+      {"date": "2026-07-25", "quantity": 1900}
+    ],
+    "sales_trend": [
+      {"date": "2026-07-19", "amount": 54200},
+      {"date": "2026-07-20", "amount": 62180},
+      {"date": "2026-07-21", "amount": 58960},
+      {"date": "2026-07-22", "amount": 71340},
+      {"date": "2026-07-23", "amount": 68420},
+      {"date": "2026-07-24", "amount": 79600},
+      {"date": "2026-07-25", "amount": 91620}
+    ],
+    "trend_days": 7
   },
   "errors": [],
-  "trace_id": "TRACE-PUBLIC-001",
-  "data_cutoff": "2026-07-23T10:00:00+08:00"
+  "trace_id": "TRACE-PUBLIC-DEMO-001",
+  "data_cutoff": "2026-07-25T16:30:00+08:00"
 }

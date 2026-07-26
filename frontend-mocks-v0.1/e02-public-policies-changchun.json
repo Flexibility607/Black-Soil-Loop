@@ -1,0 +1,89 @@
+{
+  "status": "PROCESSED",
+  "code": "OK",
+  "data": [
+    {
+      "policy_id": "POL-CC-001",
+      "category": "地方产业",
+      "title": "长春市食品产业集群协同发展观察",
+      "summary": "围绕食品加工、冷链物流和园区协同的演示政策词条。",
+      "source_url": "https://www.changchun.gov.cn/",
+      "source_type": "DEMO_SIMULATION",
+      "published_at": "2026-07-19T08:00:00+08:00",
+      "service_scope": "长春市"
+    },
+    {
+      "policy_id": "POL-CC-002",
+      "category": "冷链物流",
+      "title": "长春市冷链物流提质增效提示",
+      "summary": "关注冷链车辆、温控记录和城市配送时效的演示提示。",
+      "source_url": "https://jtysj.changchun.gov.cn/",
+      "source_type": "DEMO_SIMULATION",
+      "published_at": "2026-07-20T08:00:00+08:00",
+      "service_scope": "长春市"
+    },
+    {
+      "policy_id": "POL-CC-003",
+      "category": "区域发展",
+      "title": "东北全面振兴",
+      "summary": "东北全面振兴相关公开政策方向，演示数据不替代正式政策解读。",
+      "source_url": "https://www.gov.cn/",
+      "source_type": "DEMO_SIMULATION",
+      "published_at": "2026-07-21T08:00:00+08:00",
+      "service_scope": "长春市"
+    },
+    {
+      "policy_id": "POL-CC-004",
+      "category": "规划发展",
+      "title": "“十五五”规划观察",
+      "summary": "围绕现代农业、食品产业和数字化协同的演示词条。",
+      "source_url": "https://www.gov.cn/",
+      "source_type": "DEMO_SIMULATION",
+      "published_at": "2026-07-22T08:00:00+08:00",
+      "service_scope": "长春市"
+    },
+    {
+      "policy_id": "POL-CC-005",
+      "category": "食品安全",
+      "title": "食品安全法",
+      "summary": "食品生产经营主体应持续关注的基础法规主题。",
+      "source_url": "https://www.samr.gov.cn/",
+      "source_type": "DEMO_SIMULATION",
+      "published_at": "2026-07-23T08:00:00+08:00",
+      "service_scope": "长春市"
+    },
+    {
+      "policy_id": "POL-CC-006",
+      "category": "农业设施",
+      "title": "农产品产地冷藏保鲜",
+      "summary": "农产品产地冷藏保鲜与供应链协同主题演示。",
+      "source_url": "https://www.moa.gov.cn/",
+      "source_type": "DEMO_SIMULATION",
+      "published_at": "2026-07-24T08:00:00+08:00",
+      "service_scope": "长春市"
+    },
+    {
+      "policy_id": "POL-CC-007",
+      "category": "城市配送",
+      "title": "长春市城市配送协同",
+      "summary": "服务长春市商圈、团餐和社区配送的场景词条。",
+      "source_url": "https://www.changchun.gov.cn/",
+      "source_type": "DEMO_SIMULATION",
+      "published_at": "2026-07-25T08:00:00+08:00",
+      "service_scope": "长春市"
+    },
+    {
+      "policy_id": "POL-CC-008",
+      "category": "质量认证",
+      "title": "园区绿色食品认证",
+      "summary": "企业可关注绿色食品和质量追溯相关政策方向。",
+      "source_url": "https://www.greenfood.org.cn/",
+      "source_type": "DEMO_SIMULATION",
+      "published_at": "2026-07-26T08:00:00+08:00",
+      "service_scope": "长春市"
+    }
+  ],
+  "errors": [],
+  "trace_id": "TRACE-E02-CHANGCHUN-POLICIES-001",
+  "data_cutoff": "2026-07-26T10:00:00+08:00"
+}

@@ -141,10 +141,10 @@ def test_import_full_business_sheet_set(client: TestClient, demo_user: User) -> 
 
     assert response.status_code == 200
     assert response.json()["data"]["status"] == "READY_TO_CONFIRM"
-    assert response.json()["data"]["summary"]["row_count"] == 18
+    assert response.json()["data"]["summary"]["row_count"] == len(SPECS_BY_SHEET)
     batch_id = response.json()["data"]["batch_id"]
     confirmed = client.post(f"/api/v1/imports/{batch_id}/confirm", headers=headers(client), json={"confirmed": True})
 
     assert confirmed.status_code == 200
     results = confirmed.json()["data"]["summary"]["results"]
-    assert len(results) == 18
+    assert len(results) == len(SPECS_BY_SHEET)

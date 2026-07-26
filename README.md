@@ -1,32 +1,143 @@
-# Black-Soil-Loop：B01 网页后端
+# Black-Soil-Loop：B01 网页端
 
-当前实现覆盖 B01 网页后端 v0.1：FastAPI 应用、统一响应、JWT 认证、18 类业务资源、XLSX 两阶段导入、E01 看板与计算接口、E02 公开只读接口，以及完整 Alembic 迁移链。
+当前实现覆盖 B01 网页端 v0.1：FastAPI 后端、无构建依赖的 E01 管理台、E02 公开大屏、统一响应、JWT 认证、18 类业务资源、XLSX 两阶段导入、B01 规则计算，以及完整 Alembic 迁移链。本仓库不包含 B02 小程序。
+
+## 仓库结构
+
+- `app/`、`alembic/`、`tests/`：FastAPI 后端、数据库迁移和回归测试。
+- `frontdesign-v1/`：E01 管理台与 E02 16:9 演示大屏，无 Node 构建依赖。
+- `frontend-mocks-v0.1/`：前端 Mock 数据，含丰富的 E02 演示数据，并明确标记为模拟数据。
+- `start-dev.ps1`：Windows 一键启动后端和静态前端。
+- `manage-accounts.ps1`：仅供本机可信运维人员使用的 E01 账户维护入口。
 
 ## 本机启动
 
-在项目根目录执行：
+在本仓库根目录执行：
 
 ```powershell
-Copy-Item backend/.env.example backend/.env
-# 编辑 backend/.env，填写非 superuser 的 DATABASE_URL 和长度不少于 32 字节的随机 JWT_SECRET
+Copy-Item .env.example .env
+# 编辑 .env，填写非 superuser 的 DATABASE_URL 和长度不少于 32 字节的随机 JWT_SECRET
 
-.\backend\.venv\Scripts\alembic.exe -c backend\alembic.ini upgrade head
-.\backend\.venv\Scripts\uvicorn.exe app.main:app --app-dir backend --reload --host 127.0.0.1 --port 8000
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+
+.\.venv\Scripts\alembic.exe -c alembic.ini upgrade head
+.\.venv\Scripts\uvicorn.exe app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 如果 PostgreSQL 中还没有 `challenge_cup` 数据库，需要先用 PostgreSQL 自带工具创建数据库；本项目不会自动创建或删除数据库。
+
+### 一键启动演示
+
+完成 `.env`、虚拟环境和数据库迁移后，在仓库根目录执行：
+
+```powershell
+.\start-dev.ps1
+```
+
+脚本会启动后端 `http://127.0.0.1:8000/healthz` 和前端 `http://localhost:8080/frontdesign-v1/`，并自动打开浏览器。使用 `-NoBrowser` 可跳过自动打开；按 `Ctrl+C` 会停止两个服务。默认前端使用 Mock 数据，关闭页面右上角的 Mock 开关后才请求真实后端。
 
 接口文档：`http://127.0.0.1:8000/docs`
 
 健康检查：`http://127.0.0.1:8000/healthz`
 
-`DATABASE_URL` 是必填配置；代码没有数据库连接回退值，缺少 `backend/.env` 时会直接启动失败。建议使用 `b01_app` 等非 superuser 账号，不要让后端使用 `postgres`。密码如果包含 `#`、`@`、`:` 等 URL 特殊字符，必须进行 percent-encoding；也可以使用 PostgreSQL 用户密码文件把密码从项目配置中移出。
+`DATABASE_URL` 是必填配置；代码没有数据库连接回退值，缺少 `.env` 时会直接启动失败。建议使用 `b01_app` 等非 superuser 账号，不要让后端使用 `postgres`。密码如果包含 `#`、`@`、`:` 等 URL 特殊字符，必须进行 percent-encoding；也可以使用 PostgreSQL 用户密码文件把密码从项目配置中移出。
+
+## E01 账户创建与维护
+
+E01 网页账号存放在业务数据库的 `users` 表中，与 PostgreSQL 连接账号是两套独立身份：
+
+- `b01_app` 一类账号只供后端连接 PostgreSQL，不能登录 E01。
+- `park_admin` 是园区管理员，可使用园区范围的 E01 功能。
+- `enterprise_admin` 是企业管理员，只能访问其 `enterprise_ids` 范围内的数据。
+- 仓库不内置默认网页账号或默认密码；克隆仓库、运行迁移都不会自动创建管理员。
+
+账户维护只开放为本机命令，不提供公开 HTTP 创建账号接口。密码通过终端隐藏输入，后端仅保存 `argon2id` 哈希；命令不会打印密码或密码哈希。
+
+### 创建首个园区管理员
+
+先确认 `.env` 已连接到目标数据库，并迁移到最新版本：
+
+```powershell
+.\.venv\Scripts\alembic.exe -c alembic.ini upgrade head
+```
+
+然后在仓库根目录执行以下命令。`PARK-001` 是演示园区 ID；接入真实数据时应替换为实际 `park_id`。
+
+```powershell
+.\manage-accounts.ps1 create --username park_admin --role park_admin --park-id PARK-001
+```
+
+终端会依次提示输入和确认密码，输入过程不会回显。密码要求：
+
+- 12～256 位；推荐使用长口令。
+- 不能与用户名完全相同。
+- 不要把密码写入 `.env`、README、脚本参数、聊天记录或 Git。
+
+创建完成后检查账号列表：
+
+```powershell
+.\manage-accounts.ps1 list
+```
+
+启动项目后，在 E01 页面关闭右上角“Mock 数据”，点击“E01 登录”，输入刚创建的网页账号和密码。若 Mock 开关仍开启，页面使用的是示例会话，不会验证真实数据库账号。
+
+如果 PowerShell 执行策略阻止脚本，可直接调用相同的 Python 命令：
+
+```powershell
+.\.venv\Scripts\python.exe -m app.cli.accounts create --username park_admin --role park_admin --park-id PARK-001
+```
+
+### 创建其他管理员
+
+允许创建多个园区管理员；每个账号分别维护，且每个账号同一时间只保留最后一次登录会话。
+
+```powershell
+.\manage-accounts.ps1 create --username park_reviewer --role park_admin --park-id PARK-001
+```
+
+创建企业管理员时至少指定一个企业 ID；重复 `--enterprise-id` 可配置多个企业范围：
+
+```powershell
+.\manage-accounts.ps1 create --username ent001_admin --role enterprise_admin --park-id PARK-001 --enterprise-id ENT-001
+.\manage-accounts.ps1 create --username joint_admin --role enterprise_admin --park-id PARK-001 --enterprise-id ENT-001 --enterprise-id ENT-002
+```
+
+### 日常维护命令
+
+所有命令都在仓库根目录执行：
+
+```powershell
+# 查看用户名、角色、启停状态、园区、企业范围和最后登录时间
+.\manage-accounts.ps1 list
+
+# 重置密码；新密码仍通过隐藏提示输入，既有登录立即失效
+.\manage-accounts.ps1 reset-password park_admin
+
+# 停用或重新启用账号；停用会立即注销既有登录
+.\manage-accounts.ps1 deactivate park_admin
+.\manage-accounts.ps1 activate park_admin
+
+# 完整替换角色和数据范围；修改后既有登录立即失效
+.\manage-accounts.ps1 set-scope ent001_admin --role enterprise_admin --park-id PARK-001 --enterprise-id ENT-003
+```
+
+演示版不提供物理删除账号的命令。离职、交接或疑似泄露时应先 `deactivate`，确认无误后保留记录；需要恢复时再 `activate`。如果误停用了唯一园区管理员，仍可在服务器本机运行 `activate` 恢复，不需要 PostgreSQL superuser。
+
+### 会话与安全规则
+
+- Access Token 有效期 120 分钟，Refresh Token 有效期 7 天；连续 30 分钟无操作后必须重新登录。
+- 同一账号只允许一个登录会话：再次登录会使此前设备的 Access Token 和 Refresh Token 同时失效。
+- 重置密码、停用账号或修改角色/数据范围都会立即使既有令牌失效。
+- 可以创建多个管理员账号，但不要多人共用同一用户名；应为每位维护人员单独建号。
+- `list` 不显示用户 ID、密码或哈希。正式部署前应备份数据库，并轮换 `.env` 中的数据库密码和 `JWT_SECRET`。
+- 当前账户维护没有网页管理界面，也没有完整的维护操作审计表；演示阶段由可信运维人员在服务器本机执行命令。
 
 ## 测试与质量检查
 
 ```powershell
-.\backend\.venv\Scripts\ruff.exe check backend\app backend\tests
-.\backend\.venv\Scripts\python.exe -m pytest backend\tests -q
+.\.venv\Scripts\ruff.exe check app tests
+.\.venv\Scripts\python.exe -m pytest tests -q
 ```
 
 测试使用 SQLite 隔离库，不会修改本机 PostgreSQL。
@@ -61,10 +172,11 @@ Copy-Item backend/.env.example backend/.env
 - `GET /api/v1/dashboard/overview`、`/capacity`、`/inventory`、`/sales`、`/preorders`、`/transport`、`/freezers`、`/production-progress`
 - `GET /api/v1/analytics/material-demand`、`/freezers/summary`、`/production/progress`
 - `POST /api/v1/procurements/aggregate-preview`、`/transport-matches/preview`、`/routes/estimate`、`/policies/match`
-- E02 公开只读：`GET /api/v1/public/dashboard/overview`、`/capacity`、`/preorders`、`/transport`
+- 领导反馈业务：`GET/POST/PATCH /api/v1/enterprise-capacities`、`/inventory-threshold-requests`、`/inventory-alerts`、`/procurement-history`；安全库存另有 `/approve`、`/reject`、`/acknowledge`；运输遥测为 `GET/POST /api/v1/transport-telemetry`；计算历史为 `GET /api/v1/calculation-runs`；预计订单转换为 `POST /api/v1/preorders/{preorder_id}/convert`
+- E02 公开只读：`GET /api/v1/public/dashboard/overview`、`/capacity`、`/preorders`、`/transport`、`/policies`
 
-18 类 B01 业务资源已实现基础 CRUD、企业/园区范围权限、来源事件幂等保护和 `object_version` 乐观锁；批量导入、看板、计算和 E02 公开接口也已接通。真实 PostgreSQL 已使用非 superuser 完成 `0001`～`0007` 迁移并通过连接冒烟。
+18 类 B01 业务资源已实现基础 CRUD、企业/园区范围权限、来源事件幂等保护和 `object_version` 乐观锁；本轮新增企业日产能、安全库存审批/预警、采购历史、运输遥测、计算快照和单设备会话控制。真实 PostgreSQL 需使用非 superuser 完成 `0001`～`0009` 迁移。
 
-导入接口接收已确认的多工作表 XLSX：先整本预检，再由 E01 以 `{"confirmed": true}` 确认；确认按固定依赖顺序在一个事务中写入。批次会保存规范化行，支持 `SKIPPED_STALE`、`DUPLICATE` 和 `IDEMPOTENCY_CONFLICT` 规则。
+导入接口接收已确认的多工作表 XLSX：先整本预检，再由 E01 以 `{"confirmed": true}` 确认；确认按固定依赖顺序在一个事务中写入。当前模板含 19 个业务工作表，新增“采购历史”，支持 `SKIPPED_STALE`、`DUPLICATE` 和 `IDEMPOTENCY_CONFLICT` 规则。集中采购默认分析近 90 天有效历史记录，并按供应商计算加权平均单价。
 
-看板和计算接口只使用当前数据库真实记录；缺少输入返回 `DATA_MISSING`，未配置地图服务的路线估算返回 `RULE_MISSING`，不会生成虚假的路线或预测精度。E02 公开接口不需要 JWT，只返回脱敏汇总；由于预订单当前没有园区归属字段，公开预订单列表暂返回空集，避免跨园区混合暴露。
+看板和计算接口只使用当前数据库真实记录；缺少输入返回 `DATA_MISSING`，未配置地图服务的路线估算返回 `RULE_MISSING`，不会生成虚假的路线或预测精度。B01 规则计算会保存独立快照和规则版本。E02 公开接口不需要 JWT，只返回脱敏汇总、趋势、政策来源链接和运输路径异常点，不返回司机电话、车牌等敏感字段。会话 30 分钟无操作后需重新登录，刷新令牌不能绕过超时；同一账号再次登录会立即替换旧会话。

@@ -1,0 +1,75 @@
+{
+  "status": "PROCESSED",
+  "code": "OK",
+  "data": [
+    {
+      "news_id": "NEWS-CC-001",
+      "title": "新安食品产业园完成长春市夏季订单协同排产",
+      "published_label": "今日 10:20",
+      "summary": "园区已将 12 家企业的订单、产能和运输任务汇总到同一演示看板。",
+      "category": "园区动态",
+      "tone": "blue",
+      "source_type": "DEMO_SIMULATION",
+      "source_url": "#",
+      "service_scope": "长春市"
+    },
+    {
+      "news_id": "NEWS-CC-002",
+      "title": "长春新区团餐集配中心启动冷链联运演示",
+      "published_label": "今日 09:45",
+      "summary": "两条冷藏线路完成车辆匹配，预计覆盖新区与宽城区重点需求。",
+      "category": "物流动态",
+      "tone": "green",
+      "source_type": "DEMO_SIMULATION",
+      "source_url": "#",
+      "service_scope": "长春市"
+    },
+    {
+      "news_id": "NEWS-CC-003",
+      "title": "净月区社区生鲜订单进入补料提醒",
+      "published_label": "昨日 16:30",
+      "summary": "净菜企业 current_qty 低于已审批阈值，已反馈生产计划。",
+      "category": "库存预警",
+      "tone": "red",
+      "source_type": "DEMO_SIMULATION",
+      "source_url": "#",
+      "service_scope": "长春市"
+    },
+    {
+      "news_id": "NEWS-CC-004",
+      "title": "长春市农产品加工企业采购周报发布",
+      "published_label": "昨日 14:10",
+      "summary": "玉米、大豆、包装材料成为本周集中采购分析的主要品类。",
+      "category": "采购分析",
+      "tone": "amber",
+      "source_type": "DEMO_SIMULATION",
+      "source_url": "#",
+      "service_scope": "长春市"
+    },
+    {
+      "news_id": "NEWS-CC-005",
+      "title": "九台区与德惠市配送节点纳入服务范围",
+      "published_label": "07-24 11:00",
+      "summary": "新增节点用于模拟长春市周边订单的车辆调度和时效展示。",
+      "category": "服务范围",
+      "tone": "blue",
+      "source_type": "DEMO_SIMULATION",
+      "source_url": "#",
+      "service_scope": "长春市"
+    },
+    {
+      "news_id": "NEWS-CC-006",
+      "title": "企业负责人可查看本企业门店和订单进度",
+      "published_label": "07-23 15:20",
+      "summary": "企业侧数据按企业权限隔离；园区公共大屏只展示汇总与脱敏字段。",
+      "category": "系统公告",
+      "tone": "green",
+      "source_type": "DEMO_SIMULATION",
+      "source_url": "#",
+      "service_scope": "长春市"
+    }
+  ],
+  "errors": [],
+  "trace_id": "TRACE-E02-CHANGCHUN-NEWS-001",
+  "data_cutoff": "2026-07-26T10:00:00+08:00"
+}

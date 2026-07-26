@@ -28,6 +28,7 @@ def create_token(user: User, token_type: str, expires_delta: timedelta, settings
         "role": user.role,
         "park_id": user.park_id,
         "enterprise_ids": user.enterprise_ids or [],
+        "session_version": user.session_version,
         "type": token_type,
         "jti": jti,
         "iat": now,
@@ -44,4 +45,3 @@ def decode_token(token: str, expected_type: str, settings: Settings) -> dict:
     if payload.get("type") != expected_type or not payload.get("sub") or not payload.get("jti"):
         raise ValueError("token type is invalid")
     return payload
-

@@ -78,6 +78,7 @@ class PartnerPatch(PatchModel):
 
 class StoreCreate(PatchModel):
     store_id: str = Field(min_length=1, max_length=64)
+    enterprise_id: str | None = Field(default=None, max_length=64)
     partner_id: str = Field(min_length=1, max_length=64)
     store_name: str = Field(min_length=1, max_length=255)
     store_contact_name: str = Field(min_length=1, max_length=128)
@@ -90,6 +91,7 @@ class StoreCreate(PatchModel):
 
 
 class StorePatch(PatchModel):
+    enterprise_id: str | None = Field(default=None, max_length=64)
     partner_id: str | None = None
     store_name: str | None = Field(default=None, min_length=1, max_length=255)
     store_contact_name: str | None = Field(default=None, min_length=1, max_length=128)

@@ -9,6 +9,7 @@ from app.schemas.master_data import PatchModel
 
 class PreorderCreate(PatchModel):
     preorder_id: str = Field(min_length=1, max_length=64)
+    enterprise_id: str | None = Field(default=None, max_length=64)
     partner_id: str = Field(min_length=1, max_length=64)
     store_id: str = Field(min_length=1, max_length=64)
     product_id: str = Field(min_length=1, max_length=64)
@@ -25,6 +26,7 @@ class PreorderCreate(PatchModel):
 
 
 class PreorderPatch(PatchModel):
+    enterprise_id: str | None = Field(default=None, max_length=64)
     partner_id: str | None = Field(default=None, min_length=1, max_length=64)
     store_id: str | None = Field(default=None, min_length=1, max_length=64)
     product_id: str | None = Field(default=None, min_length=1, max_length=64)
@@ -111,6 +113,7 @@ class PolicyCreate(PatchModel):
     summary: str = Field(min_length=1)
     conditions: str | None = None
     source_url: str = Field(min_length=1, max_length=1000)
+    source_type: Literal["OFFICIAL", "DEMO_SIMULATION"] | None = "OFFICIAL"
     attachment_path: str | None = Field(default=None, max_length=1000)
     status: Literal["DRAFT", "ACTIVE", "EXPIRED", "INACTIVE"]
     remark: str | None = None
@@ -128,6 +131,7 @@ class PolicyPatch(PatchModel):
     summary: str | None = Field(default=None, min_length=1)
     conditions: str | None = None
     source_url: str | None = Field(default=None, min_length=1, max_length=1000)
+    source_type: Literal["OFFICIAL", "DEMO_SIMULATION"] | None = None
     attachment_path: str | None = Field(default=None, max_length=1000)
     status: Literal["DRAFT", "ACTIVE", "EXPIRED", "INACTIVE"] | None = None
     remark: str | None = None

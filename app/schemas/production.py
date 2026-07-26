@@ -46,6 +46,7 @@ class ProductionPlanPatch(PatchModel):
 
 class ProductionOrderCreate(PatchModel):
     production_order_id: str = Field(min_length=1, max_length=64)
+    preorder_id: str | None = Field(default=None, max_length=64)
     plan_id: str | None = Field(default=None, max_length=64)
     enterprise_id: str = Field(min_length=1, max_length=64)
     product_id: str = Field(min_length=1, max_length=64)
@@ -62,6 +63,7 @@ class ProductionOrderCreate(PatchModel):
 
 
 class ProductionOrderPatch(PatchModel):
+    preorder_id: str | None = Field(default=None, max_length=64)
     plan_id: str | None = Field(default=None, max_length=64)
     enterprise_id: str | None = Field(default=None, min_length=1, max_length=64)
     product_id: str | None = Field(default=None, min_length=1, max_length=64)

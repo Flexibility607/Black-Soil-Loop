@@ -1,0 +1,238 @@
+{
+  "status": "PROCESSED",
+  "code": "OK",
+  "data": {
+    "source_system": "DEMO_SIMULATION",
+    "park_id": "PARK-001",
+    "park_name": "新安食品产业园",
+    "service_scope": "长春市及周边",
+    "enterprise_count": 12,
+    "capacity_remaining_total": 3260,
+    "capacity_unit": "kg",
+    "capacity_occupancy_percent": 78.6,
+    "order_count_total": 128,
+    "preorder_quantity_total": 5280,
+    "preorder_unit": "kg",
+    "committed_order_quantity_total": 11180,
+    "sales_amount_total": 486320,
+    "procurement_amount_total": 285630,
+    "warning_count": 7,
+    "transport_task_counts": {
+      "DRAFT": 2,
+      "CONFIRMED": 6,
+      "CANCELLED": 0
+    },
+    "enterprise_order_pie": [
+      {
+        "enterprise_label": "长春北境鲜谷食品",
+        "committed_order_quantity": 1850
+      },
+      {
+        "enterprise_label": "长春松江河水产",
+        "committed_order_quantity": 1620
+      },
+      {
+        "enterprise_label": "长春长白山菌业",
+        "committed_order_quantity": 1430
+      },
+      {
+        "enterprise_label": "长春辽河农产",
+        "committed_order_quantity": 1320
+      },
+      {
+        "enterprise_label": "长春北辰肉制品",
+        "committed_order_quantity": 1240
+      },
+      {
+        "enterprise_label": "长春黑土乳品",
+        "committed_order_quantity": 1160
+      },
+      {
+        "enterprise_label": "长春吉沃果蔬",
+        "committed_order_quantity": 980
+      },
+      {
+        "enterprise_label": "长春禾香粮油",
+        "committed_order_quantity": 760
+      },
+      {
+        "enterprise_label": "长春鲜到家食品",
+        "committed_order_quantity": 520
+      },
+      {
+        "enterprise_label": "长春吉品调味",
+        "committed_order_quantity": 300
+      }
+    ],
+    "enterprise_order_details": [
+      {
+        "enterprise_label": "长春北境鲜谷食品",
+        "order_count": 22,
+        "committed_order_quantity": 1850,
+        "sales_amount": 84600,
+        "completion_percent": 92,
+        "status": "按计划",
+        "category": "速冻玉米"
+      },
+      {
+        "enterprise_label": "长春松江河水产",
+        "order_count": 18,
+        "committed_order_quantity": 1620,
+        "sales_amount": 73800,
+        "completion_percent": 86,
+        "status": "运输中",
+        "category": "水产预制菜"
+      },
+      {
+        "enterprise_label": "长春长白山菌业",
+        "order_count": 16,
+        "committed_order_quantity": 1430,
+        "sales_amount": 64200,
+        "completion_percent": 81,
+        "status": "产能紧张",
+        "category": "食用菌"
+      },
+      {
+        "enterprise_label": "长春辽河农产",
+        "order_count": 15,
+        "committed_order_quantity": 1320,
+        "sales_amount": 58600,
+        "completion_percent": 88,
+        "status": "按计划",
+        "category": "杂粮主食"
+      },
+      {
+        "enterprise_label": "长春北辰肉制品",
+        "order_count": 14,
+        "committed_order_quantity": 1240,
+        "sales_amount": 55200,
+        "completion_percent": 76,
+        "status": "补料中",
+        "category": "冷鲜肉制品"
+      },
+      {
+        "enterprise_label": "长春黑土乳品",
+        "order_count": 13,
+        "committed_order_quantity": 1160,
+        "sales_amount": 49800,
+        "completion_percent": 90,
+        "status": "按计划",
+        "category": "乳制品"
+      },
+      {
+        "enterprise_label": "长春吉沃果蔬",
+        "order_count": 11,
+        "committed_order_quantity": 980,
+        "sales_amount": 42100,
+        "completion_percent": 73,
+        "status": "库存预警",
+        "category": "净菜"
+      },
+      {
+        "enterprise_label": "长春禾香粮油",
+        "order_count": 9,
+        "committed_order_quantity": 760,
+        "sales_amount": 33800,
+        "completion_percent": 84,
+        "status": "按计划",
+        "category": "粮油"
+      }
+    ],
+    "procurement_pie": [
+      {
+        "label": "玉米及玉米粉",
+        "value": 98200,
+        "share_percent": 34.4,
+        "unit": "CNY"
+      },
+      {
+        "label": "大豆及豆制品原料",
+        "value": 62100,
+        "share_percent": 21.7,
+        "unit": "CNY"
+      },
+      {
+        "label": "水产与肉制品原料",
+        "value": 50780,
+        "share_percent": 17.8,
+        "unit": "CNY"
+      },
+      {
+        "label": "蔬菜及食用菌",
+        "value": 42750,
+        "share_percent": 15,
+        "unit": "CNY"
+      },
+      {
+        "label": "包装与辅料",
+        "value": 31800,
+        "share_percent": 11.1,
+        "unit": "CNY"
+      }
+    ],
+    "order_trend": [
+      {
+        "date": "2026-07-20",
+        "quantity": 1290
+      },
+      {
+        "date": "2026-07-21",
+        "quantity": 1430
+      },
+      {
+        "date": "2026-07-22",
+        "quantity": 1510
+      },
+      {
+        "date": "2026-07-23",
+        "quantity": 1680
+      },
+      {
+        "date": "2026-07-24",
+        "quantity": 1570
+      },
+      {
+        "date": "2026-07-25",
+        "quantity": 1840
+      },
+      {
+        "date": "2026-07-26",
+        "quantity": 1860
+      }
+    ],
+    "sales_trend": [
+      {
+        "date": "2026-07-20",
+        "amount": 51200
+      },
+      {
+        "date": "2026-07-21",
+        "amount": 58600
+      },
+      {
+        "date": "2026-07-22",
+        "amount": 62100
+      },
+      {
+        "date": "2026-07-23",
+        "amount": 70800
+      },
+      {
+        "date": "2026-07-24",
+        "amount": 68400
+      },
+      {
+        "date": "2026-07-25",
+        "amount": 79420
+      },
+      {
+        "date": "2026-07-26",
+        "amount": 95800
+      }
+    ],
+    "trend_days": 7
+  },
+  "errors": [],
+  "trace_id": "TRACE-E02-CHANGCHUN-OVERVIEW-001",
+  "data_cutoff": "2026-07-26T10:00:00+08:00"
+}

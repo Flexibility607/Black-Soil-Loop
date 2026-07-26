@@ -63,6 +63,7 @@ class Store(SourceTrackedMixin, Base):
     __tablename__ = "stores"
 
     store_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    enterprise_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     partner_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     store_name: Mapped[str] = mapped_column(String(255), nullable=False)
     store_contact_name: Mapped[str] = mapped_column(String(128), nullable=False)

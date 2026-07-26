@@ -16,6 +16,8 @@ from app.api.routes.master_data import (
 )
 from app.db.session import get_db
 from app.models.planning_records import Policy, Preorder, ProcurementDemand, SupplierQuote
+from app.models.master_data import Store
+from app.models.production import ProductionOrder
 from app.models.user import User
 from app.schemas.common import EventRequest, ResponseEnvelope, response_envelope
 from app.schemas.planning_records import (
@@ -28,6 +30,7 @@ from app.schemas.planning_records import (
     SupplierQuoteCreate,
     SupplierQuotePatch,
 )
+from app.schemas.production import ProductionOrderCreate
 
 router = APIRouter(tags=["E01 Resources"])
 
@@ -97,7 +100,6 @@ def list_preorders(
     start_at: datetime | None = None,
     end_at: datetime | None = None,
 ) -> dict:
-    del enterprise_id
     data = list_records(
         db,
         Preorder,
@@ -106,10 +108,10 @@ def list_preorders(
         page_size,
         keyword,
         status,
-        None,
+        enterprise_id,
         start_at,
         end_at,
-        scope_field=None,
+        scope_field=Preorder.enterprise_id,
         keyword_fields=(Preorder.preorder_id, Preorder.partner_id, Preorder.store_id, Preorder.product_id, Preorder.product_name),
         status_field=Preorder.status,
         time_field=Preorder.required_at,
@@ -124,12 +126,24 @@ def create_preorder(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
 ) -> dict:
-    ensure_park_admin(user)
     ensure_event(event, "preorder")
+    payload = event.payload.model_dump(exclude={"remark"})
+    store = db.get(Store, event.payload.store_id)
+    if store is None and user.role == "enterprise_admin":
+        raise HTTPException(status_code=400, detail={"code": "VALIDATION_ERROR", "message": "store_id 不存在，无法绑定企业"})
+    enterprise_id = payload.get("enterprise_id") or (store.enterprise_id if store is not None else None)
+    if enterprise_id is None:
+        if user.role == "enterprise_admin":
+            raise HTTPException(status_code=400, detail={"code": "VALIDATION_ERROR", "message": "预订单对应门店尚未绑定 enterprise_id"})
+    else:
+        ensure_enterprise_access(user, enterprise_id)
+        if store.enterprise_id is not None and store.enterprise_id != enterprise_id:
+            raise HTTPException(status_code=400, detail={"code": "VALIDATION_ERROR", "message": "门店与预订单企业不一致"})
+        payload["enterprise_id"] = enterprise_id
     ensure_event_id_available(db, Preorder, event.event_id)
     if db.get(Preorder, event.payload.preorder_id) is not None:
         raise HTTPException(status_code=409, detail={"code": "IDEMPOTENCY_CONFLICT", "message": "preorder_id 已存在"})
-    record = Preorder(**event.payload.model_dump(exclude={"remark"}), remark=event.payload.remark)
+    record = Preorder(**payload, remark=event.payload.remark)
     write_metadata(record, event.event_id)
     db.add(record)
     db.commit()
@@ -143,10 +157,13 @@ def get_preorder(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
 ) -> dict:
-    ensure_park_admin(user)
     record = db.get(Preorder, preorder_id)
     if record is None:
         raise HTTPException(status_code=404, detail={"code": "NOT_FOUND", "message": "预订单不存在"})
+    if record.enterprise_id is None:
+        ensure_park_admin(user)
+    else:
+        ensure_enterprise_access(user, record.enterprise_id)
     return response_envelope(record_data(record), trace_id=request.state.trace_id)
 
 
@@ -158,20 +175,64 @@ def update_preorder(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
 ) -> dict:
-    ensure_park_admin(user)
     ensure_event(event, "preorder")
     record = db.get(Preorder, preorder_id)
     if record is None:
         raise HTTPException(status_code=404, detail={"code": "NOT_FOUND", "message": "预订单不存在"})
+    if record.enterprise_id is None:
+        ensure_park_admin(user)
+    else:
+        ensure_enterprise_access(user, record.enterprise_id)
     changes = event.payload.model_dump(exclude_unset=True)
     ensure_patch(changes, ("partner_id", "store_id", "product_id", "product_name", "quantity", "unit", "required_at", "source_type", "status", "created_at", "updated_at"))
     ensure_version(record, event.object_version)
+    target_enterprise_id = changes.get("enterprise_id", record.enterprise_id)
+    if target_enterprise_id is not None:
+        ensure_enterprise_access(user, target_enterprise_id)
     for key, value in changes.items():
         setattr(record, key, value)
     record.object_version += 1
     write_metadata(record, event.event_id)
     db.commit()
     return response_envelope(record_data(record), trace_id=request.state.trace_id)
+
+
+@router.post("/preorders/{preorder_id}/convert", response_model=ResponseEnvelope[dict], status_code=201)
+def convert_preorder(
+    request: Request,
+    preorder_id: str,
+    event: EventRequest[ProductionOrderCreate],
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> dict:
+    ensure_event(event, "production_order")
+    preorder = db.get(Preorder, preorder_id)
+    if preorder is None:
+        raise HTTPException(status_code=404, detail={"code": "NOT_FOUND", "message": "预订单不存在"})
+    if preorder.enterprise_id is None:
+        ensure_park_admin(user)
+    else:
+        ensure_enterprise_access(user, preorder.enterprise_id)
+    if preorder.status != "CONFIRMED":
+        raise HTTPException(status_code=409, detail={"code": "STATE_CONFLICT", "message": "只有 CONFIRMED 预计订单可以转换"})
+    if db.scalar(select(ProductionOrder).where(ProductionOrder.preorder_id == preorder_id)) is not None:
+        raise HTTPException(status_code=409, detail={"code": "STATE_CONFLICT", "message": "该预计订单已经转换"})
+    payload = event.payload.model_dump(exclude={"remark"})
+    payload["preorder_id"] = preorder_id
+    if preorder.enterprise_id is not None and payload["enterprise_id"] != preorder.enterprise_id:
+        raise HTTPException(status_code=400, detail={"code": "VALIDATION_ERROR", "message": "转换订单企业必须与预计订单一致"})
+    if payload["product_id"] != preorder.product_id:
+        raise HTTPException(status_code=400, detail={"code": "VALIDATION_ERROR", "message": "转换订单商品必须与预计订单一致"})
+    ensure_event_id_available(db, ProductionOrder, event.event_id)
+    if db.get(ProductionOrder, payload["production_order_id"]) is not None:
+        raise HTTPException(status_code=409, detail={"code": "IDEMPOTENCY_CONFLICT", "message": "production_order_id 已存在"})
+    record = ProductionOrder(**payload, remark=event.payload.remark)
+    from app.api.routes.master_data import write_metadata
+
+    write_metadata(record, event.event_id)
+    db.add(record)
+    db.commit()
+    return response_envelope({"preorder_id": preorder_id, "production_order": record_data(record)}, trace_id=request.state.trace_id)
 
 
 @router.get("/procurement-demands", response_model=ResponseEnvelope[dict])

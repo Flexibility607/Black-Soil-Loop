@@ -2,16 +2,16 @@
   "status": "PROCESSED",
   "code": "OK",
   "data": [
-    {
-      "partner_display_name": "合作方 01",
-      "category": "冷冻食品",
-      "quantity": 300,
-      "unit": "kg",
-      "required_start_at": "2026-07-24T08:00:00+08:00",
-      "required_end_at": "2026-07-24T12:00:00+08:00"
-    }
+    {"partner_display_name": "合作方-B01", "category": "速冻食品", "quantity": 760, "unit": "kg", "required_start_at": "2026-07-26T07:30:00+08:00", "required_end_at": "2026-07-26T11:30:00+08:00"},
+    {"partner_display_name": "合作方-B02", "category": "净菜加工", "quantity": 680, "unit": "kg", "required_start_at": "2026-07-26T09:00:00+08:00", "required_end_at": "2026-07-26T13:00:00+08:00"},
+    {"partner_display_name": "合作方-B03", "category": "冷链饮品", "quantity": 540, "unit": "kg", "required_start_at": "2026-07-26T14:00:00+08:00", "required_end_at": "2026-07-26T18:00:00+08:00"},
+    {"partner_display_name": "合作方-B04", "category": "烘焙食品", "quantity": 430, "unit": "kg", "required_start_at": "2026-07-27T06:30:00+08:00", "required_end_at": "2026-07-27T10:00:00+08:00"},
+    {"partner_display_name": "合作方-B05", "category": "粮油制品", "quantity": 920, "unit": "kg", "required_start_at": "2026-07-27T08:00:00+08:00", "required_end_at": "2026-07-27T15:00:00+08:00"},
+    {"partner_display_name": "合作方-B06", "category": "豆制食品", "quantity": 360, "unit": "kg", "required_start_at": "2026-07-27T12:30:00+08:00", "required_end_at": "2026-07-27T17:00:00+08:00"},
+    {"partner_display_name": "合作方-B07", "category": "肉类加工", "quantity": 510, "unit": "kg", "required_start_at": "2026-07-28T07:00:00+08:00", "required_end_at": "2026-07-28T12:00:00+08:00"},
+    {"partner_display_name": "合作方-B08", "category": "复合调味", "quantity": 280, "unit": "kg", "required_start_at": "2026-07-28T10:00:00+08:00", "required_end_at": "2026-07-28T14:30:00+08:00"}
   ],
   "errors": [],
-  "trace_id": "TRACE-PUBLIC-003",
-  "data_cutoff": "2026-07-23T10:00:00+08:00"
+  "trace_id": "TRACE-PUBLIC-DEMO-003",
+  "data_cutoff": "2026-07-25T16:30:00+08:00"
 }

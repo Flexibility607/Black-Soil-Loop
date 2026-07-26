@@ -20,6 +20,7 @@ from app.models.master_data import Enterprise, EnterpriseTag, Park, Partner, Sto
 from app.models.planning_records import Policy, Preorder, ProcurementDemand, SupplierQuote
 from app.models.production import Bom, ProductionOrder, ProductionPlan
 from app.models.transport import FreezerRecord, TransportResource, TransportTaskSummary
+from app.models.operations import ProcurementHistory
 from app.models.user import User
 from app.schemas.business_records import InventoryCreate, ReturnRecordCreate, SalesOrderLineCreate
 from app.schemas.common import ResponseEnvelope, response_envelope
@@ -28,6 +29,7 @@ from app.schemas.master_data import EnterpriseCreate, EnterpriseTagCreate, ParkC
 from app.schemas.planning_records import PolicyCreate, PreorderCreate, ProcurementDemandCreate, SupplierQuoteCreate
 from app.schemas.production import BomCreate, ProductionOrderCreate, ProductionPlanCreate
 from app.schemas.transport import FreezerRecordCreate, TransportResourceCreate, TransportTaskSummaryCreate
+from app.schemas.operations import ProcurementHistoryCreate
 
 router = APIRouter(tags=["E01 Imports"])
 DATETIME_ADAPTER = TypeAdapter(datetime)
@@ -51,6 +53,7 @@ SHEET_SPECS: list[dict[str, Any]] = [
     {"sheet": "预订单", "model": Preorder, "schema": PreorderCreate, "keys": ("preorder_id",)},
     {"sheet": "采购需求", "model": ProcurementDemand, "schema": ProcurementDemandCreate, "keys": ("demand_id",)},
     {"sheet": "供应商报价", "model": SupplierQuote, "schema": SupplierQuoteCreate, "keys": ("supplier_id", "material_id", "tier_id")},
+    {"sheet": "采购历史", "model": ProcurementHistory, "schema": ProcurementHistoryCreate, "keys": ("purchase_record_id",)},
     {"sheet": "政策记录", "model": Policy, "schema": PolicyCreate, "keys": ("policy_id",)},
 ]
 SPECS_BY_SHEET = {spec["sheet"]: spec for spec in SHEET_SPECS}

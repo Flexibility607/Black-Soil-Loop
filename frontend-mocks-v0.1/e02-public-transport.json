@@ -3,13 +3,69 @@
   "code": "OK",
   "data": [
     {
-      "task_id": "TASK-001",
-      "status": "CONFIRMED",
-      "planned_depart_at": "2026-07-24T08:30:00+08:00",
-      "planned_arrive_at": "2026-07-24T10:00:00+08:00"
-    }
+      "task_id": "TASK-DEMO-001", "status": "CONFIRMED", "planned_depart_at": "2026-07-25T15:40:00+08:00", "planned_arrive_at": "2026-07-25T17:10:00+08:00", "vehicle_type_id": "TRUCK-REFRIGERATED-L", "vehicle_type_name": "大型冷藏车", "required_vehicle_count": 2, "estimated_fee": 1250, "currency": "CNY", "anomaly": false,
+      "path_points": [
+        {"recorded_at": "2026-07-25T15:45:00+08:00", "latitude": 41.805, "longitude": 123.431, "anomaly_status": "NORMAL", "point_color": "green"},
+        {"recorded_at": "2026-07-25T16:00:00+08:00", "latitude": 41.818, "longitude": 123.449, "anomaly_status": "NORMAL", "point_color": "green"},
+        {"recorded_at": "2026-07-25T16:15:00+08:00", "latitude": 41.831, "longitude": 123.472, "anomaly_status": "NORMAL", "point_color": "green"},
+        {"recorded_at": "2026-07-25T16:30:00+08:00", "latitude": 41.846, "longitude": 123.495, "anomaly_status": "NORMAL", "point_color": "green"},
+        {"recorded_at": "2026-07-25T16:45:00+08:00", "latitude": 41.858, "longitude": 123.518, "anomaly_status": "NORMAL", "point_color": "green"}
+      ]
+    },
+    {
+      "task_id": "TASK-DEMO-002", "status": "CONFIRMED", "planned_depart_at": "2026-07-25T15:55:00+08:00", "planned_arrive_at": "2026-07-25T17:25:00+08:00", "vehicle_type_id": "VAN-REFRIGERATED", "vehicle_type_name": "冷藏厢式车", "required_vehicle_count": 1, "estimated_fee": 980, "currency": "CNY", "anomaly": true,
+      "path_points": [
+        {"recorded_at": "2026-07-25T16:00:00+08:00", "latitude": 41.801, "longitude": 123.426, "anomaly_status": "NORMAL", "point_color": "green"},
+        {"recorded_at": "2026-07-25T16:12:00+08:00", "latitude": 41.789, "longitude": 123.452, "anomaly_status": "NORMAL", "point_color": "green"},
+        {"recorded_at": "2026-07-25T16:24:00+08:00", "latitude": 41.776, "longitude": 123.478, "anomaly_status": "TEMPERATURE_ABNORMAL", "point_color": "red"},
+        {"recorded_at": "2026-07-25T16:36:00+08:00", "latitude": 41.764, "longitude": 123.501, "anomaly_status": "NORMAL", "point_color": "green"},
+        {"recorded_at": "2026-07-25T16:48:00+08:00", "latitude": 41.752, "longitude": 123.526, "anomaly_status": "NORMAL", "point_color": "green"}
+      ]
+    },
+    {
+      "task_id": "TASK-DEMO-003", "status": "CONFIRMED", "planned_depart_at": "2026-07-25T16:10:00+08:00", "planned_arrive_at": "2026-07-25T18:00:00+08:00", "vehicle_type_id": "TRUCK-REFRIGERATED-L", "vehicle_type_name": "大型冷藏车", "required_vehicle_count": 3, "estimated_fee": 1680, "currency": "CNY", "anomaly": false,
+      "path_points": [
+        {"recorded_at": "2026-07-25T16:10:00+08:00", "latitude": 41.809, "longitude": 123.438, "anomaly_status": "NORMAL", "point_color": "green"},
+        {"recorded_at": "2026-07-25T16:22:00+08:00", "latitude": 41.827, "longitude": 123.421, "anomaly_status": "NORMAL", "point_color": "green"},
+        {"recorded_at": "2026-07-25T16:34:00+08:00", "latitude": 41.845, "longitude": 123.402, "anomaly_status": "NORMAL", "point_color": "green"},
+        {"recorded_at": "2026-07-25T16:46:00+08:00", "latitude": 41.863, "longitude": 123.384, "anomaly_status": "NORMAL", "point_color": "green"},
+        {"recorded_at": "2026-07-25T16:58:00+08:00", "latitude": 41.881, "longitude": 123.366, "anomaly_status": "NORMAL", "point_color": "green"}
+      ]
+    },
+    {
+      "task_id": "TASK-DEMO-004", "status": "CONFIRMED", "planned_depart_at": "2026-07-25T16:20:00+08:00", "planned_arrive_at": "2026-07-25T17:30:00+08:00", "vehicle_type_id": "VAN-INSULATED", "vehicle_type_name": "保温厢式车", "required_vehicle_count": 1, "estimated_fee": 760, "currency": "CNY", "anomaly": false,
+      "path_points": [
+        {"recorded_at": "2026-07-25T16:20:00+08:00", "latitude": 41.807, "longitude": 123.433, "anomaly_status": "NORMAL", "point_color": "green"},
+        {"recorded_at": "2026-07-25T16:31:00+08:00", "latitude": 41.794, "longitude": 123.412, "anomaly_status": "NORMAL", "point_color": "green"},
+        {"recorded_at": "2026-07-25T16:42:00+08:00", "latitude": 41.782, "longitude": 123.391, "anomaly_status": "NORMAL", "point_color": "green"},
+        {"recorded_at": "2026-07-25T16:53:00+08:00", "latitude": 41.769, "longitude": 123.370, "anomaly_status": "NORMAL", "point_color": "green"},
+        {"recorded_at": "2026-07-25T17:04:00+08:00", "latitude": 41.756, "longitude": 123.349, "anomaly_status": "NORMAL", "point_color": "green"}
+      ]
+    },
+    {
+      "task_id": "TASK-DEMO-005", "status": "CONFIRMED", "planned_depart_at": "2026-07-25T16:30:00+08:00", "planned_arrive_at": "2026-07-25T18:20:00+08:00", "vehicle_type_id": "TRUCK-REFRIGERATED-M", "vehicle_type_name": "中型冷藏车", "required_vehicle_count": 2, "estimated_fee": 1420, "currency": "CNY", "anomaly": true,
+      "path_points": [
+        {"recorded_at": "2026-07-25T16:30:00+08:00", "latitude": 41.803, "longitude": 123.435, "anomaly_status": "NORMAL", "point_color": "green"},
+        {"recorded_at": "2026-07-25T16:42:00+08:00", "latitude": 41.816, "longitude": 123.463, "anomaly_status": "NORMAL", "point_color": "green"},
+        {"recorded_at": "2026-07-25T16:54:00+08:00", "latitude": 41.829, "longitude": 123.491, "anomaly_status": "HUMIDITY_ABNORMAL", "point_color": "red"},
+        {"recorded_at": "2026-07-25T17:06:00+08:00", "latitude": 41.842, "longitude": 123.519, "anomaly_status": "NORMAL", "point_color": "green"},
+        {"recorded_at": "2026-07-25T17:18:00+08:00", "latitude": 41.855, "longitude": 123.547, "anomaly_status": "NORMAL", "point_color": "green"}
+      ]
+    },
+    {
+      "task_id": "TASK-DEMO-006", "status": "CONFIRMED", "planned_depart_at": "2026-07-25T16:45:00+08:00", "planned_arrive_at": "2026-07-25T18:15:00+08:00", "vehicle_type_id": "VAN-REFRIGERATED", "vehicle_type_name": "冷藏厢式车", "required_vehicle_count": 2, "estimated_fee": 1100, "currency": "CNY", "anomaly": false,
+      "path_points": [
+        {"recorded_at": "2026-07-25T16:45:00+08:00", "latitude": 41.806, "longitude": 123.430, "anomaly_status": "NORMAL", "point_color": "green"},
+        {"recorded_at": "2026-07-25T16:57:00+08:00", "latitude": 41.823, "longitude": 123.447, "anomaly_status": "NORMAL", "point_color": "green"},
+        {"recorded_at": "2026-07-25T17:09:00+08:00", "latitude": 41.840, "longitude": 123.464, "anomaly_status": "NORMAL", "point_color": "green"},
+        {"recorded_at": "2026-07-25T17:21:00+08:00", "latitude": 41.857, "longitude": 123.481, "anomaly_status": "NORMAL", "point_color": "green"},
+        {"recorded_at": "2026-07-25T17:33:00+08:00", "latitude": 41.874, "longitude": 123.498, "anomaly_status": "NORMAL", "point_color": "green"}
+      ]
+    },
+    {"task_id": "TASK-DEMO-007", "status": "DRAFT", "planned_depart_at": "2026-07-26T07:10:00+08:00", "planned_arrive_at": "2026-07-26T08:40:00+08:00", "vehicle_type_id": "VAN-INSULATED", "vehicle_type_name": "保温厢式车", "required_vehicle_count": 1, "estimated_fee": 650, "currency": "CNY", "anomaly": false, "path_points": []},
+    {"task_id": "TASK-DEMO-008", "status": "DRAFT", "planned_depart_at": "2026-07-26T08:20:00+08:00", "planned_arrive_at": "2026-07-26T10:00:00+08:00", "vehicle_type_id": "TRUCK-REFRIGERATED-M", "vehicle_type_name": "中型冷藏车", "required_vehicle_count": 1, "estimated_fee": 720, "currency": "CNY", "anomaly": false, "path_points": []}
   ],
   "errors": [],
-  "trace_id": "TRACE-PUBLIC-004",
-  "data_cutoff": "2026-07-23T10:00:00+08:00"
+  "trace_id": "TRACE-PUBLIC-DEMO-004",
+  "data_cutoff": "2026-07-25T16:30:00+08:00"
 }

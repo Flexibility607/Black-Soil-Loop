@@ -313,17 +313,26 @@ def update_partner(request: Request, partner_id: str, event: EventRequest[Partne
 
 @router.get("/stores", response_model=ResponseEnvelope[dict])
 def list_stores(request: Request, db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)], page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100), keyword: str | None = None, status: str | None = None) -> dict:
-    return response_envelope(list_records(db, Store, user, page, page_size, keyword, status, keyword_fields=(Store.store_id, Store.store_name), status_field=Store.relationship_status), trace_id=request.state.trace_id)
+    return response_envelope(list_records(db, Store, user, page, page_size, keyword, status, scope_field=Store.enterprise_id, keyword_fields=(Store.store_id, Store.store_name), status_field=Store.relationship_status), trace_id=request.state.trace_id)
 
 
 @router.post("/stores", response_model=ResponseEnvelope[dict], status_code=201)
 def create_store(request: Request, event: EventRequest[StoreCreate], db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)]) -> dict:
-    ensure_park_admin(user)
     ensure_event(event, "store")
+    if user.role == "enterprise_admin":
+        payload = event.payload.model_dump(exclude={"remark"})
+        enterprise_id = payload.get("enterprise_id") or (user.enterprise_ids[0] if len(user.enterprise_ids or []) == 1 else None)
+        if enterprise_id is None:
+            raise HTTPException(status_code=400, detail={"code": "VALIDATION_ERROR", "message": "企业负责人创建门店必须绑定 enterprise_id"})
+        ensure_enterprise_access(user, enterprise_id)
+        payload["enterprise_id"] = enterprise_id
+    else:
+        ensure_park_admin(user)
+        payload = event.payload.model_dump(exclude={"remark"})
     ensure_event_id_available(db, Store, event.event_id)
     if db.get(Store, event.payload.store_id) is not None:
         raise HTTPException(status_code=409, detail={"code": "IDEMPOTENCY_CONFLICT", "message": "store_id 已存在"})
-    record = Store(**event.payload.model_dump(exclude={"remark"}), remark=event.payload.remark)
+    record = Store(**payload, remark=event.payload.remark)
     write_metadata(record, event.event_id)
     db.add(record)
     db.commit()
@@ -335,20 +344,32 @@ def get_store(request: Request, store_id: str, db: Annotated[Session, Depends(ge
     record = db.get(Store, store_id)
     if record is None:
         raise HTTPException(status_code=404, detail={"code": "NOT_FOUND", "message": "门店不存在"})
+    if record.enterprise_id is None:
+        ensure_park_admin(user)
+    else:
+        ensure_enterprise_access(user, record.enterprise_id)
     return response_envelope(record_data(record), trace_id=request.state.trace_id)
 
 
 @router.patch("/stores/{store_id}", response_model=ResponseEnvelope[dict])
 def update_store(request: Request, store_id: str, event: EventRequest[StorePatch], db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)]) -> dict:
-    ensure_park_admin(user)
     ensure_event(event, "store")
     record = db.get(Store, store_id)
     if record is None:
         raise HTTPException(status_code=404, detail={"code": "NOT_FOUND", "message": "门店不存在"})
+    if record.enterprise_id is None:
+        ensure_park_admin(user)
+    else:
+        ensure_enterprise_access(user, record.enterprise_id)
     ensure_version(record, event.object_version)
     changes = event.payload.model_dump(exclude_unset=True)
     if not changes:
         raise HTTPException(status_code=400, detail={"code": "VALIDATION_ERROR", "message": "PATCH 至少需要一个字段"})
+    target_enterprise_id = changes.get("enterprise_id", record.enterprise_id)
+    if target_enterprise_id is None:
+        ensure_park_admin(user)
+    else:
+        ensure_enterprise_access(user, target_enterprise_id)
     for key, value in changes.items():
         setattr(record, key, value)
     record.object_version += 1

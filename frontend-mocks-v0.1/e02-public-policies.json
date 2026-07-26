@@ -1,0 +1,17 @@
+{
+  "status": "PROCESSED",
+  "code": "OK",
+  "data": [
+    {"policy_id": "POLICY-DEMO-001", "title": "东北全面振兴与现代农业协同发展", "category": "东北振兴", "summary": "聚焦现代农业、农产品深加工与区域产业协作的演示政策词条。", "source_url": "https://www.gov.cn/", "source_type": "DEMO_SIMULATION", "published_date": "2026-07-18", "effective_date": "2026-07-18"},
+    {"policy_id": "POLICY-DEMO-002", "title": "十五五现代食品产业发展规划观察", "category": "发展规划", "summary": "用于展示园区对中长期产业规划信息的分类与快速链接能力。", "source_url": "https://www.ndrc.gov.cn/", "source_type": "DEMO_SIMULATION", "published_date": "2026-07-19", "effective_date": "2026-07-19"},
+    {"policy_id": "POLICY-DEMO-003", "title": "食品安全全链条监管重点提示", "category": "食品安全", "summary": "覆盖生产、贮存、运输和销售环节的演示监管提示。", "source_url": "https://www.npc.gov.cn/", "source_type": "DEMO_SIMULATION", "published_date": "2026-07-20", "effective_date": "2026-07-20"},
+    {"policy_id": "POLICY-DEMO-004", "title": "冷链食品运输与温控记录规范提示", "category": "冷链物流", "summary": "演示运输温湿度监控、异常预警和记录留存相关政策分类。", "source_url": "https://www.samr.gov.cn/", "source_type": "DEMO_SIMULATION", "published_date": "2026-07-21", "effective_date": "2026-07-21"},
+    {"policy_id": "POLICY-DEMO-005", "title": "县域商业体系与农产品流通建设", "category": "县域商业", "summary": "演示园区集中采购、门店协同和农产品上行相关政策词条。", "source_url": "https://www.mofcom.gov.cn/", "source_type": "DEMO_SIMULATION", "published_date": "2026-07-22", "effective_date": "2026-07-22"},
+    {"policy_id": "POLICY-DEMO-006", "title": "绿色食品产业节能降碳行动参考", "category": "绿色发展", "summary": "演示生产能耗、包装减量和绿色供应链政策聚合能力。", "source_url": "https://www.mee.gov.cn/", "source_type": "DEMO_SIMULATION", "published_date": "2026-07-23", "effective_date": "2026-07-23"},
+    {"policy_id": "POLICY-DEMO-007", "title": "农业产业化龙头企业培育政策观察", "category": "企业培育", "summary": "用于展示企业梯度培育、产能提升和园区协同相关信息。", "source_url": "https://www.moa.gov.cn/", "source_type": "DEMO_SIMULATION", "published_date": "2026-07-24", "effective_date": "2026-07-24"},
+    {"policy_id": "POLICY-DEMO-008", "title": "数字乡村与农产品供应链数据应用", "category": "数字农业", "summary": "演示订单、库存、物流和采购数据汇聚的政策信息入口。", "source_url": "https://www.cac.gov.cn/", "source_type": "DEMO_SIMULATION", "published_date": "2026-07-25", "effective_date": "2026-07-25"}
+  ],
+  "errors": [],
+  "trace_id": "TRACE-PUBLIC-DEMO-POLICY-001",
+  "data_cutoff": "2026-07-25T16:30:00+08:00"
+}

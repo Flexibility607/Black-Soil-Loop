@@ -31,6 +31,7 @@ class ProductionOrder(SourceTrackedMixin, Base):
     __tablename__ = "production_orders"
 
     production_order_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    preorder_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     plan_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     enterprise_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     product_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)

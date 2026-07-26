@@ -22,7 +22,13 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 120
     refresh_token_expire_days: int = 7
-    cors_origins: list[str] = ["http://localhost:3000", "http://localhost:5173"]
+    idle_timeout_minutes: int = 30
+    cors_origins: list[str] = [
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+    ]
 
 
 @lru_cache

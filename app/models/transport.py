@@ -23,6 +23,11 @@ class TransportTaskSummary(SourceTrackedMixin, Base):
     destination: Mapped[str] = mapped_column(String(500), nullable=False)
     vehicle_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     driver_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    vehicle_type_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    vehicle_type_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    required_vehicle_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    estimated_fee: Mapped[float | None] = mapped_column(Numeric(20, 6), nullable=True)
+    currency: Mapped[str | None] = mapped_column(String(3), nullable=True)
 
 
 class TransportResource(SourceTrackedMixin, Base):
@@ -32,11 +37,15 @@ class TransportResource(SourceTrackedMixin, Base):
     driver_name: Mapped[str] = mapped_column(String(128), nullable=False)
     driver_phone: Mapped[str | None] = mapped_column(String(64), nullable=True)
     vehicle_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    vehicle_type_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    vehicle_type_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
     plate_no: Mapped[str | None] = mapped_column(String(64), nullable=True)
     mass_capacity_kg: Mapped[float | None] = mapped_column(Numeric(20, 6), nullable=True)
     volume_capacity_m3: Mapped[float | None] = mapped_column(Numeric(20, 6), nullable=True)
     temperature_min_celsius: Mapped[float | None] = mapped_column(Numeric(10, 4), nullable=True)
     temperature_max_celsius: Mapped[float | None] = mapped_column(Numeric(10, 4), nullable=True)
+    humidity_min_percent: Mapped[float | None] = mapped_column(Numeric(10, 4), nullable=True)
+    humidity_max_percent: Mapped[float | None] = mapped_column(Numeric(10, 4), nullable=True)
     on_duty: Mapped[bool] = mapped_column(nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False)
 

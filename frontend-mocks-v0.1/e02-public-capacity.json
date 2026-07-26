@@ -2,15 +2,16 @@
   "status": "PROCESSED",
   "code": "OK",
   "data": [
-    {
-      "enterprise_display_name": "园区企业 01",
-      "category": "冷冻食品",
-      "capacity_remaining": 800,
-      "unit": "kg",
-      "statistic_at": "2026-07-23T10:00:00+08:00"
-    }
+    {"enterprise_display_name": "企业-A01", "category": "速冻食品", "capacity_remaining": 1680, "unit": "kg", "statistic_at": "2026-07-25T16:30:00+08:00"},
+    {"enterprise_display_name": "企业-A02", "category": "净菜加工", "capacity_remaining": 1420, "unit": "kg", "statistic_at": "2026-07-25T16:30:00+08:00"},
+    {"enterprise_display_name": "企业-A03", "category": "烘焙食品", "capacity_remaining": 1250, "unit": "kg", "statistic_at": "2026-07-25T16:30:00+08:00"},
+    {"enterprise_display_name": "企业-A04", "category": "冷链饮品", "capacity_remaining": 1160, "unit": "kg", "statistic_at": "2026-07-25T16:30:00+08:00"},
+    {"enterprise_display_name": "企业-A05", "category": "豆制食品", "capacity_remaining": 980, "unit": "kg", "statistic_at": "2026-07-25T16:30:00+08:00"},
+    {"enterprise_display_name": "企业-A06", "category": "粮油制品", "capacity_remaining": 870, "unit": "kg", "statistic_at": "2026-07-25T16:30:00+08:00"},
+    {"enterprise_display_name": "企业-A07", "category": "肉类加工", "capacity_remaining": 760, "unit": "kg", "statistic_at": "2026-07-25T16:30:00+08:00"},
+    {"enterprise_display_name": "企业-A08", "category": "复合调味", "capacity_remaining": 610, "unit": "kg", "statistic_at": "2026-07-25T16:30:00+08:00"}
   ],
   "errors": [],
-  "trace_id": "TRACE-PUBLIC-002",
-  "data_cutoff": "2026-07-23T10:00:00+08:00"
+  "trace_id": "TRACE-PUBLIC-DEMO-002",
+  "data_cutoff": "2026-07-25T16:30:00+08:00"
 }

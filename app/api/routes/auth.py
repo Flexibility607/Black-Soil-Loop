@@ -54,10 +54,14 @@ def login(
     db: Annotated[Session, Depends(get_db)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> dict:
-    user = db.scalar(select(User).where(User.username == body.username, User.is_active.is_(True)))
+    user = db.scalar(
+        select(User).where(User.username == body.username, User.is_active.is_(True)).with_for_update()
+    )
     if user is None or not verify_password(body.password, user.password_hash):
         raise HTTPException(status_code=401, detail={"code": "UNAUTHENTICATED", "message": "用户名或密码错误"})
+    user.session_version += 1
     user.last_login_at = utc_now()
+    user.last_activity_at = user.last_login_at
     db.commit()
     return response_envelope(issue_tokens(user, settings).model_dump(), trace_id=request.state.trace_id)
 
@@ -78,6 +82,16 @@ def refresh(
     user = db.scalar(select(User).where(User.user_id == payload["sub"], User.is_active.is_(True)))
     if user is None:
         raise HTTPException(status_code=401, detail={"code": "UNAUTHENTICATED", "message": "用户不存在或已停用"})
+    if payload.get("session_version") != user.session_version:
+        raise HTTPException(status_code=401, detail={"code": "UNAUTHENTICATED", "message": "会话已在其他设备重新登录"})
+    if user.last_activity_at is not None:
+        last_activity = user.last_activity_at
+        if last_activity.tzinfo is None:
+            last_activity = last_activity.replace(tzinfo=timezone.utc)
+        if datetime.now(timezone.utc) - last_activity > timedelta(minutes=settings.idle_timeout_minutes):
+            raise HTTPException(status_code=401, detail={"code": "SESSION_TIMEOUT", "message": "会话已因无操作超时，请重新登录"})
+    user.last_activity_at = datetime.now(timezone.utc)
+    db.commit()
     return response_envelope(issue_tokens(user, settings).model_dump(), trace_id=request.state.trace_id)
 
 
@@ -100,6 +114,10 @@ def logout(
         raise HTTPException(status_code=401, detail={"code": "UNAUTHENTICATED", "message": "刷新令牌无效或已过期"}) from exc
     if payload["sub"] != user.user_id:
         raise HTTPException(status_code=403, detail={"code": "FORBIDDEN", "message": "不能注销其他用户的会话"})
+    if payload.get("session_version") != user.session_version:
+        raise HTTPException(status_code=401, detail={"code": "UNAUTHENTICATED", "message": "会话已失效"})
+    user.session_version += 1
+    user.last_activity_at = None
     if db.get(RevokedToken, payload["jti"]) is None:
         db.add(
             RevokedToken(
@@ -107,6 +125,5 @@ def logout(
                 expires_at=datetime.fromtimestamp(payload["exp"], timezone.utc),
             )
         )
-        db.commit()
+    db.commit()
     return response_envelope({"logged_out": True}, trace_id=request.state.trace_id)
-

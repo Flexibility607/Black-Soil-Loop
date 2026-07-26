@@ -4,6 +4,7 @@ from app.models.master_data import Enterprise, EnterpriseTag, Park, Partner, Sto
 from app.models.production import Bom, ProductionOrder, ProductionPlan
 from app.models.planning_records import Policy, Preorder, ProcurementDemand, SupplierQuote
 from app.models.transport import FreezerRecord, TransportResource, TransportTaskSummary
+from app.models.operations import CalculationRun, EnterpriseCapacity, InventoryAlert, InventoryThresholdRequest, ProcurementHistory, TransportTelemetry
 from app.models.user import RevokedToken, User
 
 __all__ = [
@@ -28,4 +29,10 @@ __all__ = [
     "TransportTaskSummary",
     "SalesOrderLine",
     "User",
+    "CalculationRun",
+    "EnterpriseCapacity",
+    "InventoryAlert",
+    "InventoryThresholdRequest",
+    "ProcurementHistory",
+    "TransportTelemetry",
 ]
