@@ -192,7 +192,7 @@ function renderTrendCharts(orderItems, salesItems) {
     const width = 360;
     const height = 178;
     const left = 40;
-    const right = 12;
+    const right = 72;
     const top = 16;
     const bottom = 142;
     const max = Math.max(...items.map((item) => Number(item[key]) || 0), 1) * 1.12;
@@ -204,7 +204,8 @@ function renderTrendCharts(orderItems, salesItems) {
       value,
     }));
     const currentPoints = makePoints(items.map((item) => Number(item[key]) || 0));
-    const previousPoints = makePoints(currentPoints.map((item, index) => item.value * (.62 + (index % 3) * .06)));
+    const previousValues = currentPoints.map((item, index) => item.value * (.62 + (index % 3) * .06));
+    const previousPoints = makePoints(previousValues);
     const path = (points) => points.map((item, index) => (index ? 'L' : 'M') + ' ' + item.x.toFixed(1) + ' ' + item.y.toFixed(1)).join(' ');
     const currentPath = path(currentPoints);
     const previousPath = path(previousPoints);
@@ -214,16 +215,38 @@ function renderTrendCharts(orderItems, salesItems) {
     }).join('');
     const labels = currentPoints.map((item) => '<text class="chart-axis-label" x="' + item.x.toFixed(1) + '" y="166" text-anchor="middle">' + escapeHtml(item.label) + '</text>').join('');
     const yLabels = [0, .5, 1].map((ratio) => '<text class="trend-axis-label" x="4" y="' + (bottom - ratio * (bottom - top)).toFixed(1) + '">' + escapeHtml(formatter(max * ratio)) + '</text>').join('');
-    const dots = currentPoints.map((item) => {
-      const label = item.label + '：' + formatter(item.value);
-      return '<g class="trend-chart-node" tabindex="0" role="img" aria-label="' + escapeHtml(label) + '"><circle class="trend-chart-hit" cx="' + item.x.toFixed(1) + '" cy="' + item.y.toFixed(1) + '" r="11"></circle><circle class="trend-chart-point" style="--point-color:' + color + '" cx="' + item.x.toFixed(1) + '" cy="' + item.y.toFixed(1) + '" r="3.5"></circle><title>' + escapeHtml(label) + '</title></g>';
-    }).join('');
+    const placeLabel = (point, labelWidth, labelHeight) => {
+      const gap = 5;
+      let xPosition = point.x > width - right - 38 ? point.x - labelWidth - gap : point.x + gap;
+      let yPosition = point.y > top + labelHeight + gap ? point.y - labelHeight - gap : point.y + gap;
+      xPosition = Math.max(left, Math.min(width - right - labelWidth, xPosition));
+      if (yPosition + labelHeight > bottom) yPosition = point.y - labelHeight - gap;
+      yPosition = Math.max(top, Math.min(bottom - labelHeight, yPosition));
+      return { x: xPosition, y: yPosition };
+    };
+    const placeEndLabel = (point, labelWidth, labelHeight) => {
+      const gap = 5;
+      let xPosition = point.x + gap;
+      if (xPosition + labelWidth > width - 4) xPosition = point.x - labelWidth - gap;
+      let yPosition = point.y - labelHeight - gap;
+      if (yPosition < top) yPosition = point.y + gap;
+      yPosition = Math.max(top, Math.min(bottom - labelHeight, yPosition));
+      return { x: xPosition, y: yPosition };
+    };
+    const renderNode = (item, seriesClass, seriesLabel, pointColor) => {
+      const valueLabel = formatter(item.value);
+      const label = item.label + '：' + valueLabel;
+      const labelWidth = Math.min(82, Math.max(50, label.length * 4.1 + 10));
+      const labelHeight = 15;
+      const labelPosition = placeLabel(item, labelWidth, labelHeight);
+      return '<g class="trend-chart-node ' + seriesClass + '" tabindex="0" role="img" aria-label="' + escapeHtml(seriesLabel + ' ' + label) + '"><circle class="trend-chart-hit" cx="' + item.x.toFixed(1) + '" cy="' + item.y.toFixed(1) + '" r="11"></circle><circle class="trend-chart-point ' + seriesClass + '" style="--point-color:' + pointColor + '" cx="' + item.x.toFixed(1) + '" cy="' + item.y.toFixed(1) + '" r="3.5"></circle><g class="trend-hover-label" transform="translate(' + labelPosition.x.toFixed(1) + ' ' + labelPosition.y.toFixed(1) + ')" aria-hidden="true"><rect width="' + labelWidth.toFixed(1) + '" height="' + labelHeight + '" rx="3"></rect><text x="' + (labelWidth / 2).toFixed(1) + '" y="10.5" text-anchor="middle">' + escapeHtml(label) + '</text></g><title>' + escapeHtml(seriesLabel + ' ' + label) + '</title></g>';
+    };
+    const dots = previousPoints.map((item) => renderNode(item, 'previous', '上一周期', '#b47be7')).join('') + currentPoints.map((item) => renderNode(item, 'current', '本期', color)).join('');
     const area = currentPath + ' L ' + currentPoints.at(-1).x.toFixed(1) + ' ' + bottom + ' L ' + currentPoints[0].x.toFixed(1) + ' ' + bottom + ' Z';
     const end = currentPoints.at(-1);
     const endLabel = formatter(end.value);
-    const badgeX = width - 70;
-    const badgeY = Math.max(top + 2, end.y - 25);
-    const badge = '<g class="trend-end-label"><rect x="' + badgeX + '" y="' + badgeY.toFixed(1) + '" width="58" height="18" rx="4"/><text x="' + (badgeX + 29) + '" y="' + (badgeY + 12).toFixed(1) + '" text-anchor="middle">' + escapeHtml(endLabel) + '</text></g>';
+    const badgePosition = placeEndLabel(end, 58, 18);
+    const badge = '<g class="trend-end-label" pointer-events="none"><rect x="' + badgePosition.x.toFixed(1) + '" y="' + badgePosition.y.toFixed(1) + '" width="58" height="18" rx="4"/><text x="' + (badgePosition.x + 29).toFixed(1) + '" y="' + (badgePosition.y + 12).toFixed(1) + '" text-anchor="middle">' + escapeHtml(endLabel) + '</text></g>';
     return '<article class="trend-chart-card"><div class="trend-chart-card-head"><span class="trend-chart-card-icon">' + escapeHtml(icon) + '</span><div><small>' + escapeHtml(tag) + '</small><strong>' + escapeHtml(title) + '</strong></div><b>峰值 ' + escapeHtml(formatter(Math.max(...currentPoints.map((item) => item.value)))) + '</b></div><div class="trend-chart-card-legend"><i style="--trend-color:' + color + '"></i>本期' + escapeHtml(title) + '（' + escapeHtml(unit) + '）<i class="previous"></i>上一周期</div><svg viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="' + escapeHtml(title + '近七日趋势') + '"><defs><linearGradient id="' + gradientId + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + color + '" stop-opacity=".3"/><stop offset="1" stop-color="' + color + '" stop-opacity="0"/></linearGradient></defs>' + grid + yLabels + '<path class="trend-chart-area" style="--trend-area:' + color + '" fill="url(#' + gradientId + ')" d="' + area + '"/><path class="trend-chart-line previous" d="' + previousPath + '"/><path class="trend-chart-line" style="--trend-color:' + color + '" d="' + currentPath + '"/>' + dots + badge + labels + '</svg></article>';
   };
   el.innerHTML = chart(orderItems, 'quantity', '订单量趋势', 'ORDER VOLUME', 'kg', '#35b9ff', 'orderTrendArea', formatNumber, '▥') + chart(salesItems, 'amount', '销售额趋势', 'SALES AMOUNT', 'CNY', '#f3bd57', 'salesTrendArea', formatMoney, '◒');
@@ -352,7 +375,7 @@ function renderPolicyFeed(items) {
     return;
   }
   const displayRows = rows.length > 4 ? [...rows, ...rows] : rows;
-  el.innerHTML = displayRows.map((item) => '<a class="screen-policy-item" href="' + escapeHtml(item.source_url) + '" target="_blank" rel="noreferrer"><span>' + escapeHtml(item.category) + '</span><div><strong>' + escapeHtml(item.title) + '</strong><small>' + escapeHtml(item.summary) + ' · ' + escapeHtml(item.source_type || 'OFFICIAL') + '</small></div></a>').join('');
+  el.innerHTML = displayRows.map((item) => '<a class="screen-policy-item" href="' + escapeHtml(item.source_url) + '" target="_blank" rel="noopener noreferrer" title="' + escapeHtml(item.source_name || item.title) + '"><span>' + escapeHtml(item.category) + '</span><div><strong>' + escapeHtml(item.title) + '</strong><small>' + escapeHtml(item.summary) + ' · ' + escapeHtml(item.source_verified ? '官方原文' : (item.source_type || 'OFFICIAL')) + '</small></div></a>').join('');
 }
 
 function renderNewsFeed(items) {
@@ -386,7 +409,7 @@ function bindWheelScroll(container, contentGetter) {
 function renderRouteMap(items) {
   const el = document.getElementById('public-route-map');
   if (!el) return;
-  const routes = (items || []).filter((item) => item.destination_district).slice(0, 10);
+  const routes = (items || []).filter((item) => item.destination || (Array.isArray(item.path_points) && item.path_points.length)).slice(0, 10);
   const tileZoom = 8;
   const tileGridSize = 7;
   const tileCoverage = 4.2;
@@ -397,10 +420,18 @@ function renderRouteMap(items) {
     return [x, y];
   };
   const center = geoPoint(125.305, 43.865);
-  const fallbackPoints = (route) => [[125.305, 43.865], [Number(route.destination_longitude), Number(route.destination_latitude)]];
+  const pointCoordinates = (point) => Array.isArray(point) ? [Number(point[0]), Number(point[1])] : [Number(point && point.longitude), Number(point && point.latitude)];
+  const validCoordinates = (point) => point.every((value) => Number.isFinite(value));
+  const fallbackPoints = (route) => {
+    const pathPoints = Array.isArray(route.path_points) ? route.path_points.map(pointCoordinates).filter(validCoordinates) : [];
+    if (pathPoints.length >= 2) return pathPoints;
+    const routePoints = Array.isArray(route.route_points) ? route.route_points.map(pointCoordinates).filter(validCoordinates) : [];
+    if (routePoints.length >= 2) return routePoints;
+    const destination = [Number(route.destination_longitude), Number(route.destination_latitude)];
+    return validCoordinates(destination) ? [[125.305, 43.865], destination] : [[125.305, 43.865], [125.42, 43.92]];
+  };
   const toScreenPoints = (route) => {
-    const source = Array.isArray(route.route_points) && route.route_points.length >= 2 ? route.route_points : fallbackPoints(route);
-    return source.map((point) => Array.isArray(point) ? geoPoint(point[0], point[1]) : geoPoint(point.longitude, point.latitude));
+    return fallbackPoints(route).map((point) => geoPoint(point[0], point[1]));
   };
   const lineLength = (from, to) => Math.hypot(to[0] - from[0], to[1] - from[1]);
   const pointOnRoute = (points, progress) => {
@@ -416,20 +447,48 @@ function renderRouteMap(items) {
     }
     return points.at(-1);
   };
-  const geometries = routes.map((route) => {
+  const spreadVehiclePoints = (entries) => {
+    const placed = [];
+    const clampScreen = (value, minimum, maximum) => Math.max(minimum, Math.min(maximum, value));
+    return entries.map((geometry, index) => {
+      const original = geometry.vehicle;
+      let vehicle = [...original];
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        if (!placed.some((point) => Math.hypot(vehicle[0] - point[0], vehicle[1] - point[1]) < 6.2)) break;
+        const angle = index * 2.399963 + attempt * (Math.PI / 4);
+        const radius = 6.4 + Math.floor(attempt / 8) * 1.8;
+        vehicle = [
+          clampScreen(original[0] + Math.cos(angle) * radius, 4, 96),
+          clampScreen(original[1] + Math.sin(angle) * radius, 4, 94),
+        ];
+      }
+      placed.push(vehicle);
+      return { ...geometry, vehicle };
+    });
+  };
+  const geometries = spreadVehiclePoints(routes.map((route) => {
     const points = toScreenPoints(route);
     const progress = Number.isFinite(Number(route.route_progress_percent)) ? Number(route.route_progress_percent) / 100 : .42;
     return { route, points, destination: points.at(-1), vehicle: pointOnRoute(points, progress), progress: Math.round(progress * 100) };
-  });
+  }));
   const routePaths = geometries.map(({ route, points }) => {
     const d = points.map((point, index) => (index ? 'L ' : 'M ') + point[0].toFixed(1) + ' ' + point[1].toFixed(1)).join(' ');
-    return '<path class="map-route-path ' + (route.anomaly ? 'abnormal' : '') + '" d="' + d + '"><title>' + escapeHtml(route.destination_district + ' · 模拟运输路线') + '</title></path>';
+    return '<path class="map-route-path ' + (route.anomaly ? 'abnormal' : '') + '" d="' + d + '"><title>' + escapeHtml((route.destination_district || route.destination || '目的地待确认') + ' · 模拟运输路线') + '</title></path>';
   }).join('');
-  const nodes = geometries.map(({ route, destination }) => '<button type="button" class="map-node ' + (route.anomaly ? 'abnormal' : '') + '" style="--x:' + destination[0].toFixed(1) + '%;--y:' + destination[1].toFixed(1) + '%" data-route-id="' + escapeHtml(route.task_id) + '" title="' + escapeHtml(route.destination_district) + '：' + escapeHtml(route.vehicle_type_name) + '，' + escapeHtml(route.driver_name) + '，' + escapeHtml(route.license_plate) + '"><i></i><strong>' + escapeHtml(route.destination_district) + '</strong><small>' + escapeHtml(route.status) + '</small></button>').join('');
-  const vehicles = geometries.map(({ route, vehicle, progress }) => '<button type="button" class="map-vehicle ' + (route.anomaly ? 'abnormal' : '') + '" style="--x:' + vehicle[0].toFixed(1) + '%;--y:' + vehicle[1].toFixed(1) + '%" data-route-id="' + escapeHtml(route.task_id) + '" aria-label="' + escapeHtml(route.driver_name + ' · ' + route.license_plate + ' · 路线进度 ' + progress + '%') + '" title="' + escapeHtml(route.driver_name + ' · ' + route.license_plate + ' · 路线进度 ' + progress + '%') + '"><span aria-hidden="true">🚚</span><small>' + escapeHtml(route.license_plate) + '</small></button>').join('');
+  const routeDestination = (route) => route.destination_district || route.destination || '目的地待确认';
+  const routeDriver = (route) => route.driver_name || (route.driver_id ? '司机 ' + route.driver_id : '司机待分配');
+  const routeVehicle = (route) => route.license_plate || route.plate_no || (route.vehicle_id ? '车辆 ' + route.vehicle_id : '车牌未公开');
+  const routeType = (route) => route.vehicle_type_name || route.vehicle_type_id || '车型待确认';
+  const nodes = geometries.map(({ route, destination }) => '<button type="button" class="map-node ' + (route.anomaly ? 'abnormal' : '') + '" style="--x:' + destination[0].toFixed(1) + '%;--y:' + destination[1].toFixed(1) + '%" data-route-id="' + escapeHtml(route.task_id) + '" title="' + escapeHtml(routeDestination(route) + '：' + routeType(route) + '，' + routeDriver(route) + '，' + routeVehicle(route)) + '"><i></i><strong>' + escapeHtml(routeDestination(route)) + '</strong><small>' + escapeHtml(route.status || '状态待确认') + '</small></button>').join('');
+  const vehicles = geometries.map(({ route, vehicle, progress }) => '<button type="button" class="map-vehicle ' + (route.anomaly ? 'abnormal' : '') + '" style="--x:' + vehicle[0].toFixed(1) + '%;--y:' + vehicle[1].toFixed(1) + '%" data-route-id="' + escapeHtml(route.task_id) + '" aria-label="' + escapeHtml(routeDriver(route) + ' · ' + routeVehicle(route) + ' · 路线进度 ' + progress + '%') + '" title="' + escapeHtml(routeDriver(route) + ' · ' + routeVehicle(route) + ' · 路线进度 ' + progress + '%') + '"><span aria-hidden="true">🚚</span><small>' + escapeHtml(routeVehicle(route)) + '</small></button>').join('');
   const tiles = tileCoords.map(([x, y]) => '<img src="https://tile.openstreetmap.org/' + tileZoom + '/' + x + '/' + y + '.png" alt="" loading="eager" draggable="false" referrerpolicy="no-referrer">').join('');
-  const scene = '<div class="map-scene" style="--map-zoom:' + state.publicMapZoom.toFixed(2) + '"><div class="map-tile-layer" aria-hidden="true">' + tiles + '</div><div class="map-grid-label">长春市服务范围 · 模拟路线与车辆位置</div><svg class="map-route-layer" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="长春市模拟运输路线">' + routePaths + '</svg><div class="map-center-node" style="--x:' + center[0].toFixed(1) + '%;--y:' + center[1].toFixed(1) + '%"><i></i><strong>新安食品产业园</strong><small>长春市中心节点</small></div>' + nodes + vehicles + '</div>';
-  el.innerHTML = scene + '<div class="map-attribution">© OpenStreetMap contributors · DEMO_SIMULATION</div><div id="public-route-detail" class="map-route-detail" hidden></div>';
+  const mapFallback = `<svg class="map-fallback" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="长春市服务范围演示底图"><defs><linearGradient id="mapFallbackBg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0a3d69"/><stop offset="1" stop-color="#061d3b"/></linearGradient></defs><rect width="100" height="100" fill="url(#mapFallbackBg)"/><path class="map-fallback-river" d="M-4 70 C 18 61, 26 75, 43 61 S 66 35, 105 43"/><path class="map-fallback-road" d="M5 84 L28 62 L49 49 L77 19 M19 5 L38 33 L49 49 L87 84 M2 40 L30 45 L49 49 L98 53 M13 98 L35 72 L49 49 L60 3"/><path class="map-fallback-boundary" d="M8 14 L30 6 L53 12 L73 7 L94 23 L88 46 L96 69 L78 94 L54 87 L34 96 L13 79 L7 55 Z M30 6 L38 33 L30 45 L34 72 L54 87 M53 12 L49 49 L60 70 L78 94 M73 7 L66 31 L88 46 L77 63 L96 69"/><g class="map-fallback-labels"><text x="45" y="47">长春市</text><text x="60" y="28">长春新区</text><text x="76" y="46">九台区</text><text x="27" y="39">宽城区</text><text x="20" y="62">绿园区</text><text x="39" y="78">双阳区</text><text x="64" y="73">净月区</text><text x="11" y="83">公主岭市</text><text x="80" y="18">德惠市</text><text x="5" y="28">农安县</text><text x="52" y="96">榆树市</text></g><text class="map-fallback-caption" x="4" y="8">长春市服务范围 · 本地演示底图</text></svg>`;
+  const scene = '<div class="map-scene" style="--map-zoom:' + state.publicMapZoom.toFixed(2) + '">' + mapFallback + '<div class="map-tile-layer" aria-hidden="true">' + tiles + '</div><div class="map-grid-label">长春市服务范围 · 模拟路线与车辆位置</div><svg class="map-route-layer" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="长春市模拟运输路线">' + routePaths + '</svg><div class="map-center-node" style="--x:' + center[0].toFixed(1) + '%;--y:' + center[1].toFixed(1) + '%"><i></i><strong>新安食品产业园</strong><small>长春市中心节点</small></div>' + nodes + vehicles + '</div>';
+  el.innerHTML = scene + '<div class="map-attribution">© OpenStreetMap contributors · 瓦片失败自动切换本地演示底图 · DEMO_SIMULATION</div><div id="public-route-detail" class="map-route-detail" aria-live="polite" hidden></div>';
+  const tileImages = [...el.querySelectorAll('.map-tile-layer img')];
+  el.dataset.mapTileStatus = tileImages.length ? 'loading' : 'fallback';
+  tileImages.forEach((image) => image.addEventListener('error', () => { image.hidden = true; el.dataset.mapTileStatus = 'fallback'; }));
+  tileImages.forEach((image) => image.addEventListener('load', () => { if (tileImages.every((tile) => tile.complete && !tile.hidden)) el.dataset.mapTileStatus = 'tiles'; }));
   const detail = document.getElementById('public-route-detail');
   el.querySelectorAll('.map-node, .map-vehicle').forEach((button) => button.addEventListener('click', () => {
     if (state.publicMapSuppressClickUntil > Date.now()) return;
@@ -437,7 +496,7 @@ function renderRouteMap(items) {
     const route = geometry && geometry.route;
     if (!route || !detail) return;
     detail.hidden = false;
-    detail.innerHTML = '<strong>' + escapeHtml(route.destination_district) + ' · ' + escapeHtml(route.destination) + '</strong><span>' + escapeHtml(route.driver_name) + ' · ' + escapeHtml(route.license_plate) + ' · ' + escapeHtml(route.vehicle_type_name) + '</span><span>' + escapeHtml(route.required_vehicle_count) + ' 辆 · ' + escapeHtml(formatMoney(route.estimated_fee)) + ' · 路线进度 ' + escapeHtml(geometry.progress) + '% · ' + (route.anomaly ? '异常：' : '状态：') + escapeHtml(route.anomaly ? route.anomaly_reason : route.status) + '</span>';
+    detail.innerHTML = '<strong>' + escapeHtml(routeDestination(route) + ' · ' + (route.destination || '目的地待确认')) + '</strong><span>任务 ' + escapeHtml(route.task_id || '未关联') + ' · 车辆 ' + escapeHtml(route.vehicle_id || '未分配') + '</span><span>' + escapeHtml(routeDriver(route)) + ' · ' + escapeHtml(routeVehicle(route)) + ' · ' + escapeHtml(routeType(route)) + '</span><span>' + escapeHtml(route.required_vehicle_count || '—') + ' 辆 · ' + escapeHtml(formatMoney(route.estimated_fee)) + ' · 路线进度 ' + escapeHtml(geometry.progress) + '% · ' + (route.anomaly ? '异常：' : '状态：') + escapeHtml(route.anomaly ? (route.anomaly_reason || '监测异常') : (route.status || '状态待确认')) + '</span>';
   }));
   const zoomLevel = document.getElementById('public-map-zoom-level');
   const mapScene = el.querySelector('.map-scene');
@@ -518,14 +577,66 @@ function renderRouteMap(items) {
   applyMapView();
 }
 
+function answerAssistantQuestion(question, summary, preorderItems) {
+  const normalized = String(question || '').toLowerCase();
+  const warningCount = Number(summary.warning_count || summary.inventory_alert_count || 0);
+  const preorderCount = Array.isArray(preorderItems) ? preorderItems.length : 0;
+  if (normalized.includes('库存') || normalized.includes('补货') || normalized.includes('预警')) return `规则演示：当前建议优先检查 ${warningCount || '若干'} 条库存/产能预警，补货后将缺口反馈给生产计划。`;
+  if (normalized.includes('订单') || normalized.includes('排产') || normalized.includes('计划')) return `规则演示：长春市服务范围内有 ${preorderCount} 条预订单，建议先按品类和目的地区域合并排产。`;
+  if (normalized.includes('运输') || normalized.includes('车辆') || normalized.includes('物流')) return '规则演示：运输匹配按车型温控范围、所需车辆数量、费用和路线状态综合排序。';
+  if (normalized.includes('采购') || normalized.includes('原料') || normalized.includes('供应商')) return '规则演示：集中采购建议结合历史导入的食材、数量、单价和供应商类型，优先比较园区直供与其他生产商报价。';
+  return '当前是规则演示，可继续询问库存预警、订单排产、运输匹配或集中采购。正式环境可在此接入 AI 问答接口。';
+}
+
+function appendAssistantMessage(container, role, message) {
+  const row = document.createElement('div');
+  row.className = `assistant-message ${role}`;
+  const avatar = document.createElement('div');
+  avatar.className = 'assistant-avatar';
+  avatar.setAttribute('aria-hidden', 'true');
+  avatar.textContent = role === 'user' ? '我' : '🤖';
+  const bubble = document.createElement('div');
+  bubble.className = 'assistant-bubble';
+  const label = document.createElement('small');
+  label.textContent = role === 'user' ? '当前提问' : '园区协同机器人 · 在线';
+  const answer = document.createElement('p');
+  answer.className = 'assistant-answer';
+  answer.textContent = message;
+  bubble.append(label, answer);
+  row.append(avatar, bubble);
+  container.appendChild(row);
+}
+
 function renderAssistant(summary, preorderItems) {
   const el = document.getElementById('public-assistant');
   if (!el) return;
-  const warningCount = Number(summary.warning_count || 0);
-  const preorderCount = Array.isArray(preorderItems) ? preorderItems.length : 0;
-  el.innerHTML = '<div class="assistant-widget"><div class="assistant-avatar" aria-hidden="true">🤖</div><div class="assistant-bubble"><small>园区协同机器人 · 在线</small><p class="assistant-answer" id="public-assistant-answer">已接收长春市服务范围数据：' + escapeHtml(summary.enterprise_count) + ' 家企业、' + escapeHtml(summary.order_count_total) + ' 笔订单。当前建议优先关注 ' + escapeHtml(warningCount) + ' 条库存/产能预警。</p></div></div><div class="assistant-questions"><button type="button" data-answer="建议先向长春市净月区生鲜节点补货，并把净菜产能反馈给生产计划。">库存预警</button><button type="button" data-answer="当前长春市周边有 ' + escapeHtml(preorderCount) + ' 条预订单，建议按区域合并车辆后再确认费用。">订单排产</button><button type="button" data-answer="运输匹配会优先选择温控范围匹配、距离较近且状态正常的车辆。">运输匹配</button></div>';
-  const answer = document.getElementById('public-assistant-answer');
-  el.querySelectorAll('.assistant-questions button').forEach((button) => button.addEventListener('click', () => { if (answer) answer.textContent = button.dataset.answer; }));
+  const warningCount = Number(summary.warning_count || summary.inventory_alert_count || 0);
+  el.innerHTML = '<div id="public-assistant-messages" class="assistant-messages" aria-live="polite"></div><div class="assistant-questions"><button type="button" data-question="请列出当前库存预警。">库存预警</button><button type="button" data-question="当前订单如何排产？">订单排产</button><button type="button" data-question="运输车辆如何匹配？">运输匹配</button></div><button type="button" id="public-assistant-launcher" class="assistant-question-launcher" aria-expanded="false">＋ 输入问题</button><form id="public-assistant-form" class="assistant-question-form" hidden><input id="public-assistant-input" type="text" maxlength="120" autocomplete="off" placeholder="输入问题，例如：哪些库存需要补货？" aria-label="输入问题" /><button type="submit">发送</button></form>';
+  const messages = document.getElementById('public-assistant-messages');
+  const form = document.getElementById('public-assistant-form');
+  const input = document.getElementById('public-assistant-input');
+  const launcher = document.getElementById('public-assistant-launcher');
+  if (!messages || !form || !input || !launcher) return;
+  appendAssistantMessage(messages, 'assistant', `已接收长春市服务范围数据：${summary.enterprise_count || '—'} 家企业、${summary.order_count_total || '—'} 笔订单。当前建议优先关注 ${warningCount || '若干'} 条库存/产能预警。`);
+  launcher.addEventListener('click', () => {
+    const shouldOpen = form.hidden;
+    form.hidden = !shouldOpen;
+    el.classList.toggle('assistant-ask-open', shouldOpen);
+    launcher.setAttribute('aria-expanded', String(shouldOpen));
+    launcher.textContent = shouldOpen ? '− 收起输入' : '＋ 输入问题';
+    if (shouldOpen) input.focus();
+  });
+  const sendQuestion = (question) => {
+    const value = String(question || '').trim();
+    if (!value) return;
+    appendAssistantMessage(messages, 'user', value);
+    appendAssistantMessage(messages, 'assistant', answerAssistantQuestion(value, summary, preorderItems));
+    messages.scrollTop = messages.scrollHeight;
+    input.value = '';
+    setPublicText('public-sync-state', '协同助手已回答：' + value);
+  };
+  form.addEventListener('submit', (event) => { event.preventDefault(); sendQuestion(input.value); });
+  el.querySelectorAll('.assistant-questions button').forEach((button) => button.addEventListener('click', () => sendQuestion(button.dataset.question)));
 }
 function applyPublicScreenScale() {
   const canvas = document.getElementById('public-screen-canvas');
@@ -545,11 +656,32 @@ function updatePublicClock() {
 async function togglePublicFullscreen() {
   try {
     if (document.fullscreenElement) await document.exitFullscreen();
-    else await document.documentElement.requestFullscreen();
+    else {
+      const stage = document.getElementById('public');
+      const target = stage && typeof stage.requestFullscreen === 'function' ? stage : document.documentElement;
+      if (!document.fullscreenEnabled || typeof target.requestFullscreen !== 'function') throw new Error('当前浏览器不允许网页全屏');
+      await target.requestFullscreen();
+    }
   } catch (error) {
     const stateEl = document.getElementById('public-sync-state');
     if (stateEl) stateEl.textContent = `全屏切换失败：${error.message}`;
   }
+}
+
+function applyPublicTheme(theme) {
+  const isDay = theme === 'day';
+  document.body.classList.toggle('screen-day', isDay);
+  const button = document.getElementById('public-theme-toggle');
+  if (!button) return;
+  button.textContent = isDay ? '夜间模式' : '日间模式';
+  button.title = isDay ? '切换到夜间模式' : '切换到日间模式';
+  button.setAttribute('aria-pressed', String(isDay));
+}
+
+function togglePublicTheme() {
+  const theme = document.body.classList.contains('screen-day') ? 'night' : 'day';
+  localStorage.setItem('publicTheme', theme);
+  applyPublicTheme(theme);
 }
 
 function setupOverviewDetails() {
@@ -686,6 +818,55 @@ async function loadOverview() {
   setMessage('E01 总览加载完成。', 'success');
 }
 
+function renderOperationalAlerts(resource, items, enterpriseNames = {}) {
+  const el = document.getElementById('inventory-alerts');
+  if (!el) return;
+  const rows = Array.isArray(items) ? items : [];
+  const enterpriseLabel = (item) => enterpriseNames[item.enterprise_id] || item.enterprise_name || item.enterprise_id || '未关联企业';
+  const itemMarkup = (level, title, detail, action) => `<article class="operation-alert ${level}"><div><strong>${escapeHtml(title)}</strong><small>${escapeHtml(detail)}</small></div><b>${escapeHtml(action)}</b></article>`;
+  let heading = '运行提醒';
+  let alerts = [];
+  if (resource === 'inventories') {
+    heading = '库存预警条目';
+    alerts = rows.filter((item) => {
+      const current = Number(item.current_qty);
+      const safety = Number(item.safety_stock_qty);
+      return String(item.inventory_alert_status || item.warning_status || '').toUpperCase() === 'WARNING' || (Number.isFinite(current) && Number.isFinite(safety) && current < safety);
+    }).map((item) => {
+      const current = Number(item.current_qty) || 0;
+      const safety = Number(item.safety_stock_qty);
+      const target = Number(item.target_stock_qty);
+      const unit = item.unit || '件';
+      const threshold = Number.isFinite(safety) ? safety : 0;
+      const gap = Number.isFinite(target) ? Math.max(0, target - current) : Math.max(0, threshold - current);
+      const level = threshold && current <= threshold * .5 ? 'critical' : 'warning';
+      return itemMarkup(level, `${enterpriseLabel(item)} · ${item.product_name || item.product_id || '未命名物料'}`, `当前 ${formatNumber(current)} ${unit} · 预警阈值 ${Number.isFinite(safety) ? formatNumber(safety) + ' ' + unit : '待审批'} · 建议补 ${formatNumber(gap)} ${unit}`, level === 'critical' ? '立即补货' : '安排补货');
+    });
+  } else if (resource === 'sales-order-lines') {
+    heading = '销售履约提醒';
+    alerts = rows.filter((item) => !['SETTLED', 'COMPLETED', 'CLOSED'].includes(String(item.status || '').toUpperCase())).map((item) => {
+      const status = String(item.status || '待确认').toUpperCase();
+      const action = status === 'PROCESSING' ? '跟进出库' : '确认履约';
+      return itemMarkup(status === 'PROCESSING' ? 'warning' : 'info', `${enterpriseLabel(item)} · ${item.product_name || item.product_id || '未命名商品'}`, `订单 ${item.sales_order_id || '—'} · 数量 ${formatNumber(item.quantity)} · 金额 ${formatMoney(item.order_amount)} · 状态 ${item.status || '待确认'}`, action);
+    });
+  } else if (resource === 'freezer-records') {
+    heading = '冻库监控预警';
+    alerts = rows.map((item) => {
+      const used = Number(item.used_volume_m3) || 0;
+      const total = Number(item.total_volume_m3) || 0;
+      const occupancy = total ? used / total * 100 : 0;
+      const temperature = Number(item.temperature_celsius);
+      const reasons = [];
+      if (occupancy >= 80) reasons.push(`容量占用 ${occupancy.toFixed(1)}%`);
+      if (Number.isFinite(temperature) && temperature > -16) reasons.push(`温度 ${temperature.toFixed(1)}℃偏高`);
+      if (!reasons.length) return null;
+      return itemMarkup(occupancy >= 80 ? 'critical' : 'warning', `${enterpriseLabel(item)} · ${item.freezer_id || '冻库记录'}`, `${reasons.join('、')} · 冻品 ${formatNumber(item.frozen_goods_kg)} kg`, occupancy >= 80 ? '调整入库' : '检查温控');
+    }).filter(Boolean);
+  }
+  const sourceNote = rows.length ? '演示规则 · DEMO_SIMULATION' : '当前资源没有可展示的记录';
+  el.innerHTML = `<div class="operation-alert-heading"><strong>${escapeHtml(heading)}</strong><span>${escapeHtml(alerts.length)} 条 · ${escapeHtml(sourceNote)}</span></div>${alerts.length ? alerts.join('') : '<div class="operation-alert-empty">当前资源暂无需要处理的预警条目。</div>'}`;
+}
+
 async function loadResource(section) {
   const resource = state.resource[section];
   const resultTarget = `${section}-table`;
@@ -701,8 +882,10 @@ async function loadResource(section) {
   const total = document.getElementById(`${section}-total`);
   if (total) total.textContent = `${data.total || 0} 条记录`;
   if (section === 'inventory') {
-    const alerts = (data.items || []).filter((item) => item.inventory_alert_status || item.warning_status === 'WARNING');
-    document.getElementById('inventory-alerts').textContent = alerts.length ? `当前列表有 ${alerts.length} 条库存预警，状态：${alerts.map((item) => item.inventory_alert_status || item.warning_status).join('、')}。` : '当前列表暂无已生成库存预警；阈值申请需企业提交并由园区审批。';
+    const enterpriseResult = await getAPI().list('enterprises');
+    const enterpriseItems = enterpriseResult.ok ? (dataOf(enterpriseResult) || {}).items || [] : [];
+    const enterpriseNames = Object.fromEntries(enterpriseItems.map((item) => [item.enterprise_id, item.enterprise_name]));
+    renderOperationalAlerts(resource, data.items || [], enterpriseNames);
   }
   if (section === 'transport') {
     const monitored = (data.items || []).filter((item) => item.telemetry && item.telemetry.length);
@@ -847,6 +1030,7 @@ function showSection(section) {
   if (section === 'overview') loadOverview();
   if (RESOURCE_GROUPS[section]) loadResource(section);
   if (isPublic) {
+    applyPublicTheme(localStorage.getItem('publicTheme') === 'day' ? 'day' : 'night');
     updatePublicClock();
     requestAnimationFrame(applyPublicScreenScale);
     loadPublicDashboard();
@@ -909,6 +1093,7 @@ function initPage() {
   document.getElementById('run-calculation').addEventListener('click', loadCalculation);
   document.getElementById('public-refresh').addEventListener('click', loadPublicDashboard);
   document.getElementById('public-fullscreen').addEventListener('click', togglePublicFullscreen);
+  document.getElementById('public-theme-toggle').addEventListener('click', togglePublicTheme);
   document.getElementById('public-exit').addEventListener('click', exitPublicScreen);
   document.getElementById('public-enterprise-toggle').addEventListener('click', () => {
     state.publicEnterpriseExpanded = !state.publicEnterpriseExpanded;
@@ -923,7 +1108,11 @@ function initPage() {
   }));
   window.addEventListener('resize', applyPublicScreenScale);
   document.addEventListener('fullscreenchange', () => {
-    document.getElementById('public-fullscreen').textContent = document.fullscreenElement ? '退出全屏' : '全屏';
+    const button = document.getElementById('public-fullscreen');
+    if (button) {
+      button.textContent = document.fullscreenElement ? '退出全屏' : '全屏';
+      button.title = document.fullscreenElement ? '退出浏览器全屏' : '进入浏览器全屏';
+    }
     applyPublicScreenScale();
   });
   updatePublicClock();

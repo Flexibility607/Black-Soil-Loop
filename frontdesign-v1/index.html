@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="黑土闭环 B01 网页后端的 E01 管理台与 E02 公开大屏" />
   <title>黑土闭环 · E01 / E02</title>
-  <link rel="stylesheet" href="styles.css?v=20260727-kpi-trend-hover-7" />
+  <link rel="stylesheet" href="styles.css?v=20260729-assistant-collapse-1" />
 </head>
 <body>
   <div class="app-shell">
@@ -87,7 +87,7 @@
         <div class="section-heading"><div><p class="eyebrow">B01 RECORDS</p><h2>库存、销售与冻库</h2></div><span id="inventory-total" class="data-count">—</span></div>
         <div class="toolbar"><label>资源<select id="inventory-resource"></select></label><button id="inventory-refresh" class="button secondary" type="button">刷新</button></div>
         <div id="inventory-table" class="table-card"></div>
-        <div id="inventory-alerts" class="notice-card operation-note">库存预警会在企业阈值审批通过后按当前库存自动计算。</div>
+        <div id="inventory-alerts" class="notice-card operation-note" aria-live="polite">选择库存、销售订单明细或冻库记录后显示具体预警条目。</div>
       </section>
 
       <section id="transport" class="page-section">
@@ -117,7 +117,7 @@
           <header class="screen-header">
             <div class="screen-brand-block"><span class="screen-brand-mark">土</span><div><strong>黑土闭环</strong><span>BLACK SOIL LOOP</span></div></div>
             <div class="screen-title-block"><div><span>长春市服务辐射 · 生产 · 采购 · 物流</span><h2>新安食品产业园产销协同大屏</h2></div><b>长春市 · DEMO</b></div>
-            <div class="screen-control-block"><div class="screen-clock"><strong id="public-clock">--:--:--</strong><span id="public-date">----</span></div><button id="public-refresh" class="screen-button" type="button">刷新数据</button><button id="public-fullscreen" class="screen-button" type="button">全屏</button><button id="public-exit" class="screen-button muted" type="button">返回 E01</button></div>
+            <div class="screen-control-block"><div class="screen-clock"><strong id="public-clock">--:--:--</strong><span id="public-date">----</span></div><button id="public-refresh" class="screen-button" type="button">刷新数据</button><button id="public-theme-toggle" class="screen-button" type="button" aria-pressed="false" title="切换到日间模式">日间模式</button><button id="public-fullscreen" class="screen-button" type="button" title="进入浏览器全屏">全屏</button><button id="public-exit" class="screen-button muted" type="button">返回 E01</button></div>
           </header>
 
           <div class="screen-kpi-grid">
@@ -152,7 +152,7 @@
       </section>
     </main>
   </div>
-  <script src="api.js?v=20260726-rich-mocks-2"></script>
-  <script src="scripts.js?v=20260727-kpi-trend-hover-7"></script>
+  <script src="api.js?v=20260729-assistant-collapse-1"></script>
+  <script src="scripts.js?v=20260729-assistant-collapse-1"></script>
 </body>
 </html>

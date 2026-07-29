@@ -22,6 +22,67 @@ from app.schemas.common import ResponseEnvelope, response_envelope
 router = APIRouter(tags=["E01 Analytics"])
 public_router = APIRouter(tags=["E02 Public Dashboard"])
 
+PUBLIC_POLICY_LINKS = {
+    "northeast_revitalization": "https://www.ndrc.gov.cn/xwdt/xwfb/201603/t20160302_955443.html",
+    "northeast_plan": "https://www.ndrc.gov.cn/xxgk/zcfb/ghwb/201612/t20161219_962212.html",
+    "fifteenth_plan": "https://www.npc.gov.cn/npc/c2/c30834/202603/t20260316_453274.html",
+    "food_safety": "https://flk.npc.gov.cn/detail?fileId=&id=ff8081817ab22e0c017abd8d85a205f1&title=%E4%B8%AD%E5%8D%8E%E4%BA%BA%E6%B0%91%E5%85%B1%E5%92%8C%E5%9B%BD%E9%A3%9F%E5%93%81%E5%AE%89%E5%85%A8%E6%B3%95&type=",
+    "cold_chain": "https://scs.moa.gov.cn/ccll/zcwj/202312/t20231228_6443655.htm",
+    "cold_storage": "https://scs.moa.gov.cn/ccll/zcwj/202302/t20230203_6419753.htm",
+    "changchun_industry": "https://drc.changchun.gov.cn/fzgg/fzgh/202206/P020220613588246984615.pdf",
+    "changchun_logistics": "https://zwgk.changchun.gov.cn/sy/syqrmzfbgs/zfxxgkml/202512/t20251222_3453747.html",
+    "green_food": "https://fgs.moa.gov.cn/flfg/202201/t20220127_6387807.htm",
+    "county_commerce": "https://dcj.mofcom.gov.cn/article/zcfb/zcgnmy/202106/20210603070393.shtml",
+    "green_supply_chain": "https://www.mee.gov.cn/xxgk2018/xxgk/xxgk15/201804/t20180425_630113_wh.html",
+    "leading_enterprise": "https://fgs.moa.gov.cn/flfg/202110/t20211026_6380529.htm",
+    "digital_agriculture": "https://www.cac.gov.cn/2020-01/21/c_1581145429704893.htm",
+}
+
+GENERIC_POLICY_URLS = {
+    "https://www.gov.cn/",
+    "https://www.npc.gov.cn/",
+    "https://www.ndrc.gov.cn/",
+    "https://www.samr.gov.cn/",
+    "https://www.moa.gov.cn/",
+    "https://www.changchun.gov.cn/",
+    "https://jtysj.changchun.gov.cn/",
+    "https://www.greenfood.org.cn/",
+}
+
+
+def public_policy_source(policy: Policy) -> tuple[str, bool, str]:
+    original_url = (policy.source_url or "").rstrip("/") + "/" if policy.source_url else ""
+    if original_url and original_url not in GENERIC_POLICY_URLS:
+        return policy.source_url, True, "原始政策来源"
+    text = f"{policy.title} {policy.category} {policy.summary}"
+    if "食品安全" in text:
+        return PUBLIC_POLICY_LINKS["food_safety"], True, "全国人大国家法律法规数据库：中华人民共和国食品安全法"
+    if "绿色供应链" in text or "节能降碳" in text:
+        return PUBLIC_POLICY_LINKS["green_supply_chain"], True, "生态环境部等部门：绿色供应链创新与应用"
+    if "绿色食品" in text:
+        return PUBLIC_POLICY_LINKS["green_food"], True, "农业农村部：绿色食品标志管理办法"
+    if "产地冷藏" in text or "农业设施" in text:
+        return PUBLIC_POLICY_LINKS["cold_storage"], True, "农业农村部：农产品产地冷藏保鲜设施建设通知"
+    if "冷链" in text or "温控" in text:
+        return PUBLIC_POLICY_LINKS["cold_chain"], True, "农业农村部：农产品冷藏保鲜设施建设工作通知"
+    if "十五五" in text:
+        return PUBLIC_POLICY_LINKS["fifteenth_plan"], True, "全国人大：中华人民共和国国民经济和社会发展第十五个五年规划纲要"
+    if "东北" in text and "规划" in text:
+        return PUBLIC_POLICY_LINKS["northeast_plan"], True, "国家发展改革委：东北振兴“十三五”规划"
+    if "东北" in text or "振兴" in text:
+        return PUBLIC_POLICY_LINKS["northeast_revitalization"], True, "国家发展改革委：新一轮东北振兴公开政策参考"
+    if "县域商业" in text or "商业体系" in text or "农产品流通" in text:
+        return PUBLIC_POLICY_LINKS["county_commerce"], True, "商务部：县域商业体系建设与农村消费意见"
+    if "龙头企业" in text or "企业培育" in text:
+        return PUBLIC_POLICY_LINKS["leading_enterprise"], True, "农业农村部：促进农业产业化龙头企业做大做强"
+    if "数字乡村" in text or "数字农业" in text or "供应链数据" in text:
+        return PUBLIC_POLICY_LINKS["digital_agriculture"], True, "中央网信办等部门：数字农业农村发展规划"
+    if "配送" in text or "物流" in text:
+        return PUBLIC_POLICY_LINKS["changchun_logistics"], True, "长春市双阳区政府工作报告：物流与冷链产业部署"
+    if "长春" in text or "食品产业" in text:
+        return PUBLIC_POLICY_LINKS["changchun_industry"], True, "长春市发展和改革委员会：长春市“十四五”产业体系"
+    return policy.source_url, False, "演示来源待核验"
+
 
 def number(value: Any) -> float:
     return float(value or 0)
@@ -571,12 +632,47 @@ def public_transport(request: Request, db: Annotated[Session, Depends(get_db)], 
     ids = [enterprise.enterprise_id for enterprise in public_enterprises(db, park_id)]
     records = db.scalars(select(TransportTaskSummary).where(TransportTaskSummary.enterprise_id.in_(ids))).all() if ids else []
     telemetry = db.scalars(select(TransportTelemetry).where(TransportTelemetry.task_id.in_([record.task_id for record in records]))).all() if records else []
-    items = [{"task_id": record.task_id, "status": record.status, "planned_depart_at": record.planned_depart_at, "planned_arrive_at": record.planned_arrive_at, "vehicle_type_id": record.vehicle_type_id, "vehicle_type_name": record.vehicle_type_name, "required_vehicle_count": record.required_vehicle_count, "estimated_fee": number(record.estimated_fee), "currency": record.currency, "anomaly": any(point.anomaly_status != "NORMAL" for point in telemetry if point.task_id == record.task_id), "path_points": [{"recorded_at": point.recorded_at, "latitude": number(point.latitude), "longitude": number(point.longitude), "anomaly_status": point.anomaly_status, "point_color": "red" if point.anomaly_status != "NORMAL" else "green"} for point in telemetry if point.task_id == record.task_id]} for record in records]
+    resources = db.scalars(select(TransportResource)).all()
+    resource_by_vehicle = {resource.vehicle_id: resource for resource in resources}
+    resource_by_driver = {resource.driver_id: resource for resource in resources}
+    telemetry_by_task: dict[str, list[TransportTelemetry]] = {}
+    for point in telemetry:
+        telemetry_by_task.setdefault(point.task_id, []).append(point)
+    items = []
+    for record in records:
+        points = telemetry_by_task.get(record.task_id, [])
+        resource = resource_by_vehicle.get(record.vehicle_id) or resource_by_driver.get(record.driver_id)
+        if resource is None:
+            resource = next((item for item in resources if any(point.vehicle_id == item.vehicle_id for point in points)), None)
+        vehicle_id = record.vehicle_id or (points[0].vehicle_id if points else None) or (resource.vehicle_id if resource else None)
+        driver_id = record.driver_id or (resource.driver_id if resource else None)
+        items.append({
+            "task_id": record.task_id,
+            "enterprise_id": record.enterprise_id,
+            "status": record.status,
+            "planned_depart_at": record.planned_depart_at,
+            "planned_arrive_at": record.planned_arrive_at,
+            "origin": record.origin,
+            "destination": record.destination,
+            "vehicle_id": vehicle_id,
+            "driver_id": driver_id,
+            "resource_status": resource.status if resource else None,
+            "vehicle_type_id": record.vehicle_type_id,
+            "vehicle_type_name": record.vehicle_type_name or (resource.vehicle_type_name if resource else None),
+            "required_vehicle_count": record.required_vehicle_count,
+            "estimated_fee": number(record.estimated_fee),
+            "currency": record.currency,
+            "anomaly": any(point.anomaly_status != "NORMAL" for point in points),
+            "path_points": [{"recorded_at": point.recorded_at, "latitude": number(point.latitude), "longitude": number(point.longitude), "anomaly_status": point.anomaly_status, "point_color": "red" if point.anomaly_status != "NORMAL" else "green"} for point in points],
+        })
     return response_envelope(items, trace_id=request.state.trace_id)
 
 
 @public_router.get("/public/dashboard/policies", response_model=ResponseEnvelope[list[dict]])
 def public_policies(request: Request, db: Annotated[Session, Depends(get_db)]) -> dict:
     policies = db.scalars(select(Policy).where(Policy.status == "ACTIVE").order_by(Policy.effective_date.desc().nullslast(), Policy.published_date.desc().nullslast())).all()
-    items = [{"policy_id": policy.policy_id, "title": policy.title, "category": policy.category, "summary": policy.summary, "source_url": policy.source_url, "source_type": policy.source_type or "OFFICIAL", "published_date": policy.published_date, "effective_date": policy.effective_date} for policy in policies]
+    items = []
+    for policy in policies:
+        source_url, source_verified, source_name = public_policy_source(policy)
+        items.append({"policy_id": policy.policy_id, "title": policy.title, "category": policy.category, "summary": policy.summary, "source_url": source_url, "source_type": policy.source_type or "OFFICIAL", "source_verified": source_verified, "source_name": source_name, "published_date": policy.published_date, "effective_date": policy.effective_date})
     return response_envelope(items, trace_id=request.state.trace_id)

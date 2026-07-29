@@ -52,6 +52,7 @@
   }
 
   let mockResourceRowsCache;
+  let mockTransportBundleCache;
 
   async function fixture(name) {
     const res = await fetch(`${mockBase}/${name}`, { cache: 'no-store' });
@@ -63,6 +64,61 @@
     const result = await fixture('e01-resource-rows.json');
     mockResourceRowsCache = result.ok && result.json && result.json.data ? result.json.data.resources || {} : {};
     return mockResourceRowsCache;
+  }
+
+  function publicTransportStatus(status) {
+    return { CONFIRMED: '已确认', DRAFT: '待发车', IN_PROGRESS: '运输中', COMPLETED: '已完成', CANCELLED: '已取消' }[status] || status || '状态待确认';
+  }
+
+  function internalTransportStatus(status) {
+    return { '已确认': 'CONFIRMED', '待发车': 'DRAFT', '运输中': 'IN_PROGRESS', '已完成': 'COMPLETED', '已取消': 'CANCELLED' }[status] || status || 'DRAFT';
+  }
+
+  async function getMockTransportBundle() {
+    if (mockTransportBundleCache) return mockTransportBundleCache;
+    const [publicResult, resources] = await Promise.all([fixture('e02-public-transport-changchun.json'), getMockResourceRows()]);
+    if (!publicResult.ok || !publicResult.json || !Array.isArray(publicResult.json.data)) return null;
+    const sourceTasks = Array.isArray(resources['transport-task-summaries']) ? resources['transport-task-summaries'] : [];
+    const sourceResources = Array.isArray(resources['transport-resources']) ? resources['transport-resources'] : [];
+    const routeRows = publicResult.json.data;
+    const tasks = sourceTasks.map((task, index) => {
+      const route = routeRows[index] || {};
+      const vehicle = sourceResources[index] || {};
+      return {
+        ...task,
+        destination: route.destination || task.destination,
+        vehicle_id: vehicle.vehicle_id || task.vehicle_id,
+        driver_id: vehicle.driver_id || task.driver_id,
+        driver_name: vehicle.driver_name || task.driver_name,
+        vehicle_type_name: vehicle.vehicle_type || task.vehicle_type_name,
+        required_vehicle_count: route.required_vehicle_count ?? task.required_vehicle_count,
+        estimated_fee_cny: route.estimated_fee ?? task.estimated_fee_cny,
+        status: internalTransportStatus(route.status || task.status),
+      };
+    });
+    const linkedResources = sourceResources.map((resource, index) => ({ ...resource, task_id: tasks[index] ? tasks[index].task_id : null }));
+    const publicItems = routeRows.map((route, index) => {
+      const task = tasks[index] || {};
+      const vehicle = linkedResources[index] || {};
+      return {
+        ...route,
+        task_id: task.task_id || route.task_id,
+        enterprise_id: task.enterprise_id || route.enterprise_id,
+        vehicle_id: vehicle.vehicle_id || task.vehicle_id || route.vehicle_id,
+        driver_id: vehicle.driver_id || task.driver_id || route.driver_id,
+        driver_name: vehicle.driver_name || task.driver_name || route.driver_name,
+        driver_phone: vehicle.driver_phone || route.driver_phone,
+        license_plate: vehicle.license_plate || route.license_plate,
+        vehicle_type_id: task.vehicle_type_id || route.vehicle_type_id,
+        vehicle_type_name: vehicle.vehicle_type || task.vehicle_type_name || route.vehicle_type_name,
+        required_vehicle_count: task.required_vehicle_count ?? route.required_vehicle_count,
+        estimated_fee: task.estimated_fee_cny ?? route.estimated_fee,
+        status: publicTransportStatus(task.status || route.status),
+        source_record_id: task.source_record_id || route.source_record_id,
+      };
+    });
+    mockTransportBundleCache = { publicResult, tasks, resources: linkedResources, publicItems };
+    return mockTransportBundleCache;
   }
 
   async function mockRequest(path) {
@@ -82,11 +138,19 @@
     if (path === '/public/dashboard/overview') return fixture('e02-public-overview-changchun.json');
     if (path === '/public/dashboard/capacity') return fixture('e02-public-capacity-changchun.json');
     if (path === '/public/dashboard/preorders') return fixture('e02-public-preorders-changchun.json');
-    if (path === '/public/dashboard/transport') return fixture('e02-public-transport-changchun.json');
+    if (path === '/public/dashboard/transport') {
+      const bundle = await getMockTransportBundle();
+      if (bundle) return response(true, 200, { ...bundle.publicResult.json, data: bundle.publicItems });
+      return fixture('e02-public-transport-changchun.json');
+    }
     if (path === '/public/dashboard/policies') return fixture('e02-public-policies-changchun.json');
     if (path === '/public/dashboard/news') return fixture('e02-public-news-changchun.json');
     if (path === '/imports/precheck') return fixture('import-precheck-success.json');
     if (path.startsWith('/imports/') && path.endsWith('/confirm')) return fixture('import-precheck-success.json');
+    if (path === '/transport-task-summaries' || path === '/transport-resources') {
+      const bundle = await getMockTransportBundle();
+      if (bundle) return response(true, 200, mockList(path === '/transport-task-summaries' ? bundle.tasks : bundle.resources));
+    }
     const rows = await getMockResourceRows();
     return response(true, 200, mockList(rows[path.slice(1)] || []));
   }
