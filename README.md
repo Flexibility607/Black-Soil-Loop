@@ -133,6 +133,36 @@ E01 网页账号存放在业务数据库的 `users` 表中，与 PostgreSQL 连�
 - `list` 不显示用户 ID、密码或哈希。正式部署前应备份数据库，并轮换 `.env` 中的数据库密码和 `JWT_SECRET`。
 - 当前账户维护没有网页管理界面，也没有完整的维护操作审计表；演示阶段由可信运维人员在服务器本机执行命令。
 
+## Cloudflare 前端与 Mock 自动部署
+
+GitHub 仓库继续完整保留后端、前端、Mock、迁移、脚本和公开文档，克隆后可按本 README 在本机运行全量项目。Cloudflare 构建时仅把 E01/E02 静态前端和 JSON Mock 放入公开静态产物，不会从 GitHub 删除或裁剪后端文件，也不会把 `.env` 和数据库配置暴露为网页资源。线上演示保持“Mock 数据”开启；需要本地联调时再克隆完整仓库并启动 FastAPI/PostgreSQL。
+
+首次本地验证：
+
+```powershell
+npm install
+npm run build
+npm run cf:check
+```
+
+`npm run build` 会生成被 Git 忽略的 `dist/`，其中只包含 `frontdesign-v1` 的四个运行文件和 `frontend-mocks-v0.1` 的 JSON 文件。`npm run cf:dev` 可启动本地 Cloudflare 预览；`npm run cf:deploy` 可在已登录 Wrangler 时手动部署。
+
+在 Cloudflare Workers 的“导入 Git 仓库”页面填写：
+
+| 配置项 | 值 |
+|---|---|
+| 项目名称 | `black-soil-loop` |
+| 生产分支 | `main` |
+| 构建命令 | `npm run build` |
+| 部署命令 | `npx wrangler deploy` |
+| 非生产分支部署命令 | `npx wrangler versions upload` |
+| 路径 | `/` |
+| 构建变量 | 留空 |
+
+项目名称必须与 `wrangler.jsonc` 的 `name` 完全一致。Cloudflare 的 GitHub 集成连接成功后，每次推送 `main` 都会自动构建并更新生产部署；其他分支只有在启用“非生产分支构建”后才生成预览版本。
+
+截图里 API 令牌缺少的 SSL、Connectivity Directory 和 AI Search 权限不属于本静态站点。不要为了消除提示盲目扩大权限；只需确认所选构建令牌拥有 `Workers Scripts: Edit`。如果首次部署明确报权限错误，再在 Cloudflare 的 Builds 设置中创建或选择具备该权限的构建令牌。
+
 ## 测试与质量检查
 
 ```powershell

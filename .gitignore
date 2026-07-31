@@ -11,3 +11,6 @@ __pycache__/
 *.inspect.ndjson
 *.log
 tmp/
+node_modules/
+dist/
+.wrangler/
