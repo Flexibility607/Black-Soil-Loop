@@ -8,6 +8,8 @@
 - `frontdesign-v1/`：E01 管理台与 E02 16:9 演示大屏，无 Node 构建依赖。
 - `frontend-mocks-v0.1/`：前端 Mock 数据，含丰富的 E02 演示数据，并明确标记为模拟数据。
 - `start-dev.ps1`：Windows 一键启动后端和静态前端。
+- `verify-local.ps1`：使用真实 PostgreSQL、独立端口和 Cloudflare dry-run 验收本地全功能。
+- `verify-cloudflare.mjs`：对已部署域名检查前端资源、全部 Mock JSON 和 404 行为。
 - `manage-accounts.ps1`：仅供本机可信运维人员使用的 E01 账户维护入口。
 
 ## 本机启动
@@ -140,12 +142,12 @@ GitHub 仓库继续完整保留后端、前端、Mock、迁移、脚本和公开
 首次本地验证：
 
 ```powershell
-npm install
+npm ci
 npm run build
 npm run cf:check
 ```
 
-`npm run build` 会生成被 Git 忽略的 `dist/`，其中只包含 `frontdesign-v1` 的四个运行文件和 `frontend-mocks-v0.1` 的 JSON 文件。`npm run cf:dev` 可启动本地 Cloudflare 预览；`npm run cf:deploy` 可在已登录 Wrangler 时手动部署。
+`npm run build` 会先逐个解析 Mock 响应，再生成被 Git 忽略的 `dist/`；其中只包含 `frontdesign-v1` 的四个运行文件和 `frontend-mocks-v0.1` 的 JSON 文件。任一 JSON 损坏或缺少 `data` 字段都会让 Cloudflare 构建失败。`npm run cf:dev` 可启动本地 Cloudflare 预览；`npm run cf:deploy` 可在已登录 Wrangler 时手动部署。
 
 在 Cloudflare Workers 的“导入 Git 仓库”页面填写：
 
@@ -161,16 +163,35 @@ npm run cf:check
 
 项目名称必须与 `wrangler.jsonc` 的 `name` 完全一致。Cloudflare 的 GitHub 集成连接成功后，每次推送 `main` 都会自动构建并更新生产部署；其他分支只有在启用“非生产分支构建”后才生成预览版本。
 
+首次部署成功后，用 Cloudflare 显示的正式域名执行线上 Mock 冒烟测试：
+
+```powershell
+npm run verify:cloud -- https://你的域名.workers.dev
+```
+
+该命令会检查首页默认勾选 Mock、CSS/JavaScript、仓库内全部 18 个 JSON，以及缺失 Mock 必须返回 404。不要用本地 Wrangler 预览结果代替正式域名测试。
+
 截图里 API 令牌缺少的 SSL、Connectivity Directory 和 AI Search 权限不属于本静态站点。不要为了消除提示盲目扩大权限；只需确认所选构建令牌拥有 `Workers Scripts: Edit`。如果首次部署明确报权限错误，再在 Cloudflare 的 Builds 设置中创建或选择具备该权限的构建令牌。
 
 ## 测试与质量检查
 
+完整本机验收推荐直接执行：
+
 ```powershell
-.\.venv\Scripts\ruff.exe check app tests
-.\.venv\Scripts\python.exe -m pytest tests -q
+.\verify-local.ps1
 ```
 
-测试使用 SQLite 隔离库，不会修改本机 PostgreSQL。
+脚本依次运行 Ruff、24 个隔离测试、真实 PostgreSQL 迁移头与查询、6 个 E02 公共接口、CORS、Cloudflare 构建/dry-run，并在 `18000/18080` 独立端口启动真实后端和静态前端进行 HTTP 探测。它只读取本机业务数据库，不创建、修改或删除业务记录；测试结束会关闭自己启动的进程。
+
+分项检查仍可执行：
+
+```powershell
+.\.venv\Scripts\ruff.exe check app tests scripts
+.\.venv\Scripts\python.exe -m pytest tests -q
+.\.venv\Scripts\python.exe scripts\verify_runtime.py
+```
+
+pytest 使用 SQLite 隔离库；`verify_runtime.py` 只读连接 `.env` 指向的 PostgreSQL，检查迁移 head、`SELECT 1`、公开接口、认证边界和 CORS。GitHub 的 `.github/workflows/verify.yml` 会在每次 push 到 `main` 及 Pull Request 时使用临时 PostgreSQL 重跑同一套后端和 Cloudflare 构建检查。
 
 ## 当前接口
 
@@ -203,7 +224,7 @@ npm run cf:check
 - `GET /api/v1/analytics/material-demand`、`/freezers/summary`、`/production/progress`
 - `POST /api/v1/procurements/aggregate-preview`、`/transport-matches/preview`、`/routes/estimate`、`/policies/match`
 - 领导反馈业务：`GET/POST/PATCH /api/v1/enterprise-capacities`、`/inventory-threshold-requests`、`/inventory-alerts`、`/procurement-history`；安全库存另有 `/approve`、`/reject`、`/acknowledge`；运输遥测为 `GET/POST /api/v1/transport-telemetry`；计算历史为 `GET /api/v1/calculation-runs`；预计订单转换为 `POST /api/v1/preorders/{preorder_id}/convert`
-- E02 公开只读：`GET /api/v1/public/dashboard/overview`、`/capacity`、`/preorders`、`/transport`、`/policies`
+- E02 公开只读：`GET /api/v1/public/dashboard/overview`、`/capacity`、`/preorders`、`/transport`、`/policies`、`/news`
 
 18 类 B01 业务资源已实现基础 CRUD、企业/园区范围权限、来源事件幂等保护和 `object_version` 乐观锁；本轮新增企业日产能、安全库存审批/预警、采购历史、运输遥测、计算快照和单设备会话控制。真实 PostgreSQL 需使用非 superuser 完成 `0001`～`0009` 迁移。
 

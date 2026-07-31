@@ -49,6 +49,53 @@ GENERIC_POLICY_URLS = {
     "https://www.greenfood.org.cn/",
 }
 
+PUBLIC_NEWS_DEMO = [
+    {
+        "news_id": "NEWS-CC-001",
+        "title": "新安食品产业园完成长春市夏季订单协同排产",
+        "published_label": "今日 10:20",
+        "summary": "园区已将企业订单、产能和运输任务汇总到同一演示看板。",
+        "category": "园区动态",
+        "tone": "blue",
+        "source_type": "DEMO_SIMULATION",
+        "source_url": "#",
+        "service_scope": "长春市",
+    },
+    {
+        "news_id": "NEWS-CC-002",
+        "title": "长春新区团餐集配中心启动冷链联运演示",
+        "published_label": "今日 09:45",
+        "summary": "两条冷藏线路完成车辆匹配，预计覆盖新区与宽城区重点需求。",
+        "category": "物流动态",
+        "tone": "green",
+        "source_type": "DEMO_SIMULATION",
+        "source_url": "#",
+        "service_scope": "长春市",
+    },
+    {
+        "news_id": "NEWS-CC-003",
+        "title": "净月区社区生鲜订单进入补料提醒",
+        "published_label": "昨日 16:30",
+        "summary": "净菜企业当前库存低于已审批阈值，已反馈生产计划。",
+        "category": "库存预警",
+        "tone": "red",
+        "source_type": "DEMO_SIMULATION",
+        "source_url": "#",
+        "service_scope": "长春市",
+    },
+    {
+        "news_id": "NEWS-CC-004",
+        "title": "长春市农产品加工企业采购周报发布",
+        "published_label": "昨日 14:10",
+        "summary": "玉米、大豆、包装材料成为本周集中采购分析的主要品类。",
+        "category": "采购分析",
+        "tone": "amber",
+        "source_type": "DEMO_SIMULATION",
+        "source_url": "#",
+        "service_scope": "长春市",
+    },
+]
+
 
 def public_policy_source(policy: Policy) -> tuple[str, bool, str]:
     original_url = (policy.source_url or "").rstrip("/") + "/" if policy.source_url else ""
@@ -676,3 +723,8 @@ def public_policies(request: Request, db: Annotated[Session, Depends(get_db)]) -
         source_url, source_verified, source_name = public_policy_source(policy)
         items.append({"policy_id": policy.policy_id, "title": policy.title, "category": policy.category, "summary": policy.summary, "source_url": source_url, "source_type": policy.source_type or "OFFICIAL", "source_verified": source_verified, "source_name": source_name, "published_date": policy.published_date, "effective_date": policy.effective_date})
     return response_envelope(items, trace_id=request.state.trace_id)
+
+
+@public_router.get("/public/dashboard/news", response_model=ResponseEnvelope[list[dict]])
+def public_news(request: Request) -> dict:
+    return response_envelope(PUBLIC_NEWS_DEMO, trace_id=request.state.trace_id)

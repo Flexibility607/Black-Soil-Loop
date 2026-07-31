@@ -17,6 +17,7 @@ def test_dashboard_calculation_missing_data_and_public_read(client: TestClient, 
     route_estimate = client.post("/api/v1/routes/estimate", headers=auth, json={})
     public_overview = client.get("/api/v1/public/dashboard/overview")
     public_capacity = client.get("/api/v1/public/dashboard/capacity")
+    public_news = client.get("/api/v1/public/dashboard/news")
 
     assert overview.status_code == 200
     assert overview.json()["data"]["enterprise_count"] == 0
@@ -27,3 +28,6 @@ def test_dashboard_calculation_missing_data_and_public_read(client: TestClient, 
     assert public_overview.status_code == 200
     assert public_capacity.status_code == 200
     assert isinstance(public_capacity.json()["data"], list)
+    assert public_news.status_code == 200
+    assert len(public_news.json()["data"]) == 4
+    assert all(item["source_type"] == "DEMO_SIMULATION" for item in public_news.json()["data"])

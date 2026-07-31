@@ -6,7 +6,8 @@
     "build": "node build-cloudflare.mjs",
     "cf:check": "npm run build && wrangler deploy --dry-run",
     "cf:dev": "npm run build && wrangler dev",
-    "cf:deploy": "npm run build && wrangler deploy"
+    "cf:deploy": "npm run build && wrangler deploy",
+    "verify:cloud": "node verify-cloudflare.mjs"
   },
   "devDependencies": {
     "wrangler": "4.116.0"

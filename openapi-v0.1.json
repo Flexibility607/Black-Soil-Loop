@@ -8134,6 +8134,27 @@
           }
         }
       }
+    },
+    "/api/v1/public/dashboard/news": {
+      "get": {
+        "tags": [
+          "E02 Public Dashboard"
+        ],
+        "summary": "Public News",
+        "operationId": "public_news_api_v1_public_dashboard_news_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseEnvelope_list_dict__"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
