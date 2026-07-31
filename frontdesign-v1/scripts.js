@@ -483,12 +483,25 @@ function renderRouteMap(items) {
   const vehicles = geometries.map(({ route, vehicle, progress }) => '<button type="button" class="map-vehicle ' + (route.anomaly ? 'abnormal' : '') + '" style="--x:' + vehicle[0].toFixed(1) + '%;--y:' + vehicle[1].toFixed(1) + '%" data-route-id="' + escapeHtml(route.task_id) + '" aria-label="' + escapeHtml(routeDriver(route) + ' · ' + routeVehicle(route) + ' · 路线进度 ' + progress + '%') + '" title="' + escapeHtml(routeDriver(route) + ' · ' + routeVehicle(route) + ' · 路线进度 ' + progress + '%') + '"><span aria-hidden="true">🚚</span><small>' + escapeHtml(routeVehicle(route)) + '</small></button>').join('');
   const tiles = tileCoords.map(([x, y]) => '<img src="https://tile.openstreetmap.org/' + tileZoom + '/' + x + '/' + y + '.png" alt="" loading="eager" draggable="false" referrerpolicy="no-referrer">').join('');
   const mapFallback = `<svg class="map-fallback" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="长春市服务范围演示底图"><defs><linearGradient id="mapFallbackBg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0a3d69"/><stop offset="1" stop-color="#061d3b"/></linearGradient></defs><rect width="100" height="100" fill="url(#mapFallbackBg)"/><path class="map-fallback-river" d="M-4 70 C 18 61, 26 75, 43 61 S 66 35, 105 43"/><path class="map-fallback-road" d="M5 84 L28 62 L49 49 L77 19 M19 5 L38 33 L49 49 L87 84 M2 40 L30 45 L49 49 L98 53 M13 98 L35 72 L49 49 L60 3"/><path class="map-fallback-boundary" d="M8 14 L30 6 L53 12 L73 7 L94 23 L88 46 L96 69 L78 94 L54 87 L34 96 L13 79 L7 55 Z M30 6 L38 33 L30 45 L34 72 L54 87 M53 12 L49 49 L60 70 L78 94 M73 7 L66 31 L88 46 L77 63 L96 69"/><g class="map-fallback-labels"><text x="45" y="47">长春市</text><text x="60" y="28">长春新区</text><text x="76" y="46">九台区</text><text x="27" y="39">宽城区</text><text x="20" y="62">绿园区</text><text x="39" y="78">双阳区</text><text x="64" y="73">净月区</text><text x="11" y="83">公主岭市</text><text x="80" y="18">德惠市</text><text x="5" y="28">农安县</text><text x="52" y="96">榆树市</text></g><text class="map-fallback-caption" x="4" y="8">长春市服务范围 · 本地演示底图</text></svg>`;
-  const scene = '<div class="map-scene" style="--map-zoom:' + state.publicMapZoom.toFixed(2) + '">' + mapFallback + '<div class="map-tile-layer" aria-hidden="true">' + tiles + '</div><div class="map-grid-label">长春市服务范围 · 模拟路线与车辆位置</div><svg class="map-route-layer" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="长春市模拟运输路线">' + routePaths + '</svg><div class="map-center-node" style="--x:' + center[0].toFixed(1) + '%;--y:' + center[1].toFixed(1) + '%"><i></i><strong>新安食品产业园</strong><small>长春市中心节点</small></div>' + nodes + vehicles + '</div>';
+  const scene = '<div class="map-scene" style="--map-zoom:' + state.publicMapZoom.toFixed(2) + '">' + mapFallback + '<div class="map-tile-layer" aria-hidden="true">' + tiles + '</div><div class="map-grid-label">长春市服务范围 · 模拟路线与车辆位置</div><svg class="map-route-layer" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="长春市模拟运输路线">' + routePaths + '</svg><div class="map-center-node" style="--x:' + center[0].toFixed(1) + '%;--y:' + center[1].toFixed(1) + '%"><i></i><strong>吉品食品产业园</strong><small>长春市中心节点</small></div>' + nodes + vehicles + '</div>';
   el.innerHTML = scene + '<div class="map-attribution">© OpenStreetMap contributors · 瓦片失败自动切换本地演示底图 · DEMO_SIMULATION</div><div id="public-route-detail" class="map-route-detail" aria-live="polite" hidden></div>';
   const tileImages = [...el.querySelectorAll('.map-tile-layer img')];
-  el.dataset.mapTileStatus = tileImages.length ? 'loading' : 'fallback';
-  tileImages.forEach((image) => image.addEventListener('error', () => { image.hidden = true; el.dataset.mapTileStatus = 'fallback'; }));
-  tileImages.forEach((image) => image.addEventListener('load', () => { if (tileImages.every((tile) => tile.complete && !tile.hidden)) el.dataset.mapTileStatus = 'tiles'; }));
+  const updateMapTileStatus = () => {
+    const loadedCount = tileImages.filter((image) => image.dataset.tileState === 'loaded').length;
+    const settledCount = tileImages.filter((image) => image.dataset.tileState).length;
+    el.dataset.mapTileStatus = loadedCount ? 'tiles' : settledCount === tileImages.length ? 'fallback' : 'loading';
+  };
+  tileImages.forEach((image) => {
+    const markTile = (status) => {
+      image.dataset.tileState = status;
+      image.hidden = status === 'error';
+      updateMapTileStatus();
+    };
+    image.addEventListener('error', () => markTile('error'));
+    image.addEventListener('load', () => markTile('loaded'));
+    if (image.complete) markTile(image.naturalWidth ? 'loaded' : 'error');
+  });
+  updateMapTileStatus();
   const detail = document.getElementById('public-route-detail');
   el.querySelectorAll('.map-node, .map-vehicle').forEach((button) => button.addEventListener('click', () => {
     if (state.publicMapSuppressClickUntil > Date.now()) return;

@@ -7,7 +7,10 @@
     "cf:check": "npm run build && wrangler deploy --dry-run",
     "cf:dev": "npm run build && wrangler dev",
     "cf:deploy": "npm run build && wrangler deploy",
-    "verify:cloud": "node verify-cloudflare.mjs"
+    "verify:cloud": "node verify-cloudflare.mjs",
+    "verify:pages": "node verify-pages-forwarder.mjs",
+    "pages:dev": "wrangler pages dev --cwd pages-forwarder",
+    "pages:deploy": "wrangler pages deploy --cwd pages-forwarder --project-name black-soil-loop-cn --branch main"
   },
   "devDependencies": {
     "wrangler": "4.116.0"

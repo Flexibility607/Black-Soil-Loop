@@ -31,7 +31,7 @@ for (const marker of ['id="toggle-mock"', 'checked', 'id="public-screen-canvas"'
   if (!html.includes(marker)) throw new Error(`The deployed page is missing ${marker}.`);
 }
 
-for (const path of ['/styles.css', '/api.js', '/scripts.js']) {
+for (const path of ['/styles.css', '/api.js', '/scripts.js', '/jipin-logo.jpg']) {
   const content = await (await requireOk(path)).text();
   if (content.length < 100) throw new Error(`${path} is unexpectedly empty.`);
 }

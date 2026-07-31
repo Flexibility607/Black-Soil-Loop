@@ -6,7 +6,7 @@ const projectRoot = dirname(fileURLToPath(import.meta.url));
 const outputDir = join(projectRoot, 'dist');
 const frontendDir = join(projectRoot, 'frontdesign-v1');
 const mockDir = join(projectRoot, 'frontend-mocks-v0.1');
-const frontendFiles = ['index.html', 'styles.css', 'api.js', 'scripts.js'];
+const frontendFiles = ['index.html', 'styles.css', 'api.js', 'scripts.js', 'jipin-logo.jpg'];
 
 const mockFiles = (await readdir(mockDir, { withFileTypes: true }))
   .filter((entry) => entry.isFile() && entry.name.endsWith('.json'))

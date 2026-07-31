@@ -52,7 +52,7 @@ GENERIC_POLICY_URLS = {
 PUBLIC_NEWS_DEMO = [
     {
         "news_id": "NEWS-CC-001",
-        "title": "新安食品产业园完成长春市夏季订单协同排产",
+        "title": "吉品食品产业园完成长春市夏季订单协同排产",
         "published_label": "今日 10:20",
         "summary": "园区已将企业订单、产能和运输任务汇总到同一演示看板。",
         "category": "园区动态",

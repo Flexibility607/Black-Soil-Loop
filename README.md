@@ -10,6 +10,7 @@
 - `start-dev.ps1`：Windows 一键启动后端和静态前端。
 - `verify-local.ps1`：使用真实 PostgreSQL、独立端口和 Cloudflare dry-run 验收本地全功能。
 - `verify-cloudflare.mjs`：对已部署域名检查前端资源、全部 Mock JSON 和 404 行为。
+- `pages-forwarder/`：只通过 Service Binding 转发现有 Worker 的 Cloudflare Pages 备用入口。
 - `manage-accounts.ps1`：仅供本机可信运维人员使用的 E01 账户维护入口。
 
 ## 本机启动
@@ -147,7 +148,7 @@ npm run build
 npm run cf:check
 ```
 
-`npm run build` 会先逐个解析 Mock 响应，再生成被 Git 忽略的 `dist/`；其中只包含 `frontdesign-v1` 的四个运行文件和 `frontend-mocks-v0.1` 的 JSON 文件。任一 JSON 损坏或缺少 `data` 字段都会让 Cloudflare 构建失败。`npm run cf:dev` 可启动本地 Cloudflare 预览；`npm run cf:deploy` 可在已登录 Wrangler 时手动部署。
+`npm run build` 会先逐个解析 Mock 响应，再生成被 Git 忽略的 `dist/`；其中只包含 `frontdesign-v1` 的 HTML、CSS、JavaScript、吉品 Logo 和 `frontend-mocks-v0.1` 的 JSON 文件。任一 JSON 损坏或缺少 `data` 字段都会让 Cloudflare 构建失败。`npm run cf:dev` 可启动本地 Cloudflare 预览；`npm run cf:deploy` 可在已登录 Wrangler 时手动部署。
 
 在 Cloudflare Workers 的“导入 Git 仓库”页面填写：
 
@@ -170,6 +171,22 @@ npm run verify:cloud -- https://你的域名.workers.dev
 ```
 
 该命令会检查首页默认勾选 Mock、CSS/JavaScript、仓库内全部 18 个 JSON，以及缺失 Mock 必须返回 404。不要用本地 Wrangler 预览结果代替正式域名测试。
+
+### Pages 备用转发入口
+
+`pages-forwarder/` 不复制前端、Mock 或后端，也不做 302 跳转。其 `_worker.js` 通过 `UPSTREAM` Service Binding 把访问路径转发给 `black-soil-loop` Worker，因此浏览器保持在 Pages 域名，Worker 后续自动部署也会立即反映到该入口。
+
+当前备用入口：<https://black-soil-loop-cn.pages.dev/>。
+
+首次创建与部署：
+
+```powershell
+npm run verify:pages
+npx wrangler pages project create black-soil-loop-cn --production-branch main
+npm run pages:deploy
+```
+
+必须明确：该 Pages 地址只是额外入口，不能保证中国大陆稳定访问。Cloudflare 官方说明 `pages.dev` 证书不位于中国大陆，Pages 不属于其中国大陆直接可用服务；若答辩或正式运行要求稳定的大陆访问，需要完成 ICP 备案的自有域名及适用的中国网络方案。
 
 截图里 API 令牌缺少的 SSL、Connectivity Directory 和 AI Search 权限不属于本静态站点。不要为了消除提示盲目扩大权限；只需确认所选构建令牌拥有 `Workers Scripts: Edit`。如果首次部署明确报权限错误，再在 Cloudflare 的 Builds 设置中创建或选择具备该权限的构建令牌。
 
