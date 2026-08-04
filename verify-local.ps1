@@ -75,7 +75,9 @@ try {
     $env:WRANGLER_LOG_PATH = Join-Path $wranglerLogDir 'wrangler-verify.log'
     Invoke-Checked 'Ruff' $ruff @('check', 'app', 'tests', 'scripts')
     Invoke-Checked 'pytest' $python @('-m', 'pytest', 'tests', '-q')
+    Invoke-Checked 'Frontend tests' 'npm.cmd' @('run', 'test:frontend')
     Invoke-Checked 'PostgreSQL and API runtime' $python @('scripts\verify_runtime.py')
+    Invoke-Checked 'Pages forwarding contract' 'npm.cmd' @('run', 'verify:pages')
     Invoke-Checked 'Cloudflare static build' 'npm.cmd' @('run', 'cf:check')
 
     Assert-PortAvailable $BackendPort
@@ -88,10 +90,13 @@ try {
     Wait-HttpOk "$backendBase/healthz" $backendProcess
     Wait-HttpOk "$frontendBase/frontdesign-v1/" $frontendProcess
 
-    $null = Invoke-RestMethod "$backendBase/api/v1/public/dashboard/news" -TimeoutSec 5
-    $mock = Invoke-RestMethod "$frontendBase/frontend-mocks-v0.1/e02-public-overview-changchun.json" -TimeoutSec 5
-    if ($mock.code -ne 'OK' -or $null -eq $mock.data) {
-        throw 'The local Mock endpoint returned an invalid response.'
+    $snapshot = Invoke-RestMethod "$backendBase/api/v1/public/dashboard/snapshot?period=30d" -TimeoutSec 5
+    if ($snapshot.code -ne 'OK' -or $null -eq $snapshot.data.headline) {
+        throw 'The dashboard snapshot endpoint returned an invalid response.'
+    }
+    $mock = Invoke-RestMethod "$frontendBase/frontend-mocks-v0.1/e02-dashboard-snapshot.json" -TimeoutSec 5
+    if ($mock.code -ne 'OK' -or $null -eq $mock.data.headline) {
+        throw 'The local dashboard snapshot returned an invalid response.'
     }
 
     Write-Host 'Local full verification passed.' -ForegroundColor Green

@@ -1,11 +1,11 @@
 # Black-Soil-Loop：B01 网页端
 
-当前实现覆盖 B01 网页端 v0.1：FastAPI 后端、无构建依赖的 E01 管理台、E02 公开大屏、统一响应、JWT 认证、18 类业务资源、XLSX 两阶段导入、B01 规则计算，以及完整 Alembic 迁移链。本仓库不包含 B02 小程序。
+当前实现覆盖 FastAPI/PostgreSQL 后端、E01 管理台、E02 产销协同大屏、JWT 认证、XLSX 两阶段导入、B01 规则计算、B02 事件接收与门店经营日报投影，以及完整 Alembic 迁移链。本仓库不包含 B02 小程序界面，但包含其与 B01 交互所需的服务端事件契约。
 
 ## 仓库结构
 
 - `app/`、`alembic/`、`tests/`：FastAPI 后端、数据库迁移和回归测试。
-- `frontdesign-v1/`：E01 管理台与 E02 16:9 演示大屏，无 Node 构建依赖。
+- `frontdesign-v1/`：E01 管理台与 E02 16:9 大屏，包含本地 ECharts、字体、东北三省地图和冰雪农业背景的构建入口。
 - `frontend-mocks-v0.1/`：前端 Mock 数据，含丰富的 E02 演示数据，并明确标记为模拟数据。
 - `start-dev.ps1`：Windows 一键启动后端和静态前端。
 - `verify-local.ps1`：使用真实 PostgreSQL、独立端口和 Cloudflare dry-run 验收本地全功能。
@@ -38,7 +38,7 @@ python -m venv .venv
 .\start-dev.ps1
 ```
 
-脚本会启动后端 `http://127.0.0.1:8000/healthz` 和前端 `http://localhost:8080/frontdesign-v1/`，并自动打开浏览器。使用 `-NoBrowser` 可跳过自动打开；按 `Ctrl+C` 会停止两个服务。默认前端使用 Mock 数据，关闭页面右上角的 Mock 开关后才请求真实后端。
+脚本会启动后端 `http://127.0.0.1:8000/healthz` 和前端 `http://localhost:8080/frontdesign-v1/`，并自动打开浏览器。使用 `-NoBrowser` 可跳过自动打开；按 `Ctrl+C` 会停止两个服务。E02 默认请求真实后端，首次连接失败时才使用带明显标记的本地演示快照。
 
 接口文档：`http://127.0.0.1:8000/docs`
 
@@ -138,7 +138,7 @@ E01 网页账号存放在业务数据库的 `users` 表中，与 PostgreSQL 连�
 
 ## Cloudflare 前端与 Mock 自动部署
 
-GitHub 仓库继续完整保留后端、前端、Mock、迁移、脚本和公开文档，克隆后可按本 README 在本机运行全量项目。Cloudflare 构建时仅把 E01/E02 静态前端和 JSON Mock 放入公开静态产物，不会从 GitHub 删除或裁剪后端文件，也不会把 `.env` 和数据库配置暴露为网页资源。线上演示保持“Mock 数据”开启；需要本地联调时再克隆完整仓库并启动 FastAPI/PostgreSQL。
+GitHub 仓库继续完整保留后端、前端、Mock、迁移、脚本和公开文档。Cloudflare 构建把 E01/E02、本地地图、字体、背景、ECharts 和 JSON 演示快照放入静态产物；Worker 把同源 `/api/v1/*` 转发给 FastAPI。生产默认请求真实后端，首次不可用时 E02 才加载带醒目标识的本地演示快照。
 
 首次本地验证：
 
@@ -148,7 +148,14 @@ npm run build
 npm run cf:check
 ```
 
-`npm run build` 会先逐个解析 Mock 响应，再生成被 Git 忽略的 `dist/`；其中只包含 `frontdesign-v1` 的 HTML、CSS、JavaScript、吉品 Logo 和 `frontend-mocks-v0.1` 的 JSON 文件。任一 JSON 损坏或缺少 `data` 字段都会让 Cloudflare 构建失败。`npm run cf:dev` 可启动本地 Cloudflare 预览；`npm run cf:deploy` 可在已登录 Wrangler 时手动部署。
+`npm run build` 会先逐个解析 Mock 响应，再生成被 Git 忽略的 `dist/`。任一 JSON 损坏或缺少 `data` 字段都会让构建失败；生产产物检查禁止 localhost、在线地图、Google Fonts 和 CDN。`npm run cf:dev` 可启动本地 Cloudflare 预览；仓库合并至 `main` 后由既有 Cloudflare Git 流程自动部署。
+
+Cloudflare 生产环境需要配置：
+
+- `BACKEND_API_BASE_URL`：FastAPI 的 HTTPS 源站地址，不含 `/api/v1`。
+- `DASHBOARD_SERVICE_TOKEN`：与后端一致的强随机助手服务令牌，作为 Worker Secret 保存。
+
+本地开发可复制 `.dev.vars.example` 为 `.dev.vars`。OpenAI 密钥只保存在 FastAPI 的环境变量中。
 
 在 Cloudflare Workers 的“导入 Git 仓库”页面填写：
 
@@ -198,7 +205,7 @@ npm run pages:deploy
 .\verify-local.ps1
 ```
 
-脚本依次运行 Ruff、24 个隔离测试、真实 PostgreSQL 迁移头与查询、6 个 E02 公共接口、CORS、Cloudflare 构建/dry-run，并在 `18000/18080` 独立端口启动真实后端和静态前端进行 HTTP 探测。它只读取本机业务数据库，不创建、修改或删除业务记录；测试结束会关闭自己启动的进程。
+脚本依次运行 Ruff、全部后端与前端测试、真实 PostgreSQL 迁移头与快照查询、CORS、Pages 转发校验和 Cloudflare 构建/dry-run，并在 `18000/18080` 独立端口启动真实后端和静态前端进行 HTTP 探测。它只读取本机业务数据库，不创建、修改或删除业务记录；测试结束会关闭自己启动的进程。
 
 分项检查仍可执行：
 
@@ -241,9 +248,12 @@ pytest 使用 SQLite 隔离库；`verify_runtime.py` 只读连接 `.env` 指向�
 - `GET /api/v1/analytics/material-demand`、`/freezers/summary`、`/production/progress`
 - `POST /api/v1/procurements/aggregate-preview`、`/transport-matches/preview`、`/routes/estimate`、`/policies/match`
 - 领导反馈业务：`GET/POST/PATCH /api/v1/enterprise-capacities`、`/inventory-threshold-requests`、`/inventory-alerts`、`/procurement-history`；安全库存另有 `/approve`、`/reject`、`/acknowledge`；运输遥测为 `GET/POST /api/v1/transport-telemetry`；计算历史为 `GET /api/v1/calculation-runs`；预计订单转换为 `POST /api/v1/preorders/{preorder_id}/convert`
-- E02 公开只读：`GET /api/v1/public/dashboard/overview`、`/capacity`、`/preorders`、`/transport`、`/policies`、`/news`
+- E02 快照：`GET /api/v1/public/dashboard/snapshot?period=7d|30d|month`；E01 鉴权快照：`GET /api/v1/dashboard/snapshot`
+- B02 事件：`POST /api/v1/internal/b02/events`
+- 语音助手：`POST /api/v1/public/assistant/transcriptions`、`POST /api/v1/public/assistant/query`
+- 旧版 E02 公开接口继续兼容：`GET /api/v1/public/dashboard/overview`、`/capacity`、`/preorders`、`/transport`、`/policies`、`/news`
 
-18 类 B01 业务资源已实现基础 CRUD、企业/园区范围权限、来源事件幂等保护和 `object_version` 乐观锁；本轮新增企业日产能、安全库存审批/预警、采购历史、运输遥测、计算快照和单设备会话控制。真实 PostgreSQL 需使用非 superuser 完成 `0001`～`0009` 迁移。
+18 类 B01 业务资源已实现基础 CRUD、企业/园区范围权限、来源事件幂等保护和 `object_version` 乐观锁；本轮新增门店渠道、园区坐标、B02 HMAC/nonce/连续版本事件收件箱、经营日报投影、语音助手限流和单设备会话控制。真实 PostgreSQL 需使用非 superuser 完成 `0001`～`0010` 迁移。
 
 导入接口接收已确认的多工作表 XLSX：先整本预检，再由 E01 以 `{"confirmed": true}` 确认；确认按固定依赖顺序在一个事务中写入。当前模板含 19 个业务工作表，新增“采购历史”，支持 `SKIPPED_STALE`、`DUPLICATE` 和 `IDEMPOTENCY_CONFLICT` 规则。集中采购默认分析近 90 天有效历史记录，并按供应商计算加权平均单价。
 

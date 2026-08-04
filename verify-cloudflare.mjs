@@ -27,13 +27,18 @@ async function requireOk(path) {
 }
 
 const html = await (await requireOk('/')).text();
-for (const marker of ['id="toggle-mock"', 'checked', 'id="public-screen-canvas"']) {
+for (const marker of ['id="toggle-mock"', 'id="public-screen-canvas"', 'id="dv2-order-donut"', 'id="dv2-sales-donut"', 'id="dv2-mic-button"']) {
   if (!html.includes(marker)) throw new Error(`The deployed page is missing ${marker}.`);
 }
 
-for (const path of ['/styles.css', '/api.js', '/scripts.js', '/jipin-logo.jpg']) {
+for (const path of ['/styles.css', '/dashboard.css', '/api.js', '/scripts.js', '/dashboard-v2.js', '/jipin-logo.jpg', '/vendor/echarts/echarts.min.js', '/assets/maps/northeast-china-admin1.geojson', '/assets/backgrounds/northeast-winter-corn-v1.webp']) {
   const content = await (await requireOk(path)).text();
   if (content.length < 100) throw new Error(`${path} is unexpectedly empty.`);
+}
+
+const productionSource = await Promise.all(['/index.html', '/api.js', '/scripts.js', '/dashboard-v2.js', '/dashboard.css'].map(async (path) => (await requireOk(path)).text()));
+for (const marker of ['localhost', 'openstreetmap', 'fonts.googleapis', 'cdnjs', 'unpkg.com', 'jsdelivr']) {
+  if (productionSource.join('\n').toLowerCase().includes(marker)) throw new Error(`Production bundle contains banned marker: ${marker}.`);
 }
 
 for (const name of mockFiles) {

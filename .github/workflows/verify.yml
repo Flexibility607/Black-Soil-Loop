@@ -45,5 +45,6 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
+      - run: npm run test:frontend
       - run: npm run verify:pages
       - run: npm run cf:check

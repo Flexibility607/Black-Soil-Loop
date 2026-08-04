@@ -29,6 +29,7 @@ def main() -> None:
     require(current_heads == expected_heads, f"Database migration mismatch: current={current_heads}, expected={expected_heads}")
 
     public_paths = [
+        "/api/v1/public/dashboard/snapshot?period=30d",
         "/api/v1/public/dashboard/overview",
         "/api/v1/public/dashboard/capacity",
         "/api/v1/public/dashboard/preorders",
@@ -41,12 +42,17 @@ def main() -> None:
         require(health.status_code == 200 and health.json().get("status") == "ok", "Health check failed.")
         openapi = client.get("/openapi.json")
         require(openapi.status_code == 200, "OpenAPI document is unavailable.")
-        require(public_paths[-1] in openapi.json().get("paths", {}), "The public news endpoint is missing from OpenAPI.")
+        openapi_paths = openapi.json().get("paths", {})
+        require("/api/v1/public/dashboard/snapshot" in openapi_paths, "The public dashboard snapshot is missing from OpenAPI.")
+        require(public_paths[-1] in openapi_paths, "The public news endpoint is missing from OpenAPI.")
         for path in public_paths:
             response = client.get(path)
             payload = response.json()
             require(response.status_code == 200, f"{path} returned HTTP {response.status_code}.")
             require(payload.get("code") == "OK" and "data" in payload, f"{path} returned an invalid envelope.")
+        snapshot = client.get(public_paths[0]).json()["data"]
+        require("headline" in snapshot and "channel_mix" in snapshot, "The dashboard snapshot is incomplete.")
+        require(isinstance(snapshot.get("map_nodes"), list), "The dashboard map nodes are invalid.")
         unauthorized = client.get("/api/v1/auth/me")
         require(unauthorized.status_code == 401, "Protected E01 endpoints must reject unauthenticated requests.")
         preflight = client.options(
