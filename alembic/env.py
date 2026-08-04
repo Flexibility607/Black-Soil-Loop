@@ -1,15 +1,42 @@
-from logging.config import fileConfig
 import sys
+from logging.config import fileConfig
 from pathlib import Path
 
-from alembic import context
 from sqlalchemy import engine_from_config, pool
+
+from alembic import context
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.config import get_settings
 from app.db.base import Base
-from app.models import Bom, Enterprise, EnterpriseTag, FreezerRecord, ImportBatch, Inventory, Park, Partner, Policy, Preorder, ProcurementDemand, ProductionOrder, ProductionPlan, ReturnRecord, RevokedToken, SalesOrderLine, Store, SupplierQuote, TransportResource, TransportTaskSummary, User  # noqa: F401
+from app.models import (  # noqa: F401
+    AssistantRateWindow,
+    B02InboxEvent,
+    B02ServiceNonce,
+    Bom,
+    Enterprise,
+    EnterpriseTag,
+    FreezerRecord,
+    ImportBatch,
+    Inventory,
+    Park,
+    Partner,
+    Policy,
+    Preorder,
+    ProcurementDemand,
+    ProductionOrder,
+    ProductionPlan,
+    ReturnRecord,
+    RevokedToken,
+    SalesOrderLine,
+    Store,
+    StoreOperationSummary,
+    SupplierQuote,
+    TransportResource,
+    TransportTaskSummary,
+    User,
+)
 
 config = context.config
 if config.config_file_name is not None:

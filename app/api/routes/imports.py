@@ -25,7 +25,13 @@ from app.models.user import User
 from app.schemas.business_records import InventoryCreate, ReturnRecordCreate, SalesOrderLineCreate
 from app.schemas.common import ResponseEnvelope, response_envelope
 from app.schemas.imports import ImportConfirmRequest
-from app.schemas.master_data import EnterpriseCreate, EnterpriseTagCreate, ParkCreate, PartnerCreate, StoreCreate
+from app.schemas.master_data import (
+    EnterpriseCreate,
+    EnterpriseTagCreate,
+    ParkLegacyImportCreate,
+    PartnerCreate,
+    StoreLegacyImportCreate,
+)
 from app.schemas.planning_records import PolicyCreate, PreorderCreate, ProcurementDemandCreate, SupplierQuoteCreate
 from app.schemas.production import BomCreate, ProductionOrderCreate, ProductionPlanCreate
 from app.schemas.transport import FreezerRecordCreate, TransportResourceCreate, TransportTaskSummaryCreate
@@ -36,11 +42,11 @@ DATETIME_ADAPTER = TypeAdapter(datetime)
 CONTROL_SHEETS = {"导入说明", "字段字典", "枚举字典", "业务键字典"}
 
 SHEET_SPECS: list[dict[str, Any]] = [
-    {"sheet": "园区档案", "model": Park, "schema": ParkCreate, "keys": ("park_id",)},
+    {"sheet": "园区档案", "model": Park, "schema": ParkLegacyImportCreate, "keys": ("park_id",)},
     {"sheet": "企业档案", "model": Enterprise, "schema": EnterpriseCreate, "keys": ("enterprise_id",)},
     {"sheet": "企业标签", "model": EnterpriseTag, "schema": EnterpriseTagCreate, "keys": ("enterprise_id", "tag")},
     {"sheet": "合作方", "model": Partner, "schema": PartnerCreate, "keys": ("partner_id",)},
-    {"sheet": "门店", "model": Store, "schema": StoreCreate, "keys": ("store_id",)},
+    {"sheet": "门店", "model": Store, "schema": StoreLegacyImportCreate, "keys": ("store_id",)},
     {"sheet": "生产计划", "model": ProductionPlan, "schema": ProductionPlanCreate, "keys": ("plan_id",)},
     {"sheet": "生产订单", "model": ProductionOrder, "schema": ProductionOrderCreate, "keys": ("production_order_id",)},
     {"sheet": "物料清单", "model": Bom, "schema": BomCreate, "keys": ("bom_id", "product_id", "material_id")},

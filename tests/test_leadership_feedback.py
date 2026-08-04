@@ -1,9 +1,10 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi.testclient import TestClient
 
 from app.core.security import hash_password
 from app.models.business_records import Inventory
+from app.models.master_data import Park, Partner
 from app.models.operations import ProcurementHistory
 from app.models.production import Bom, ProductionOrder, ProductionPlan
 from app.models.transport import TransportResource, TransportTaskSummary
@@ -47,6 +48,31 @@ def tracked(**values):
 
 def test_store_scope_and_inventory_threshold_approval(client: TestClient, demo_user: User, db_session) -> None:
     add_enterprise_user(db_session)
+    db_session.add_all(
+        [
+            Park(
+                **tracked(
+                    source_record_id="PARK-001",
+                    park_id="PARK-001",
+                    park_name="测试园区",
+                    address="长春市",
+                    status="ACTIVE",
+                )
+            ),
+            Partner(
+                **tracked(
+                    source_record_id="PARTNER-001",
+                    partner_id="PARTNER-001",
+                    partner_name="测试合作方",
+                    partner_type="STORE",
+                    partner_contact_name="负责人",
+                    partner_phone="13000000000",
+                    partner_address="园区内",
+                    relationship_status="ACTIVE",
+                )
+            ),
+        ]
+    )
     db_session.add(
         Inventory(
             **tracked(
@@ -68,7 +94,24 @@ def test_store_scope_and_inventory_threshold_approval(client: TestClient, demo_u
     store = client.post(
         "/api/v1/stores",
         headers=enterprise_headers,
-        json=event("store", "STORE-ENT-001", {"store_id": "STORE-ENT-001", "enterprise_id": "ENT-001", "partner_id": "PARTNER-001", "store_name": "企业门店", "store_contact_name": "负责人", "store_phone": "13000000000", "delivery_address": "园区内", "relationship_status": "ACTIVE"}, "EV-STORE-ENT-001"),
+        json=event(
+            "store",
+            "STORE-ENT-001",
+            {
+                "store_id": "STORE-ENT-001",
+                "enterprise_id": "ENT-001",
+                "partner_id": "PARTNER-001",
+                "park_id": "PARK-001",
+                "channel_type": "TRADITIONAL_STORE",
+                "reporting_authorized": True,
+                "store_name": "企业门店",
+                "store_contact_name": "负责人",
+                "store_phone": "13000000000",
+                "delivery_address": "园区内",
+                "relationship_status": "ACTIVE",
+            },
+            "EV-STORE-ENT-001",
+        ),
     )
     assert store.status_code == 201
     assert client.get("/api/v1/stores", headers=enterprise_headers).json()["data"]["total"] == 1
@@ -104,7 +147,12 @@ def test_rule_calculation_uses_unlinked_orders_and_purchase_history(client: Test
     demand = client.get("/api/v1/analytics/material-demand", headers=headers)
     assert demand.status_code == 200
     assert demand.json()["data"]["calc_results"]["items"][0]["quantity"] == 62.5
-    procurement = client.post("/api/v1/procurements/aggregate-preview", headers=headers, json={"start_date": "2026-07-01", "end_date": "2026-07-31"})
+    today = datetime.now(timezone.utc).date()
+    procurement = client.post(
+        "/api/v1/procurements/aggregate-preview",
+        headers=headers,
+        json={"start_date": (today - timedelta(days=30)).isoformat(), "end_date": today.isoformat()},
+    )
     assert procurement.status_code == 200
     item = procurement.json()["data"]["calc_results"]["items"][0]
     assert item["recommended_supplier"]["supplier_id"] == "PARK-DIRECT"

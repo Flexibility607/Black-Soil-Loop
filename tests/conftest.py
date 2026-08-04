@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 
@@ -8,13 +9,14 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+os.environ.setdefault("DATABASE_URL", "sqlite+pysqlite://")
 
-from app.core.config import Settings  # noqa: E402
-from app.core.security import hash_password  # noqa: E402
-from app.db.base import Base  # noqa: E402
-from app.db.session import get_db  # noqa: E402
-from app.main import create_app  # noqa: E402
-from app.models.user import User  # noqa: E402
+from app.core.config import Settings
+from app.core.security import hash_password
+from app.db.base import Base
+from app.db.session import get_db
+from app.main import create_app
+from app.models.user import User
 
 
 @pytest.fixture()

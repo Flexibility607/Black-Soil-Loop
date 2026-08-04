@@ -332,6 +332,10 @@ def create_store(request: Request, event: EventRequest[StoreCreate], db: Annotat
     ensure_event_id_available(db, Store, event.event_id)
     if db.get(Store, event.payload.store_id) is not None:
         raise HTTPException(status_code=409, detail={"code": "IDEMPOTENCY_CONFLICT", "message": "store_id 已存在"})
+    if db.get(Park, event.payload.park_id) is None:
+        raise HTTPException(status_code=422, detail={"code": "UPSTREAM_ERROR", "message": "门店关联园区不存在"})
+    if db.get(Partner, event.payload.partner_id) is None:
+        raise HTTPException(status_code=422, detail={"code": "UPSTREAM_ERROR", "message": "门店关联合作方不存在"})
     record = Store(**payload, remark=event.payload.remark)
     write_metadata(record, event.event_id)
     db.add(record)
@@ -370,6 +374,10 @@ def update_store(request: Request, store_id: str, event: EventRequest[StorePatch
         ensure_park_admin(user)
     else:
         ensure_enterprise_access(user, target_enterprise_id)
+    if "park_id" in changes and db.get(Park, changes["park_id"]) is None:
+        raise HTTPException(status_code=422, detail={"code": "UPSTREAM_ERROR", "message": "门店关联园区不存在"})
+    if "partner_id" in changes and db.get(Partner, changes["partner_id"]) is None:
+        raise HTTPException(status_code=422, detail={"code": "UPSTREAM_ERROR", "message": "门店关联合作方不存在"})
     for key, value in changes.items():
         setattr(record, key, value)
     record.object_version += 1

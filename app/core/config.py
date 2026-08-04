@@ -29,6 +29,17 @@ class Settings(BaseSettings):
         "http://localhost:8080",
         "http://127.0.0.1:8080",
     ]
+    default_dashboard_park_id: str | None = None
+    demo_data_enabled: bool = False
+    dashboard_proxy_token: str | None = None
+    b02_to_b01_shared_secret: str = Field(default="development-b02-shared-secret-change-me", min_length=16)
+    service_signature_tolerance_seconds: int = Field(default=300, ge=30, le=900)
+    openai_api_key: str | None = None
+    openai_base_url: str = "https://api.openai.com/v1"
+    openai_chat_model: str = "gpt-5.6-terra"
+    openai_transcribe_model: str = "gpt-4o-transcribe"
+    assistant_request_limit_per_minute: int = Field(default=6, ge=1, le=120)
+    assistant_audio_max_bytes: int = Field(default=5 * 1024 * 1024, ge=1024)
 
 
 @lru_cache

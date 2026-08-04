@@ -11,6 +11,18 @@ class ParkCreate(PatchModel):
     park_id: str = Field(min_length=1, max_length=64)
     park_name: str = Field(min_length=1, max_length=255)
     address: str | None = None
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    status: Literal["ACTIVE", "INACTIVE"]
+    remark: str | None = None
+
+
+class ParkLegacyImportCreate(PatchModel):
+    """Compatibility schema for workbooks created before migration 0010."""
+
+    park_id: str = Field(min_length=1, max_length=64)
+    park_name: str = Field(min_length=1, max_length=255)
+    address: str | None = None
     status: Literal["ACTIVE", "INACTIVE"]
     remark: str | None = None
 
@@ -18,6 +30,8 @@ class ParkCreate(PatchModel):
 class ParkPatch(PatchModel):
     park_name: str | None = Field(default=None, min_length=1, max_length=255)
     address: str | None = None
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+    latitude: float | None = Field(default=None, ge=-90, le=90)
     status: Literal["ACTIVE", "INACTIVE"] | None = None
     remark: str | None = None
 
@@ -80,6 +94,25 @@ class StoreCreate(PatchModel):
     store_id: str = Field(min_length=1, max_length=64)
     enterprise_id: str | None = Field(default=None, max_length=64)
     partner_id: str = Field(min_length=1, max_length=64)
+    park_id: str = Field(min_length=1, max_length=64)
+    channel_type: Literal["TRADITIONAL_STORE", "THIRD_SPACE"]
+    reporting_authorized: bool = False
+    store_name: str = Field(min_length=1, max_length=255)
+    store_contact_name: str = Field(min_length=1, max_length=128)
+    store_phone: str = Field(min_length=1, max_length=64)
+    delivery_address: str = Field(min_length=1, max_length=500)
+    city: str | None = Field(default=None, min_length=1, max_length=128)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    relationship_status: Literal["ACTIVE", "INACTIVE"]
+    remark: str | None = None
+
+
+class StoreLegacyImportCreate(PatchModel):
+    """Compatibility schema for workbooks created before migration 0010."""
+
+    store_id: str = Field(min_length=1, max_length=64)
+    partner_id: str = Field(min_length=1, max_length=64)
     store_name: str = Field(min_length=1, max_length=255)
     store_contact_name: str = Field(min_length=1, max_length=128)
     store_phone: str = Field(min_length=1, max_length=64)
@@ -93,10 +126,14 @@ class StoreCreate(PatchModel):
 class StorePatch(PatchModel):
     enterprise_id: str | None = Field(default=None, max_length=64)
     partner_id: str | None = None
+    park_id: str | None = Field(default=None, min_length=1, max_length=64)
+    channel_type: Literal["TRADITIONAL_STORE", "THIRD_SPACE"] | None = None
+    reporting_authorized: bool | None = None
     store_name: str | None = Field(default=None, min_length=1, max_length=255)
     store_contact_name: str | None = Field(default=None, min_length=1, max_length=128)
     store_phone: str | None = Field(default=None, min_length=1, max_length=64)
     delivery_address: str | None = Field(default=None, min_length=1, max_length=500)
+    city: str | None = Field(default=None, min_length=1, max_length=128)
     longitude: float | None = Field(default=None, ge=-180, le=180)
     latitude: float | None = Field(default=None, ge=-90, le=90)
     relationship_status: Literal["ACTIVE", "INACTIVE"] | None = None
