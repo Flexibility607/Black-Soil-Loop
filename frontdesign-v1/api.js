@@ -1,13 +1,13 @@
 // E01 / E02 / B01 的轻量 API 客户端。
-// 页面保持无构建依赖，Mock 和 Live 只通过 localStorage 中的开关切换。
+// 浏览器始终使用同源 /api/v1；生产源站地址与助手服务令牌由 Cloudflare Worker 注入。
 (function () {
-  const defaultBase = 'http://localhost:8000/api/v1';
-  const mockBase = '../frontend-mocks-v0.1';
+  const defaultBase = '/api/v1';
+  const mockBase = './frontend-mocks-v0.1';
   const accessTokenKey = 'b01.accessToken';
   const refreshTokenKey = 'b01.refreshToken';
 
   function useMock() {
-    return localStorage.getItem('useMock') !== 'false';
+    return localStorage.getItem('useMock') === 'true';
   }
 
   function getLiveBase() {
@@ -145,6 +145,7 @@
     }
     if (path === '/public/dashboard/policies') return fixture('e02-public-policies-changchun.json');
     if (path === '/public/dashboard/news') return fixture('e02-public-news-changchun.json');
+    if (path.startsWith('/public/dashboard/snapshot') || path.startsWith('/dashboard/snapshot')) return fixture('e02-dashboard-snapshot.json');
     if (path === '/imports/precheck') return fixture('import-precheck-success.json');
     if (path.startsWith('/imports/') && path.endsWith('/confirm')) return fixture('import-precheck-success.json');
     if (path === '/transport-task-summaries' || path === '/transport-resources') {
@@ -219,6 +220,28 @@
     return request(`/public/dashboard/${path}`);
   }
 
+  async function getDashboardSnapshot(period = '30d', authenticated = false) {
+    const prefix = authenticated ? '/dashboard/snapshot' : '/public/dashboard/snapshot';
+    const query = new URLSearchParams({ period });
+    return request(`${prefix}?${query.toString()}`);
+  }
+
+  async function transcribeDashboardAudio(blob, durationSeconds, filename = 'question.webm') {
+    if (useMock()) return response(false, 503, { code: 'DEMO_AUDIO_UNAVAILABLE', message: '本地演示快照不提供语音转写。' });
+    const form = new FormData();
+    form.append('audio', blob, filename);
+    form.append('duration_seconds', String(durationSeconds));
+    return request('/public/assistant/transcriptions', { method: 'POST', body: form }, false);
+  }
+
+  async function queryDashboardAssistant(question, period = '30d', parkId = null) {
+    if (useMock()) return response(false, 503, { code: 'DEMO_ASSISTANT_UNAVAILABLE', message: '本地演示快照不调用智能助手。' });
+    return request('/public/assistant/query', {
+      method: 'POST',
+      body: JSON.stringify({ question, period, park_id: parkId }),
+    }, false);
+  }
+
   async function precheckImport(file) {
     if (useMock()) return mockRequest('/imports/precheck');
     const form = new FormData();
@@ -240,6 +263,7 @@
     confirmImport,
     calculate,
     getDashboard,
+    getDashboardSnapshot,
     getPublicDashboard,
     getLiveBase,
     getCurrentUser: () => request('/auth/me'),
@@ -248,6 +272,8 @@
     login,
     logout,
     precheckImport,
+    queryDashboardAssistant,
     request,
+    transcribeDashboardAudio,
   };
 })();

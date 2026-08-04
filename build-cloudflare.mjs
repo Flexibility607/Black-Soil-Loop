@@ -1,4 +1,4 @@
-import { copyFile, mkdir, readFile, readdir, rm } from 'node:fs/promises';
+import { copyFile, cp, mkdir, readFile, readdir, rm } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -6,7 +6,6 @@ const projectRoot = dirname(fileURLToPath(import.meta.url));
 const outputDir = join(projectRoot, 'dist');
 const frontendDir = join(projectRoot, 'frontdesign-v1');
 const mockDir = join(projectRoot, 'frontend-mocks-v0.1');
-const frontendFiles = ['index.html', 'styles.css', 'api.js', 'scripts.js', 'jipin-logo.jpg'];
 
 const mockFiles = (await readdir(mockDir, { withFileTypes: true }))
   .filter((entry) => entry.isFile() && entry.name.endsWith('.json'))
@@ -32,14 +31,29 @@ if (dirname(outputDir) !== projectRoot || basename(outputDir) !== 'dist') {
 }
 
 await rm(outputDir, { recursive: true, force: true });
+await mkdir(outputDir, { recursive: true });
+await cp(frontendDir, outputDir, {
+  recursive: true,
+  filter: (source) => !source.includes(`${join(frontendDir, 'tests')}`) && !source.endsWith('README.md'),
+});
+
 await mkdir(join(outputDir, 'frontend-mocks-v0.1'), { recursive: true });
+await Promise.all(mockFiles.map((name) => copyFile(join(mockDir, name), join(outputDir, 'frontend-mocks-v0.1', name))));
 
-await Promise.all(
-  frontendFiles.map((name) => copyFile(join(frontendDir, name), join(outputDir, name))),
-);
+await mkdir(join(outputDir, 'vendor', 'echarts'), { recursive: true });
+await copyFile(join(projectRoot, 'node_modules', 'echarts', 'dist', 'echarts.min.js'), join(outputDir, 'vendor', 'echarts', 'echarts.min.js'));
 
-await Promise.all(
-  mockFiles.map((name) => copyFile(join(mockDir, name), join(outputDir, 'frontend-mocks-v0.1', name))),
-);
+const fonts = [
+  { packageName: '@fontsource-variable/noto-sans-sc', css: 'index.css', outputName: 'noto-sans-sc' },
+  { packageName: '@fontsource/zcool-qingke-huangyou', css: '400.css', outputName: 'zcool-qingke-huangyou' },
+  { packageName: '@fontsource-variable/jetbrains-mono', css: 'index.css', outputName: 'jetbrains-mono' },
+];
+for (const font of fonts) {
+  const source = join(projectRoot, 'node_modules', ...font.packageName.split('/'));
+  const target = join(outputDir, 'vendor', 'fonts', font.outputName);
+  await mkdir(target, { recursive: true });
+  await copyFile(join(source, font.css), join(target, font.css));
+  await cp(join(source, 'files'), join(target, 'files'), { recursive: true });
+}
 
-console.log(`Cloudflare assets ready: ${frontendFiles.length} frontend files, ${mockFiles.length} Mock files.`);
+console.log(`Cloudflare assets ready: recursive frontend, local ECharts, ${fonts.length} local fonts, ${mockFiles.length} Mock files.`);
