@@ -24,7 +24,7 @@ def workbook_bytes(park_name: str = "导入园区") -> bytes:
         worksheet = workbook.create_sheet(sheet_name)
         worksheet.append(expected_headers(spec))
         if sheet_name == "园区档案":
-            worksheet.append(["PARK-IMPORT-001", park_name, "导入测试地址", "ACTIVE", "ERP", "PARK-IMPORT-001", "2026-07-23T00:00:00+00:00", "导入测试"])
+            worksheet.append(["PARK-IMPORT-001", park_name, "导入测试地址", None, None, "ACTIVE", "ERP", "PARK-IMPORT-001", "2026-07-23T00:00:00+00:00", "导入测试"])
     output = BytesIO()
     workbook.save(output)
     return output.getvalue()
@@ -140,7 +140,7 @@ def test_import_full_business_sheet_set(client: TestClient, demo_user: User) -> 
     )
 
     assert response.status_code == 200
-    assert response.json()["data"]["status"] == "READY_TO_CONFIRM"
+    assert response.json()["data"]["status"] == "READY_TO_CONFIRM", response.json()["data"]["errors"]
     assert response.json()["data"]["summary"]["row_count"] == len(SPECS_BY_SHEET)
     batch_id = response.json()["data"]["batch_id"]
     confirmed = client.post(f"/api/v1/imports/{batch_id}/confirm", headers=headers(client), json={"confirmed": True})

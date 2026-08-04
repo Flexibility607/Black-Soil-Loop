@@ -1,5 +1,5 @@
 from datetime import date, datetime, timedelta, timezone
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -8,16 +8,24 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
-from app.api.routes.master_data import record_data
+from app.api.routes.master_data import ensure_park_access, record_data
+from app.core.config import Settings, get_settings
 from app.db.session import get_db
 from app.models.business_records import Inventory, SalesOrderLine
-from app.models.master_data import Enterprise, Partner
+from app.models.master_data import Enterprise, Partner, Store
 from app.models.operations import CalculationRun, EnterpriseCapacity, InventoryAlert, InventoryThresholdRequest, ProcurementHistory, TransportTelemetry
 from app.models.planning_records import Policy, Preorder
 from app.models.production import Bom, ProductionOrder, ProductionPlan
 from app.models.transport import FreezerRecord, TransportResource, TransportTaskSummary
 from app.models.user import User
 from app.schemas.common import ResponseEnvelope, response_envelope
+from app.schemas.dashboard import AuthenticatedDashboardSnapshot, DashboardSnapshot
+from app.services.dashboard import (
+    VALID_PREORDER_STATUSES,
+    build_authenticated_dashboard_snapshot,
+    build_dashboard_snapshot,
+    resolve_dashboard_window,
+)
 
 router = APIRouter(tags=["E01 Analytics"])
 public_router = APIRouter(tags=["E02 Public Dashboard"])
@@ -284,10 +292,15 @@ def dashboard_capacity(
     start_at: datetime | None = None,
     end_at: datetime | None = None,
 ) -> dict:
-    del status, start_at, end_at
     statement = scope_statement(select(ProductionPlan), ProductionPlan, user)
     if enterprise_id is not None:
         statement = statement.where(ProductionPlan.enterprise_id == enterprise_id)
+    if status is not None:
+        statement = statement.where(ProductionPlan.status == status)
+    if start_at is not None:
+        statement = statement.where((ProductionPlan.planned_end_at.is_(None)) | (ProductionPlan.planned_end_at >= start_at))
+    if end_at is not None:
+        statement = statement.where((ProductionPlan.planned_start_at.is_(None)) | (ProductionPlan.planned_start_at <= end_at))
     plans = db.scalars(statement).all()
     capacity_records = db.scalars(select(EnterpriseCapacity).where(EnterpriseCapacity.status == "ACTIVE")).all()
     names = {enterprise.enterprise_id: enterprise.enterprise_name for enterprise in db.scalars(select(Enterprise)).all()}
@@ -321,10 +334,15 @@ def dashboard_inventory(
     start_at: datetime | None = None,
     end_at: datetime | None = None,
 ) -> dict:
-    del status, start_at, end_at
     statement = scope_statement(select(Inventory), Inventory, user)
     if enterprise_id is not None:
         statement = statement.where(Inventory.enterprise_id == enterprise_id)
+    if status is not None:
+        statement = statement.where(Inventory.status == status)
+    if start_at is not None:
+        statement = statement.where(Inventory.recorded_at >= start_at)
+    if end_at is not None:
+        statement = statement.where(Inventory.recorded_at <= end_at)
     records = db.scalars(statement).all()
     thresholds = {item.inventory_record_id: item for item in db.scalars(select(InventoryThresholdRequest).where(InventoryThresholdRequest.status == "APPROVED")).all()}
     alerts = {item.inventory_record_id: item for item in db.scalars(select(InventoryAlert).where(InventoryAlert.status.in_(["OPEN", "ACKNOWLEDGED"]))).all()}
@@ -345,12 +363,17 @@ def dashboard_sales(
     start_at: datetime | None = None,
     end_at: datetime | None = None,
 ) -> dict:
-    del keyword, status, start_at, end_at
     statement = scope_statement(select(SalesOrderLine), SalesOrderLine, user)
     if enterprise_id is not None:
         statement = statement.where(SalesOrderLine.enterprise_id == enterprise_id)
+    if status is not None:
+        statement = statement.where(SalesOrderLine.status == status)
+    if start_at is not None:
+        statement = statement.where(SalesOrderLine.ordered_at >= start_at)
+    if end_at is not None:
+        statement = statement.where(SalesOrderLine.ordered_at <= end_at)
     records = db.scalars(statement).all()
-    result = [{"sales_order_id": record.sales_order_id, "line_no": record.line_no, "enterprise_id": record.enterprise_id, "quantity": number(record.quantity), "order_amount": number(record.order_amount), "discount_amount": number(record.discount_amount), "received_amount": number(record.received_amount), "currency": record.currency, "status": record.status} for record in records]
+    result = [{"sales_order_id": record.sales_order_id, "line_no": record.line_no, "enterprise_id": record.enterprise_id, "quantity": number(record.quantity), "unit": record.unit, "order_amount": number(record.order_amount), "discount_amount": number(record.discount_amount), "received_amount": number(record.received_amount), "currency": record.currency, "status": record.status} for record in records if keyword is None or keyword.lower() in f"{record.sales_order_id} {record.product_id} {record.product_name}".lower()]
     return response_envelope(paged(result, page, page_size), trace_id=request.state.trace_id)
 
 
@@ -367,9 +390,16 @@ def dashboard_preorders(
     start_at: datetime | None = None,
     end_at: datetime | None = None,
 ) -> dict:
-    del status, enterprise_id, start_at, end_at
-    require_park_admin_for_unscoped(user, Preorder)
-    records = db.scalars(select(Preorder)).all()
+    statement = scope_statement(select(Preorder), Preorder, user)
+    if enterprise_id is not None:
+        statement = statement.where(Preorder.enterprise_id == enterprise_id)
+    if status is not None:
+        statement = statement.where(Preorder.status == status)
+    if start_at is not None:
+        statement = statement.where(Preorder.required_at >= start_at)
+    if end_at is not None:
+        statement = statement.where(Preorder.required_at <= end_at)
+    records = db.scalars(statement).all()
     partner_names = {item.partner_id: item.partner_name for item in db.scalars(select(Partner)).all()}
     result = [{"preorder_id": record.preorder_id, "partner_id": record.partner_id, "partner_name": partner_names.get(record.partner_id, record.partner_id), "store_id": record.store_id, "product_id": record.product_id, "product_name": record.product_name, "quantity": number(record.quantity), "unit": record.unit, "required_at": record.required_at, "status": record.status} for record in records if keyword is None or keyword.lower() in f"{record.product_id} {record.product_name}".lower()]
     return response_envelope(paged(result, page, page_size), trace_id=request.state.trace_id)
@@ -388,10 +418,13 @@ def dashboard_transport(
     start_at: datetime | None = None,
     end_at: datetime | None = None,
 ) -> dict:
-    del start_at, end_at
     statement = scope_statement(select(TransportTaskSummary), TransportTaskSummary, user)
     if enterprise_id is not None:
         statement = statement.where(TransportTaskSummary.enterprise_id == enterprise_id)
+    if start_at is not None:
+        statement = statement.where((TransportTaskSummary.planned_arrive_at.is_(None)) | (TransportTaskSummary.planned_arrive_at >= start_at))
+    if end_at is not None:
+        statement = statement.where((TransportTaskSummary.planned_depart_at.is_(None)) | (TransportTaskSummary.planned_depart_at <= end_at))
     records = db.scalars(statement).all()
     telemetry = db.scalars(select(TransportTelemetry)).all()
     result = [{"task_id": record.task_id, "order_id": record.order_id, "enterprise_id": record.enterprise_id, "status": record.status, "status_version": record.status_version, "planned_depart_at": record.planned_depart_at, "planned_arrive_at": record.planned_arrive_at, "vehicle_id": record.vehicle_id, "driver_id": record.driver_id, "vehicle_type_id": record.vehicle_type_id, "vehicle_type_name": record.vehicle_type_name, "required_vehicle_count": record.required_vehicle_count, "estimated_fee": number(record.estimated_fee), "currency": record.currency, "telemetry": [record_data(point) for point in telemetry if point.task_id == record.task_id]} for record in records if (status is None or record.status == status) and (keyword is None or keyword.lower() in f"{record.task_id} {record.order_id}".lower())]
@@ -628,8 +661,25 @@ def public_enterprises(db: Session, park_id: str | None) -> list[Enterprise]:
 
 
 @public_router.get("/public/dashboard/overview", response_model=ResponseEnvelope[dict])
-def public_overview(request: Request, db: Annotated[Session, Depends(get_db)], park_id: str | None = None, trend_days: int = 7) -> dict:
-    enterprises = public_enterprises(db, park_id)
+def public_overview(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    park_id: str | None = None,
+    trend_days: int = Query(7, ge=1, le=31),
+    start_at: datetime | None = None,
+    end_at: datetime | None = None,
+) -> dict:
+    period = "7d" if trend_days <= 7 else "30d"
+    snapshot = build_dashboard_snapshot(
+        db,
+        settings,
+        park_id=park_id,
+        period=period,
+        start_at=start_at,
+        end_at=end_at,
+    )
+    enterprises = public_enterprises(db, snapshot.park_id)
     ids = [enterprise.enterprise_id for enterprise in enterprises]
     plans = db.scalars(select(ProductionPlan).where(ProductionPlan.enterprise_id.in_(ids))).all() if ids else []
     orders = db.scalars(select(ProductionOrder).where(ProductionOrder.enterprise_id.in_(ids), ProductionOrder.status.in_(["CONFIRMED", "IN_PROGRESS", "COMPLETED"]))).all() if ids else []
@@ -638,7 +688,7 @@ def public_overview(request: Request, db: Annotated[Session, Depends(get_db)], p
     counts: dict[str, int] = {}
     for task in tasks:
         counts[task.status] = counts.get(task.status, 0) + 1
-    trend_start = date.today() - timedelta(days=max(trend_days, 1) - 1)
+    trend_start = snapshot.range_start.date()
     enterprise_labels = {enterprise.enterprise_id: f"企业-{index:02d}" for index, enterprise in enumerate(enterprises, start=1)}
     order_trend = []
     sales_trend = []
@@ -647,37 +697,135 @@ def public_overview(request: Request, db: Annotated[Session, Depends(get_db)], p
         order_trend.append({"date": current_date, "quantity": sum(number(order.quantity) for order in orders if order.ordered_at and order.ordered_at.date() == current_date)})
         sales_trend.append({"date": current_date, "amount": sum(number(line.order_amount) for line in sales if line.ordered_at.date() == current_date)})
     order_pie = [{"enterprise_label": enterprise_labels[enterprise.enterprise_id], "committed_order_quantity": sum(number(order.quantity) for order in orders if order.enterprise_id == enterprise.enterprise_id)} for enterprise in enterprises]
-    return response_envelope({"park_id": park_id, "enterprise_count": len(enterprises), "capacity_remaining_total": sum(number(plan.planned_quantity) - number(plan.qualified_quantity) for plan in plans), "capacity_unit": "piece", "preorder_quantity_total": 0, "preorder_unit": "piece", "transport_task_counts": counts, "committed_order_quantity_total": sum(number(order.quantity) for order in orders), "sales_amount_total": sum(number(line.order_amount) for line in sales), "enterprise_order_pie": order_pie, "order_trend": order_trend, "sales_trend": sales_trend, "trend_days": trend_days}, trace_id=request.state.trace_id)
+    single_demand = snapshot.headline.demand_totals[0] if len(snapshot.headline.demand_totals) == 1 else None
+    payload = {
+        "park_id": snapshot.park_id,
+        "enterprise_count": len(enterprises),
+        "capacity_remaining_total": sum(number(plan.planned_quantity) - number(plan.qualified_quantity) for plan in plans),
+        "capacity_unit": None,
+        "preorder_count_total": snapshot.headline.preorder_count,
+        "preorder_quantity_total": None if single_demand is None else single_demand.quantity,
+        "preorder_unit": None if single_demand is None else single_demand.unit,
+        "demand_totals": [item.model_dump() for item in snapshot.headline.demand_totals],
+        "operation_order_count_total": snapshot.headline.operation_order_count,
+        "operation_sales_amount_total": snapshot.headline.sales_amount,
+        "currency": snapshot.headline.currency,
+        "transport_task_counts": counts,
+        "committed_order_quantity_total": sum(number(order.quantity) for order in orders),
+        "sales_amount_total": sum(number(line.order_amount) for line in sales),
+        "enterprise_order_pie": order_pie,
+        "order_trend": order_trend,
+        "sales_trend": sales_trend,
+        "trend_days": trend_days,
+        "data_cutoff": snapshot.data_cutoff,
+    }
+    return response_envelope(payload, trace_id=request.state.trace_id)
+
+
+@public_router.get("/public/dashboard/snapshot", response_model=ResponseEnvelope[DashboardSnapshot])
+def public_dashboard_snapshot(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    park_id: str | None = None,
+    period: Literal["7d", "30d", "month"] = "30d",
+    start_at: datetime | None = None,
+    end_at: datetime | None = None,
+) -> dict:
+    snapshot = build_dashboard_snapshot(
+        db,
+        settings,
+        park_id=park_id,
+        period=period,
+        start_at=start_at,
+        end_at=end_at,
+    )
+    return response_envelope(snapshot, trace_id=request.state.trace_id)
+
+
+@router.get("/dashboard/snapshot", response_model=ResponseEnvelope[AuthenticatedDashboardSnapshot])
+def authenticated_dashboard_snapshot(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    user: Annotated[User, Depends(get_current_user)],
+    park_id: str | None = None,
+    period: Literal["7d", "30d", "month"] = "30d",
+) -> dict:
+    resolved_park_id = park_id or user.park_id or settings.default_dashboard_park_id
+    if not resolved_park_id:
+        raise HTTPException(status_code=400, detail={"code": "VALIDATION_ERROR", "message": "缺少园区范围"})
+    ensure_park_access(user, resolved_park_id)
+    snapshot = build_authenticated_dashboard_snapshot(db, settings, park_id=resolved_park_id, period=period)
+    return response_envelope(snapshot, trace_id=request.state.trace_id)
 
 
 @public_router.get("/public/dashboard/capacity", response_model=ResponseEnvelope[list[dict]])
 def public_capacity(request: Request, db: Annotated[Session, Depends(get_db)], park_id: str | None = None, start_at: datetime | None = None, end_at: datetime | None = None) -> dict:
-    del start_at, end_at
     enterprise_ids = [enterprise.enterprise_id for enterprise in public_enterprises(db, park_id)]
     enterprises = {enterprise_id: f"企业-{index:02d}" for index, enterprise_id in enumerate(enterprise_ids, start=1)}
-    plans = db.scalars(select(ProductionPlan).where(ProductionPlan.enterprise_id.in_(enterprises))) if enterprises else []
+    statement = select(ProductionPlan).where(ProductionPlan.enterprise_id.in_(enterprises))
+    if start_at is not None:
+        statement = statement.where((ProductionPlan.planned_end_at.is_(None)) | (ProductionPlan.planned_end_at >= start_at))
+    if end_at is not None:
+        statement = statement.where((ProductionPlan.planned_start_at.is_(None)) | (ProductionPlan.planned_start_at <= end_at))
+    plans = db.scalars(statement) if enterprises else []
     items = [{"enterprise_display_name": enterprises[plan.enterprise_id], "category": plan.product_name, "capacity_remaining": number(plan.planned_quantity) - number(plan.qualified_quantity), "unit": plan.unit, "statistic_at": datetime.now(timezone.utc)} for plan in plans]
     return response_envelope(items, trace_id=request.state.trace_id)
 
 
 @public_router.get("/public/dashboard/preorders", response_model=ResponseEnvelope[list[dict]])
-def public_preorders(request: Request, db: Annotated[Session, Depends(get_db)], park_id: str | None = None, start_at: datetime | None = None, end_at: datetime | None = None) -> dict:
-    del start_at, end_at
-    ids = [enterprise.enterprise_id for enterprise in public_enterprises(db, park_id)]
-    records = db.scalars(select(Preorder).where(Preorder.enterprise_id.in_(ids), Preorder.status.in_(["DRAFT", "CONFIRMED"]))).all() if ids else []
-    grouped: dict[tuple[str, str], float] = {}
-    for record in records:
-        key = (record.product_id, record.product_name)
-        grouped[key] = grouped.get(key, 0) + number(record.quantity)
-    items = [{"product_id": key[0], "product_name": key[1], "quantity": quantity, "unit": "piece"} for key, quantity in grouped.items()]
+def public_preorders(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    park_id: str | None = None,
+    channel_type: Literal["TRADITIONAL_STORE", "THIRD_SPACE"] | None = None,
+    start_at: datetime | None = None,
+    end_at: datetime | None = None,
+) -> dict:
+    range_start, range_end = resolve_dashboard_window("30d", start_at, end_at)
+    park = build_dashboard_snapshot(db, settings, park_id=park_id, start_at=range_start, end_at=range_end)
+    store_statement = select(Store).where(Store.park_id == park.park_id, Store.relationship_status == "ACTIVE")
+    if channel_type:
+        store_statement = store_statement.where(Store.channel_type == channel_type)
+    stores = {store.store_id: store for store in db.scalars(store_statement)}
+    statement = (
+        select(Preorder)
+        .where(
+            Preorder.store_id.in_(stores),
+            Preorder.status.in_(VALID_PREORDER_STATUSES),
+            Preorder.required_at >= range_start.astimezone(timezone.utc),
+            Preorder.required_at < range_end.astimezone(timezone.utc),
+        )
+        .order_by(Preorder.required_at)
+    )
+    items = [
+        {
+            "preorder_id": record.preorder_id,
+            "store_display_name": stores[record.store_id].store_name,
+            "channel_type": stores[record.store_id].channel_type,
+            "product_id": record.product_id,
+            "product_name": record.product_name,
+            "quantity": number(record.quantity),
+            "unit": record.unit,
+            "required_at": record.required_at,
+            "status": record.status,
+        }
+        for record in db.scalars(statement)
+    ]
     return response_envelope(items, trace_id=request.state.trace_id)
 
 
 @public_router.get("/public/dashboard/transport", response_model=ResponseEnvelope[list[dict]])
 def public_transport(request: Request, db: Annotated[Session, Depends(get_db)], park_id: str | None = None, start_at: datetime | None = None, end_at: datetime | None = None) -> dict:
-    del start_at, end_at
     ids = [enterprise.enterprise_id for enterprise in public_enterprises(db, park_id)]
-    records = db.scalars(select(TransportTaskSummary).where(TransportTaskSummary.enterprise_id.in_(ids))).all() if ids else []
+    statement = select(TransportTaskSummary).where(TransportTaskSummary.enterprise_id.in_(ids))
+    if start_at is not None:
+        statement = statement.where((TransportTaskSummary.planned_arrive_at.is_(None)) | (TransportTaskSummary.planned_arrive_at >= start_at))
+    if end_at is not None:
+        statement = statement.where((TransportTaskSummary.planned_depart_at.is_(None)) | (TransportTaskSummary.planned_depart_at <= end_at))
+    records = db.scalars(statement).all() if ids else []
     telemetry = db.scalars(select(TransportTelemetry).where(TransportTelemetry.task_id.in_([record.task_id for record in records]))).all() if records else []
     resources = db.scalars(select(TransportResource)).all()
     resource_by_vehicle = {resource.vehicle_id: resource for resource in resources}

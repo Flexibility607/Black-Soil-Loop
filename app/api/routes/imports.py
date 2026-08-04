@@ -25,7 +25,13 @@ from app.models.user import User
 from app.schemas.business_records import InventoryCreate, ReturnRecordCreate, SalesOrderLineCreate
 from app.schemas.common import ResponseEnvelope, response_envelope
 from app.schemas.imports import ImportConfirmRequest
-from app.schemas.master_data import EnterpriseCreate, EnterpriseTagCreate, ParkCreate, PartnerCreate, StoreCreate
+from app.schemas.master_data import (
+    EnterpriseCreate,
+    EnterpriseTagCreate,
+    ParkLegacyImportCreate,
+    PartnerCreate,
+    StoreLegacyImportCreate,
+)
 from app.schemas.planning_records import PolicyCreate, PreorderCreate, ProcurementDemandCreate, SupplierQuoteCreate
 from app.schemas.production import BomCreate, ProductionOrderCreate, ProductionPlanCreate
 from app.schemas.transport import FreezerRecordCreate, TransportResourceCreate, TransportTaskSummaryCreate
@@ -36,11 +42,23 @@ DATETIME_ADAPTER = TypeAdapter(datetime)
 CONTROL_SHEETS = {"导入说明", "字段字典", "枚举字典", "业务键字典"}
 
 SHEET_SPECS: list[dict[str, Any]] = [
-    {"sheet": "园区档案", "model": Park, "schema": ParkCreate, "keys": ("park_id",)},
+    {
+        "sheet": "园区档案",
+        "model": Park,
+        "schema": ParkLegacyImportCreate,
+        "keys": ("park_id",),
+        "legacy_headers": ["park_id", "park_name", "address", "status", "source_system", "source_record_id", "source_updated_at", "remark"],
+    },
     {"sheet": "企业档案", "model": Enterprise, "schema": EnterpriseCreate, "keys": ("enterprise_id",)},
     {"sheet": "企业标签", "model": EnterpriseTag, "schema": EnterpriseTagCreate, "keys": ("enterprise_id", "tag")},
     {"sheet": "合作方", "model": Partner, "schema": PartnerCreate, "keys": ("partner_id",)},
-    {"sheet": "门店", "model": Store, "schema": StoreCreate, "keys": ("store_id",)},
+    {
+        "sheet": "门店",
+        "model": Store,
+        "schema": StoreLegacyImportCreate,
+        "keys": ("store_id",),
+        "legacy_headers": ["store_id", "enterprise_id", "partner_id", "store_name", "store_contact_name", "store_phone", "delivery_address", "longitude", "latitude", "relationship_status", "source_system", "source_record_id", "source_updated_at", "remark"],
+    },
     {"sheet": "生产计划", "model": ProductionPlan, "schema": ProductionPlanCreate, "keys": ("plan_id",)},
     {"sheet": "生产订单", "model": ProductionOrder, "schema": ProductionOrderCreate, "keys": ("production_order_id",)},
     {"sheet": "物料清单", "model": Bom, "schema": BomCreate, "keys": ("bom_id", "product_id", "material_id")},
@@ -176,7 +194,7 @@ def read_workbook(content: bytes, user: User) -> tuple[list[dict[str, Any]], lis
         while header and header[-1] is None:
             header.pop()
         expected = expected_headers(spec)
-        if header != expected:
+        if header != expected and header != spec.get("legacy_headers"):
             errors.append(error_item(sheet_name, 1, None, "HEADER_MISMATCH", f"表头必须严格匹配模板，期望: {','.join(expected)}"))
             continue
         for row_number, raw_values in enumerate(values, start=2):

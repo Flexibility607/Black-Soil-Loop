@@ -83,6 +83,44 @@ def ensure_park_admin(user: User) -> None:
         raise HTTPException(status_code=403, detail={"code": "FORBIDDEN", "message": "只有园区管理员可以执行此操作"})
 
 
+def ensure_park_access(user: User, park_id: str) -> None:
+    ensure_park_admin(user)
+    if user.park_id and user.park_id != park_id:
+        raise HTTPException(status_code=403, detail={"code": "FORBIDDEN", "message": "无权访问其他园区数据"})
+
+
+def ensure_store_scope_consistent(db: Session, payload: dict[str, Any]) -> None:
+    park_id = payload.get("park_id")
+    partner_id = payload.get("partner_id")
+    enterprise_id = payload.get("enterprise_id")
+    status = payload.get("relationship_status")
+    channel_type = payload.get("channel_type")
+    if not park_id and not channel_type:
+        return
+    if status == "ACTIVE" and (not park_id or not channel_type):
+        raise HTTPException(status_code=400, detail={"code": "VALIDATION_ERROR", "message": "有效门店必须填写园区和渠道"})
+    if park_id and db.get(Park, park_id) is None:
+        raise HTTPException(status_code=422, detail={"code": "UPSTREAM_ERROR", "message": "门店关联园区不存在"})
+    if partner_id and db.get(Partner, partner_id) is None:
+        raise HTTPException(status_code=422, detail={"code": "UPSTREAM_ERROR", "message": "门店关联合作方不存在"})
+    if enterprise_id:
+        enterprise = db.get(Enterprise, enterprise_id)
+        if enterprise is None:
+            raise HTTPException(status_code=422, detail={"code": "UPSTREAM_ERROR", "message": "门店关联企业不存在"})
+        if park_id and enterprise.park_id != park_id:
+            raise HTTPException(status_code=409, detail={"code": "SCOPE_CONFLICT", "message": "门店园区与企业园区不一致"})
+    if partner_id and park_id:
+        other_park = db.scalar(
+            select(Store.park_id).where(
+                Store.partner_id == partner_id,
+                Store.park_id.is_not(None),
+                Store.park_id != park_id,
+            ).limit(1)
+        )
+        if other_park:
+            raise HTTPException(status_code=409, detail={"code": "SCOPE_CONFLICT", "message": "合作方已有门店归属其他园区"})
+
+
 def ensure_enterprise_access(user: User, enterprise_id: str, *, allow_park_admin: bool = True) -> None:
     if user.role == "park_admin" and allow_park_admin:
         return
@@ -332,6 +370,9 @@ def create_store(request: Request, event: EventRequest[StoreCreate], db: Annotat
     ensure_event_id_available(db, Store, event.event_id)
     if db.get(Store, event.payload.store_id) is not None:
         raise HTTPException(status_code=409, detail={"code": "IDEMPOTENCY_CONFLICT", "message": "store_id 已存在"})
+    ensure_store_scope_consistent(db, payload)
+    if user.role == "park_admin" and payload.get("park_id"):
+        ensure_park_access(user, payload["park_id"])
     record = Store(**payload, remark=event.payload.remark)
     write_metadata(record, event.event_id)
     db.add(record)
@@ -370,6 +411,11 @@ def update_store(request: Request, store_id: str, event: EventRequest[StorePatch
         ensure_park_admin(user)
     else:
         ensure_enterprise_access(user, target_enterprise_id)
+    merged = {column.key: getattr(record, column.key) for column in inspect(record).mapper.column_attrs}
+    merged.update(changes)
+    ensure_store_scope_consistent(db, merged)
+    if user.role == "park_admin" and merged.get("park_id"):
+        ensure_park_access(user, merged["park_id"])
     for key, value in changes.items():
         setattr(record, key, value)
     record.object_version += 1

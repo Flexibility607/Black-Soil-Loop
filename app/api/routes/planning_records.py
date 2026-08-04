@@ -10,6 +10,7 @@ from app.api.routes.master_data import (
     ensure_enterprise_access,
     ensure_event,
     ensure_event_id_available,
+    ensure_park_access,
     ensure_version,
     record_data,
     write_metadata,
@@ -130,7 +131,11 @@ def create_preorder(
     payload = event.payload.model_dump(exclude={"remark"})
     store = db.get(Store, event.payload.store_id)
     if store is None and user.role == "enterprise_admin":
-        raise HTTPException(status_code=400, detail={"code": "VALIDATION_ERROR", "message": "store_id 不存在，无法绑定企业"})
+        raise HTTPException(status_code=400, detail={"code": "VALIDATION_ERROR", "message": "store_id 不存在"})
+    if store is not None and store.partner_id != event.payload.partner_id:
+        raise HTTPException(status_code=409, detail={"code": "SCOPE_CONFLICT", "message": "预订单合作方与门店归属不一致"})
+    if store is not None and user.role == "park_admin" and store.park_id:
+        ensure_park_access(user, store.park_id)
     enterprise_id = payload.get("enterprise_id") or (store.enterprise_id if store is not None else None)
     if enterprise_id is None:
         if user.role == "enterprise_admin":
@@ -189,6 +194,16 @@ def update_preorder(
     target_enterprise_id = changes.get("enterprise_id", record.enterprise_id)
     if target_enterprise_id is not None:
         ensure_enterprise_access(user, target_enterprise_id)
+    target_store = db.get(Store, changes.get("store_id", record.store_id))
+    if target_store is None and (user.role == "enterprise_admin" or "store_id" in changes):
+        raise HTTPException(status_code=400, detail={"code": "VALIDATION_ERROR", "message": "store_id 不存在"})
+    target_partner_id = changes.get("partner_id", record.partner_id)
+    if target_store is not None and target_store.partner_id != target_partner_id:
+        raise HTTPException(status_code=409, detail={"code": "SCOPE_CONFLICT", "message": "预订单合作方与门店归属不一致"})
+    if target_store is not None and target_enterprise_id is not None and target_store.enterprise_id not in {None, target_enterprise_id}:
+        raise HTTPException(status_code=409, detail={"code": "SCOPE_CONFLICT", "message": "预订单企业与门店企业不一致"})
+    if target_store is not None and user.role == "park_admin" and target_store.park_id:
+        ensure_park_access(user, target_store.park_id)
     for key, value in changes.items():
         setattr(record, key, value)
     record.object_version += 1

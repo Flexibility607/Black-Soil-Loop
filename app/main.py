@@ -6,7 +6,21 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.routes import analytics, auth, business_records, health, imports, master_data, meta, operations, planning_records, production, transport
+from app.api.routes import (
+    analytics,
+    assistant,
+    auth,
+    b02_events,
+    business_records,
+    health,
+    imports,
+    master_data,
+    meta,
+    operations,
+    planning_records,
+    production,
+    transport,
+)
 from app.core.config import Settings, get_settings
 from app.schemas.common import ErrorItem, response_envelope
 
@@ -75,6 +89,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(analytics.router, prefix="/api/v1")
     app.include_router(operations.router, prefix="/api/v1")
     app.include_router(analytics.public_router, prefix="/api/v1")
+    app.include_router(assistant.router, prefix="/api/v1")
+    app.include_router(b02_events.router, prefix="/api/v1")
+
+    if settings.demo_data_enabled:
+
+        @app.on_event("startup")
+        def seed_demo_dashboard() -> None:
+            from app.db.session import SessionLocal
+            from app.services.demo_data import seed_dashboard_demo_data
+
+            with SessionLocal() as db:
+                seed_dashboard_demo_data(db)
     return app
 
 
