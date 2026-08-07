@@ -3,6 +3,9 @@
   "name": "black-soil-loop-flexibility607",
   "compatibility_date": "2026-07-31",
   "main": "cloudflare-worker.js",
+  "vars": {
+    "BACKEND_API_BASE_URL": "https://api.flexibility607.cn"
+  },
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
