@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile, stat } from 'node:fs/promises';
+import { access, readFile, stat } from 'node:fs/promises';
 
 const projectRoot = new URL('../../', import.meta.url);
 
@@ -33,4 +33,14 @@ test('生产构建包含本地地图、背景和 ECharts 且不含外部依赖�
   const textFiles = ['dist/index.html', 'dist/api.js', 'dist/scripts.js', 'dist/dashboard-v2.js', 'dist/dashboard.css'];
   const source = (await Promise.all(textFiles.map((path) => readFile(new URL(path, projectRoot), 'utf8')))).join('\n').toLowerCase();
   for (const banned of ['localhost', 'openstreetmap', 'fonts.googleapis', 'cdnjs', 'unpkg.com', 'jsdelivr']) assert.equal(source.includes(banned), false, `found banned marker: ${banned}`);
+});
+
+test('生产构建强制真实 API 且不携带 Mock 数据', async () => {
+  const runtime = await readFile(new URL('dist/runtime-config.js', projectRoot), 'utf8');
+  assert.match(runtime, /api\.flexibility607\.cn\/api\/v1/);
+  assert.match(runtime, /demo: false/);
+  await assert.rejects(access(new URL('dist/frontend-mocks-v0.1', projectRoot)));
+  const html = await readFile(new URL('dist/index.html', projectRoot), 'utf8');
+  assert.doesNotMatch(html, /id="toggle-mock"/);
+  for (const label of ['DEMAND BY UNIT', 'CHANNEL MIX', 'VOICE DATA AGENT']) assert.equal(html.includes(label), false);
 });

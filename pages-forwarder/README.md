@@ -2,7 +2,7 @@
 
 该项目不复制前端和 Mock，只通过 `UPSTREAM` Service Binding 将全部路径转发到 `black-soil-loop` Worker。Worker 更新后，Pages 无需重新部署即可读取最新静态资源。
 
-当前入口：<https://black-soil-loop-cn.pages.dev/>。
+当前入口：<https://black-soil-loop-f607.pages.dev/>。
 
 本地校验：
 

@@ -1,8 +1,27 @@
 # Black-Soil-Loop：B01 网页端
 
-当前实现覆盖 FastAPI/PostgreSQL 后端、E01 管理台、E02 产销协同大屏、JWT 认证、XLSX 两阶段导入、B01 规则计算、B02 事件接收与门店经营日报投影，以及完整 Alembic 迁移链。本仓库不包含 B02 小程序界面，但包含其与 B01 交互所需的服务端事件契约。
+本 fork 现作为黑土循环网页仓库：维护 E01 管理台、E02 产销协同大屏、Cloudflare 构建与前端测试。生产构建固定连接 `https://api.flexibility607.cn/api/v1`，不会打包 Mock；显式执行 `npm run build:demo` 才会生成本地演示构建。
 
-## 仓库结构
+新的 B01/B02 FastAPI 与 PostgreSQL 实现位于独立仓库 `Flexibility607/Black-Soil-Loop-server`。本仓库原有 `app/`、Alembic 和后端测试暂时只作迁移来源留存，待新服务器通过 PostgreSQL、线上部署与恢复验收后再删除，不能继续作为生产后端发布。
+
+## 当前网页结构
+
+- `frontdesign-v1/`：E01 管理台与 E02 公开大屏，接入新服务器 OpenAPI、SSE 和受控智能助手。
+- `dist/`：由构建脚本生成的 Cloudflare/阿里云共用静态制品。
+- `build-cloudflare.mjs`、`cloudflare-worker.js`：生产构建与 Cloudflare Worker。
+- `pages-forwarder/`：Cloudflare Pages 服务绑定入口。
+- `design.md`、`.hallmark/`：界面设计约束和视觉审核记录。
+
+## 网页开发与验证
+
+```powershell
+npm ci
+npm run test:frontend
+```
+
+本地联调时在 `runtime-config.js` 中显式指定本地 B01 地址；提交或发布前必须重新执行 `npm run build`，确认 `dist/runtime-config.js` 指向生产 API 且 `dist/mock/` 不存在。
+
+## 迁移前旧结构（只读参考）
 
 - `app/`、`alembic/`、`tests/`：FastAPI 后端、数据库迁移和回归测试。
 - `frontdesign-v1/`：E01 管理台与 E02 16:9 大屏，包含本地 ECharts、字体、东北三省地图和冰雪农业背景的构建入口。
@@ -183,13 +202,13 @@ npm run verify:cloud -- https://你的域名.workers.dev
 
 `pages-forwarder/` 不复制前端、Mock 或后端，也不做 302 跳转。其 `_worker.js` 通过 `UPSTREAM` Service Binding 把访问路径转发给 `black-soil-loop` Worker，因此浏览器保持在 Pages 域名，Worker 后续自动部署也会立即反映到该入口。
 
-当前备用入口：<https://black-soil-loop-cn.pages.dev/>。
+当前备用入口：<https://black-soil-loop-f607.pages.dev/>。
 
 首次创建与部署：
 
 ```powershell
 npm run verify:pages
-npx wrangler pages project create black-soil-loop-cn --production-branch main
+npx wrangler pages project create black-soil-loop-f607 --production-branch main
 npm run pages:deploy
 ```
 

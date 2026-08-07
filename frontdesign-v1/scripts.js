@@ -1,26 +1,24 @@
 const RESOURCE_GROUPS = {
   enterprise: [
     { value: 'enterprises', label: '企业档案' },
-    { value: 'parks', label: '园区档案' },
-    { value: 'enterprise-tags', label: '企业标签' },
-    { value: 'partners', label: '合作方' },
-    { value: 'stores', label: '门店档案' },
+    { value: 'stores', label: '门店与第三空间' },
+    { value: 'products', label: '商品与原料' },
+    { value: 'suppliers', label: '供应商' },
   ],
   production: [
-    { value: 'production-plans', label: '生产计划' },
-    { value: 'production-orders', label: '生产订单' },
-    { value: 'preorders', label: '预订单' },
-    { value: 'boms', label: '物料清单 BOM' },
+    { value: 'transport-orders', label: '多企业运输订单' },
+    { value: 'transport-plans', label: '拼车运输计划' },
+    { value: 'products', label: '商品与原料' },
   ],
   inventory: [
-    { value: 'inventories', label: '企业库存' },
-    { value: 'sales-order-lines', label: '销售订单明细' },
-    { value: 'returns', label: '退货记录' },
-    { value: 'freezer-records', label: '冻库记录' },
+    { value: 'warehouses', label: '仓库与温区' },
+    { value: 'products', label: '商品库存维度' },
   ],
   transport: [
-    { value: 'transport-task-summaries', label: '运输任务摘要' },
-    { value: 'transport-resources', label: '运输资源' },
+    { value: 'transport-tasks', label: '运输任务实时投影' },
+    { value: 'transport-plans', label: '拼车计划' },
+    { value: 'alerts', label: '温湿度与运输报警' },
+    { value: 'vehicles', label: '车辆与司机资源' },
   ],
 };
 
@@ -28,9 +26,9 @@ const state = {
   activeSection: 'overview',
   resource: {
     enterprise: 'enterprises',
-    production: 'production-plans',
-    inventory: 'inventories',
-    transport: 'transport-task-summaries',
+    production: 'transport-orders',
+    inventory: 'warehouses',
+    transport: 'transport-tasks',
   },
   resourcePage: { enterprise: 1, production: 1, inventory: 1, transport: 1 },
   resourceSearch: { enterprise: '', production: '', inventory: '', transport: '' },
@@ -42,6 +40,7 @@ const state = {
   publicMapPanY: 0,
   publicMapSuppressClickUntil: 0,
   publicMapDragCleanup: null,
+  lastMatchRunId: null,
 };
 
 function getAPI() {
@@ -56,7 +55,10 @@ function errorOf(result) {
   const body = result && result.json;
   if (!body) return `请求失败（HTTP ${result ? result.status : '未知'}）`;
   const first = body.errors && body.errors[0];
-  return first ? `${body.code || '请求失败'}：${first.message}` : `${body.code || '请求失败'}：${body.message || `HTTP ${result.status}`}`;
+  const details = body.details && typeof body.details === 'object' ? Object.values(body.details).join('；') : '';
+  return first
+    ? `${body.code || '请求失败'}：${first.message}`
+    : `${body.code || '请求失败'}：${body.message || details || `HTTP ${result.status}`}`;
 }
 
 function formatValue(value) {
@@ -95,21 +97,55 @@ const FIELD_LABELS = {
   source_record_id: '来源记录编号', plan_date: '计划日期', daily_capacity: '日产能', planned_quantity: '计划数量',
   completed_quantity: '已完成数量', warning_threshold: '预警阈值', inventory_quantity: '库存数量', freezer_capacity: '冻库容量',
   task_id: '任务编号', origin: '起点', destination: '终点', driver_name: '司机', license_plate: '车牌号',
+  id: '记录编号', code: '业务编码', name: '名称', enabled: '是否启用', object_version: '数据版本', display_name: '显示名称',
+  channel: '渠道', latitude: '纬度', longitude: '经度', temperature_zone: '温区', plate_no: '车牌号', driver_id: '司机编号',
+  max_weight_kg: '最大载重（千克）', max_volume_m3: '最大容积（立方米）', capacity_m3: '总库容（立方米）', used_m3: '已用库容（立方米）',
+  plan_no: '计划编号', task_no: '任务编号', store_id: '门店编号', product_id: '商品编号', order_no: '订单编号', scenario_code: '演示场景',
+  departure_at: '计划发车时间', weight_kg: '重量（千克）', volume_m3: '体积（立方米）', task_id: '执行任务编号',
+  source_order_ids: '来源订单', total_weight_kg: '总重量（千克）', total_volume_m3: '总体积（立方米）', stops: '配送站点',
+  latest_telemetry: '最新温湿度', latest_location: '最新位置', route_label: '路线性质', alert_type: '报警类型', message: '报警说明', opened_at: '报警时间',
+  delivery_score: '交付能力评分', quality_score: '质量评分', category: '品类', unit: '单位', updated_at: '更新时间', created_at: '创建时间',
+  quantity_kg: '确认需求量（千克）', count: '数量', utilization_pct: '容量占用率',
+  match_run_id: '计算编号', run_id: '计算编号', rules_version: '规则版本', candidates: '候选方案', rejections: '不匹配原因',
+  order_ids: '订单记录', order_nos: '订单编号', vehicle_id: '车辆编号', planned_departure_at: '计划发车时间',
+  origin_spread_km: '始发地离散距离（千米）', destination_spread_km: '目的地离散距离（千米）',
+  departure_span_minutes: '发车时间差（分钟）', capacity_utilization_pct: '车辆容量使用率', explanation: '规则解释',
+  rules: '匹配规则', recommendation: '推荐方案', alternatives: '备选方案', weights: '评分权重',
+  forecast: '预测结果', forecast_quantity: '预测量', lower_bound: '预测下界', upper_bound: '预测上界',
+  method: '预测方法', mae: '平均绝对误差', smape: '对称平均绝对百分比误差', data_cutoff: '数据截止时间',
+  unmatched: '未匹配订单', reason: '原因', enterprise_count: '企业数量', product_count: '品类数量',
+  weight_utilization_pct: '载重使用率', volume_utilization_pct: '容积使用率', expected_quantity: '应交数量', delivery_lines: '交付明细',
+  candidate_warehouses: '候选仓库', warehouse_id: '仓库编号', warehouse_name: '仓库名称', estimated_distance_km: '估算距离（千米）',
+  available_volume_m3: '可用库容（立方米）', eligible: '是否符合规则', required_volume_m3: '所需库容（立方米）',
+  required_quantity: '采购需求量', supplier_id: '供应商编号', supplier_name: '供应商名称', unit_price: '单价', total_amount: '总金额',
+  price_score: '价格评分', composite_score: '综合评分', tier_min_quantity: '阶梯起订量', supply_capacity: '供货能力',
+  price: '价格权重', delivery: '交付权重', quality: '质量权重', data_points: '历史数据点',
+  production_plan_quantity: '生产计划数量', method_note: '方法说明',
+  origin_max_km: '始发地最大距离（千米）', destination_max_km: '目的地最大距离（千米）', departure_window_minutes: '发车时间窗（分钟）',
+  capacity_utilization_limit: '容量上限', distance_max_km: '最大距离（千米）',
 };
 
 const VALUE_LABELS = {
-  TRADITIONAL_STORE: '传统门店', THIRD_SPACE: '第三空间', CONFIRMED: '已确认', COMPLETED: '已完成',
-  DRAFT: '草稿', IN_PROGRESS: '进行中', CANCELLED: '已取消', ACTIVE: '有效', INACTIVE: '停用',
+  TRADITIONAL: '传统门店', TRADITIONAL_STORE: '传统门店', THIRD_SPACE: '第三空间', CONFIRMED: '已确认', COMPLETED: '已完成',
+  DRAFT: '草稿', MATCHED: '已匹配', PUBLISHED: '已发布', DRIVER_ACCEPTED: '司机已接单', PICKED_UP: '已取货', IN_TRANSIT: '运输中',
+  DELIVERED: '已送达', STORE_SIGNED: '门店已签收', IN_PROGRESS: '进行中', CANCELLED: '已取消', OPEN: '待处理', RESOLVED: '已处理',
+  ACTIVE: '有效', INACTIVE: '停用', AMBIENT: '常温', CHILLED: '冷藏', FROZEN: '冷冻',
   COMPLETE: '完整上报', INCOMPLETE: '部分上报', MISSING: '缺报', true: '是', false: '否',
+  NO_DATA: '无历史数据', SEASONAL_EXPONENTIAL_SMOOTHING: '季节性指数平滑', WEIGHTED_MOVING_AVERAGE: '加权移动平均',
 };
 
 function displayField(key) {
-  return FIELD_LABELS[key] || key.replaceAll('_', ' ');
+  return FIELD_LABELS[key] || '扩展信息';
 }
 
-function displayCell(value) {
+function displayCell(value, key = '') {
   if (value === true || value === false) return VALUE_LABELS[String(value)];
   if (typeof value === 'string' && VALUE_LABELS[value]) return VALUE_LABELS[value];
+  if (Array.isArray(value) && ['order_ids', 'order_nos'].includes(key)) return `${value.length} 条订单`;
+  if (Array.isArray(value) && key === 'stops') return `${value.length} 个配送站点`;
+  if (value && typeof value === 'object' && ['origin', 'destination'].includes(key)) {
+    return `纬度 ${formatNumber(value.latitude, 4)}，经度 ${formatNumber(value.longitude, 4)}`;
+  }
   return formatValue(value);
 }
 
@@ -121,7 +157,7 @@ function renderTable(target, items, emptyMessage = '暂无数据') {
     return;
   }
   const keys = [...new Set(items.flatMap((item) => Object.keys(item)))];
-  el.innerHTML = `<div class="table-scroll"><table><thead><tr>${keys.map((key) => `<th>${escapeHtml(displayField(key))}</th>`).join('')}</tr></thead><tbody>${items.map((item) => `<tr>${keys.map((key) => `<td>${escapeHtml(displayCell(item[key]))}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  el.innerHTML = `<div class="table-scroll"><table><thead><tr>${keys.map((key) => `<th>${escapeHtml(displayField(key))}</th>`).join('')}</tr></thead><tbody>${items.map((item) => `<tr>${keys.map((key) => `<td>${escapeHtml(displayCell(item[key], key))}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
 }
 
 function renderStructuredResult(target, data) {
@@ -131,20 +167,26 @@ function renderStructuredResult(target, data) {
     el.textContent = formatValue(data);
     return;
   }
-  const primitiveEntries = Object.entries(data).filter(([, value]) => value === null || ['string', 'number', 'boolean'].includes(typeof value));
+  const hiddenMetadata = new Set(['trace_id', 'schema_version', 'generated_at']);
+  const primitiveEntries = Object.entries(data).filter(([key, value]) => !hiddenMetadata.has(key) && (value === null || ['string', 'number', 'boolean'].includes(typeof value)));
   const listEntries = Object.entries(data).filter(([, value]) => Array.isArray(value));
+  const objectEntries = Object.entries(data).filter(([, value]) => value && typeof value === 'object' && !Array.isArray(value));
   const cards = primitiveEntries.length
-    ? `<div class="readable-result-cards">${primitiveEntries.map(([key, value]) => `<div><span>${escapeHtml(displayField(key))}</span><strong>${escapeHtml(displayCell(value))}</strong></div>`).join('')}</div>`
+    ? `<div class="readable-result-cards">${primitiveEntries.map(([key, value]) => `<div><span>${escapeHtml(displayField(key))}</span><strong>${escapeHtml(displayCell(value, key))}</strong></div>`).join('')}</div>`
     : '';
+  const objects = objectEntries.map(([key, value]) => {
+    const entries = Object.entries(value).filter(([field]) => !hiddenMetadata.has(field));
+    return `<section><h4>${escapeHtml(displayField(key))}</h4><div class="readable-result-cards">${entries.map(([field, item]) => `<div><span>${escapeHtml(displayField(field))}</span><strong>${escapeHtml(displayCell(item, field))}</strong></div>`).join('')}</div></section>`;
+  }).join('');
   const lists = listEntries.map(([key, value]) => {
     if (!value.length) return `<section><h4>${escapeHtml(displayField(key))}</h4><p>暂无记录</p></section>`;
     if (value.every((item) => item && typeof item === 'object' && !Array.isArray(item))) {
       const keys = [...new Set(value.slice(0, 20).flatMap((item) => Object.keys(item)))];
-      return `<section><h4>${escapeHtml(displayField(key))}</h4><div class="table-scroll"><table><thead><tr>${keys.map((field) => `<th>${escapeHtml(displayField(field))}</th>`).join('')}</tr></thead><tbody>${value.slice(0, 20).map((item) => `<tr>${keys.map((field) => `<td>${escapeHtml(displayCell(item[field]))}</td>`).join('')}</tr>`).join('')}</tbody></table></div></section>`;
+      return `<section><h4>${escapeHtml(displayField(key))}</h4><div class="table-scroll"><table><thead><tr>${keys.map((field) => `<th>${escapeHtml(displayField(field))}</th>`).join('')}</tr></thead><tbody>${value.slice(0, 20).map((item) => `<tr>${keys.map((field) => `<td>${escapeHtml(displayCell(item[field], field))}</td>`).join('')}</tr>`).join('')}</tbody></table></div></section>`;
     }
-    return `<section><h4>${escapeHtml(displayField(key))}</h4><p>${value.map(displayCell).map(escapeHtml).join('、')}</p></section>`;
+    return `<section><h4>${escapeHtml(displayField(key))}</h4><p>${value.map((item) => displayCell(item, key)).map(escapeHtml).join('、')}</p></section>`;
   }).join('');
-  el.innerHTML = `${cards}${lists}<details><summary>查看原始 JSON（调试）</summary><pre>${escapeHtml(JSON.stringify(data, null, 2))}</pre></details>`;
+  el.innerHTML = `${cards}${objects}${lists}<details><summary>查看原始数据（调试）</summary><pre>${escapeHtml(JSON.stringify(data, null, 2))}</pre></details>`;
 }
 
 function formatNumber(value, maximumFractionDigits = 0) {
@@ -174,6 +216,15 @@ function formatShortDate(value, includeTime = false) {
     ? { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }
     : { month: '2-digit', day: '2-digit' };
   return new Intl.DateTimeFormat('zh-CN', options).format(date).replaceAll('/', '-');
+}
+
+function formatShanghaiDateTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return formatValue(value);
+  return new Intl.DateTimeFormat('zh-CN', {
+    timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  }).format(date);
 }
 
 function renderLineChart(target, items, labelKey, valueKey, gradientId) {
@@ -505,7 +556,7 @@ function setupOverviewDetails() {
   const popover = document.getElementById('overview-detail-popover');
   const targetLabels = {
     enterprise: '主数据与企业',
-    production: '生产计划与订单',
+    production: '运输订单与拼车计划',
     inventory: '库存、销售与冻库',
     transport: '运输任务与资源',
   };
@@ -588,11 +639,12 @@ function renderAuthState(user) {
   const loginButton = document.getElementById('open-login');
   const logoutButton = document.getElementById('logout-button');
   if (user) {
-    stateEl.textContent = `${user.username} · ${user.role}`;
+    const role = { park_admin: '园区管理员', analyst: '数据分析员' }[user.role] || '已授权用户';
+    stateEl.textContent = `${user.display_name || user.username} · ${role}`;
     loginButton.hidden = true;
     logoutButton.hidden = false;
   } else {
-    stateEl.textContent = getAPI().isMock() ? 'Mock E01 会话' : '未登录';
+    stateEl.textContent = '未登录';
     loginButton.hidden = false;
     logoutButton.hidden = true;
   }
@@ -629,7 +681,7 @@ async function loadOverview() {
     if (el) el.textContent = formatValue(value);
   });
   const cutoff = result.json && result.json.data_cutoff;
-  document.getElementById('data-cutoff').textContent = formatValue(cutoff);
+  document.getElementById('data-cutoff').textContent = formatShanghaiDateTime(cutoff);
   renderTable('overview-enterprise-details', data.details || [], '暂无企业明细');
   document.getElementById('overview-body').textContent = `E01 总览已同步：预计订单 ${formatValue(data.expected_order_quantity)}，已承担订单 ${formatValue(data.committed_order_quantity)}，销售额 ${formatValue(data.sales_amount_total)}；当前未处理库存预警 ${formatValue(data.inventory_alert_count)}。`;
   setMessage('E01 总览加载完成。', 'success');
@@ -643,7 +695,13 @@ function renderOperationalAlerts(resource, items, enterpriseNames = {}) {
   const itemMarkup = (level, title, detail, action) => `<article class="operation-alert ${level}"><div><strong>${escapeHtml(title)}</strong><small>${escapeHtml(detail)}</small></div><b>${escapeHtml(action)}</b></article>`;
   let heading = '运行提醒';
   let alerts = [];
-  if (resource === 'inventories') {
+  if (resource === 'warehouses') {
+    heading = '仓库容量提醒';
+    alerts = rows.filter((item) => Number(item.capacity_m3) > 0 && Number(item.used_m3) / Number(item.capacity_m3) >= 0.8).map((item) => {
+      const occupancy = Number(item.used_m3) / Number(item.capacity_m3) * 100;
+      return itemMarkup(occupancy >= 90 ? 'critical' : 'warning', item.name || item.code || '仓库', `容量占用 ${occupancy.toFixed(1)}% · ${displayCell(item.temperature_zone)}`, occupancy >= 90 ? '暂停入库并调度拼仓' : '关注剩余库容');
+    });
+  } else if (resource === 'inventories') {
     heading = '库存预警条目';
     alerts = rows.filter((item) => {
       const current = Number(item.current_qty);
@@ -680,7 +738,7 @@ function renderOperationalAlerts(resource, items, enterpriseNames = {}) {
       return itemMarkup(occupancy >= 80 ? 'critical' : 'warning', `${enterpriseLabel(item)} · ${item.freezer_id || '冻库记录'}`, `${reasons.join('、')} · 冻品 ${formatNumber(item.frozen_goods_kg)} kg`, occupancy >= 80 ? '调整入库' : '检查温控');
     }).filter(Boolean);
   }
-  const sourceNote = rows.length ? '演示规则 · DEMO_SIMULATION' : '当前资源没有可展示的记录';
+  const sourceNote = rows.length ? '依据服务器实时记录计算' : '当前资源没有可展示的记录';
   el.innerHTML = `<div class="operation-alert-heading"><strong>${escapeHtml(heading)}</strong><span>${escapeHtml(alerts.length)} 条 · ${escapeHtml(sourceNote)}</span></div>${alerts.length ? alerts.join('') : '<div class="operation-alert-empty">当前资源暂无需要处理的预警条目。</div>'}`;
 }
 
@@ -715,8 +773,14 @@ async function loadResource(section) {
     renderOperationalAlerts(resource, data.items || [], enterpriseNames);
   }
   if (section === 'transport') {
-    const monitored = (data.items || []).filter((item) => item.telemetry && item.telemetry.length);
-    document.getElementById('transport-monitoring').textContent = monitored.length ? `当前有 ${monitored.length} 条运输任务带遥测记录，异常点将在 E02 以红色展示。` : '当前没有遥测记录；可先用 DEMO_SIMULATION 数据演示路径和温湿度异常。';
+    const rows = data.items || [];
+    const monitored = rows.filter((item) => item.latest_telemetry);
+    const openAlerts = rows.filter((item) => item.status === 'OPEN');
+    document.getElementById('transport-monitoring').textContent = resource === 'alerts'
+      ? `服务器当前返回 ${openAlerts.length} 条待处理报警；报警时间、类型和对象版本均来自 B02 投影。`
+      : monitored.length
+        ? `当前有 ${monitored.length} 条运输任务带最新温湿度采样，异常路线在 E02 以红色显示。`
+        : '当前任务投影暂无温湿度采样，页面不会生成模拟异常提示。';
   }
 }
 
@@ -724,13 +788,11 @@ async function loadCalculation() {
   const kind = document.getElementById('calc-kind').value;
   const resultEl = document.getElementById('calculation-result');
   resultEl.textContent = '计算中…';
-  let body = {};
-  if (kind === 'routes/estimate') {
-    body = {
-      origin: document.getElementById('calc-origin').value.trim(),
-      destination: document.getElementById('calc-destination').value.trim(),
-    };
-  }
+  const body = ['carpool-preview', 'warehouse-preview'].includes(kind)
+    ? { scenario_code: document.getElementById('calc-scenario').value }
+    : kind === 'procurement'
+      ? { product_id: document.getElementById('calc-product').value, required_quantity: document.getElementById('calc-quantity').value }
+      : { enterprise_id: document.getElementById('calc-enterprise').value, product_id: document.getElementById('calc-product').value };
   const result = await getAPI().calculate(kind, body);
   if (!result.ok) {
     requireAuth(result);
@@ -738,8 +800,44 @@ async function loadCalculation() {
     setMessage(errorOf(result), 'error');
     return;
   }
+  const data = dataOf(result);
+  renderStructuredResult('calculation-result', data);
+  state.lastMatchRunId = kind === 'carpool-preview' ? data?.match_run_id : null;
+  document.getElementById('confirm-carpool').hidden = !state.lastMatchRunId || !(data?.candidates || []).length;
+  setMessage('计算已返回规则版本、候选方案及不匹配原因。', 'success');
+}
+
+async function confirmCarpool() {
+  if (!state.lastMatchRunId) return;
+  const result = await getAPI().confirmCarpool(state.lastMatchRunId, 1, 0);
+  if (!result.ok) {
+    document.getElementById('calculation-result').textContent = errorOf(result);
+    return;
+  }
+  document.getElementById('confirm-carpool').hidden = true;
   renderStructuredResult('calculation-result', dataOf(result));
-  setMessage('B01 计算接口已返回结果；请按 calculation_status 处理缺失输入或规则。', 'success');
+  setMessage('首选拼车方案已确认，服务器正在创建执行任务。', 'success');
+}
+
+function updateCalculationFields() {
+  const kind = document.getElementById('calc-kind').value;
+  document.getElementById('scenario-fields').hidden = !['carpool-preview', 'warehouse-preview'].includes(kind);
+  document.getElementById('enterprise-fields').hidden = kind !== 'forecast';
+  document.getElementById('product-fields').hidden = !['procurement', 'forecast'].includes(kind);
+  document.getElementById('quantity-fields').hidden = kind !== 'procurement';
+  document.getElementById('confirm-carpool').hidden = true;
+  state.lastMatchRunId = null;
+}
+
+async function loadCalculationOptions() {
+  const [enterprises, products] = await Promise.all([
+    getAPI().list('enterprises', { page_size: '100' }),
+    getAPI().list('products', { page_size: '100' }),
+  ]);
+  const enterpriseRows = dataOf(enterprises)?.items || [];
+  const productRows = dataOf(products)?.items || [];
+  document.getElementById('calc-enterprise').innerHTML = enterpriseRows.map((row) => `<option value="${escapeHtml(row.id)}">${escapeHtml(row.name)}</option>`).join('');
+  document.getElementById('calc-product').innerHTML = productRows.map((row) => `<option value="${escapeHtml(row.id)}">${escapeHtml(row.name)}（${escapeHtml(row.unit)}）</option>`).join('');
 }
 
 async function handleImport(event) {
@@ -816,7 +914,7 @@ function showSection(section) {
   document.body.classList.toggle('screen-mode', isPublic);
   document.querySelectorAll('.page-section').forEach((item) => item.classList.toggle('active', item.id === section));
   document.querySelectorAll('.sidebar button[data-section]').forEach((item) => item.classList.toggle('active', item.dataset.section === section));
-  const titles = { overview: 'E01 管理总览', enterprise: '主数据与企业', production: '生产计划与订单', inventory: '库存、销售与冻库', transport: '运输任务与资源', import: 'B01 批量导入', analytics: 'B01 计算与建议', public: 'E02 公开大屏' };
+  const titles = { overview: 'E01 管理总览', enterprise: '主数据与企业', production: '运输订单与拼车计划', inventory: '库存、销售与冻库', transport: '运输任务与资源', import: 'B01 批量导入', analytics: 'B01 计算与建议', public: 'E02 公开大屏' };
   document.getElementById('page-title').textContent = titles[section] || '黑土闭环';
   if (section === 'overview') loadOverview();
   if (RESOURCE_GROUPS[section]) loadResource(section);
@@ -847,6 +945,7 @@ async function handleLogin(event) {
   const me = await getAPI().getCurrentUser();
   renderAuthState(dataOf(me) || { username, role: 'E01' });
   document.getElementById('auth-panel').hidden = true;
+  await loadCalculationOptions();
   setMessage('E01 登录成功。', 'success');
   showSection(state.activeSection);
 }
@@ -858,30 +957,15 @@ async function handleLogout() {
   setMessage('已退出 E01 会话；E02 公开大屏仍可访问。', 'info');
 }
 
-function initPage() {
-  const mockToggle = document.getElementById('toggle-mock');
-  mockToggle.checked = getAPI().isMock();
-  mockToggle.addEventListener('change', () => {
-    localStorage.setItem('useMock', mockToggle.checked ? 'true' : 'false');
-    getAPI().clearTokens();
-    renderAuthState(null);
-    setMessage(mockToggle.checked ? '已切换到本地 Mock 数据。' : `已切换到 Live：${getAPI().getLiveBase()}`, 'info');
-    showSection(state.activeSection);
-  });
-
+async function initPage() {
   document.querySelectorAll('.sidebar button[data-section]').forEach((button) => button.addEventListener('click', () => showSection(button.dataset.section)));
   document.getElementById('open-login').addEventListener('click', () => { document.getElementById('auth-panel').hidden = false; });
   document.getElementById('close-login').addEventListener('click', () => { document.getElementById('auth-panel').hidden = true; });
   document.getElementById('logout-button').addEventListener('click', handleLogout);
   document.getElementById('login-form').addEventListener('submit', handleLogin);
-  document.getElementById('import-form').addEventListener('submit', handleImport);
-  document.getElementById('confirm-import').addEventListener('click', confirmImport);
-  document.getElementById('calc-kind').addEventListener('change', () => {
-    const isRoute = document.getElementById('calc-kind').value === 'routes/estimate';
-    document.getElementById('route-fields').hidden = !isRoute;
-    document.getElementById('route-fields-destination').hidden = !isRoute;
-  });
+  document.getElementById('calc-kind').addEventListener('change', updateCalculationFields);
   document.getElementById('run-calculation').addEventListener('click', loadCalculation);
+  document.getElementById('confirm-carpool').addEventListener('click', confirmCarpool);
   document.getElementById('public-refresh')?.addEventListener('click', () => window.DashboardV2?.refresh());
   document.getElementById('public-fullscreen')?.addEventListener('click', togglePublicFullscreen);
   document.getElementById('public-theme-toggle')?.addEventListener('click', togglePublicTheme);
@@ -910,7 +994,20 @@ function initPage() {
   window.setInterval(updatePublicClock, 1000);
   setupResourceSelects();
   setupOverviewDetails();
-  renderAuthState(null);
+  getAPI().onAuthChange(({ user, reason }) => {
+    renderAuthState(user);
+    if (!user && reason === 'idle_timeout') {
+      document.getElementById('auth-panel').hidden = false;
+      setMessage('会话因 30 分钟无操作已自动退出，请重新登录。', 'warning');
+    }
+  });
+  ['pointerdown', 'keydown'].forEach((eventName) => document.addEventListener(eventName, getAPI().touchActivity, { passive: true }));
+  const me = await getAPI().getCurrentUser();
+  const user = me.ok ? dataOf(me) : null;
+  renderAuthState(user);
+  document.getElementById('auth-panel').hidden = Boolean(user);
+  if (user) await loadCalculationOptions();
+  updateCalculationFields();
   showSection('overview');
 }
 

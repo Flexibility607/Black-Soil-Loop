@@ -23,6 +23,14 @@ function nodeColor(type) {
   return COLORS.traditional;
 }
 
+function statusLabel(status) {
+  return {
+    DRAFT: '草稿', MATCHED: '已匹配', CONFIRMED: '已确认', PUBLISHED: '已发布', DRIVER_ACCEPTED: '司机已接单',
+    PICKED_UP: '已取货', IN_TRANSIT: '运输中', DELIVERED: '已送达', STORE_SIGNED: '门店已签收',
+    COMPLETED: '已完成', CANCELLED: '已取消',
+  }[status] || '状态待同步';
+}
+
 export function buildNortheastMapOption(snapshot) {
   const nodeById = new Map((snapshot.map_nodes || []).map((node) => [node.node_id, node]));
   const lines = (snapshot.map_edges || []).map((edge) => {
@@ -30,8 +38,12 @@ export function buildNortheastMapOption(snapshot) {
     const target = nodeById.get(edge.target_id);
     if (!source || !target) return null;
     return {
+      name: `${edge.task_no || edge.task_id || '运输任务'} · ${edge.route_label || '经纬度估算路线'}`,
       coords: [[Number(source.longitude), Number(source.latitude)], [Number(target.longitude), Number(target.latitude)]],
-      lineStyle: { color: edge.channel_type === 'THIRD_SPACE' ? COLORS.thirdSpace : COLORS.traditional },
+      taskStatus: edge.status,
+      telemetry: edge.latest_telemetry,
+      abnormal: edge.abnormal,
+      lineStyle: { color: edge.abnormal ? '#ff6b68' : edge.channel_type === 'THIRD_SPACE' ? COLORS.thirdSpace : COLORS.traditional },
     };
   }).filter(Boolean);
 
@@ -51,6 +63,14 @@ export function buildNortheastMapOption(snapshot) {
       textStyle: { color: COLORS.text },
       formatter(params) {
         if (params.seriesName === '节点') return `${params.name}<br/>${params.value?.[2] === 'PARK' ? '园区中心' : params.value?.[2] === 'THIRD_SPACE' ? '第三空间' : '传统门店'}`;
+        if (params.seriesName === '估算运输路线') {
+          const telemetry = params.data?.telemetry;
+          const status = statusLabel(params.data?.taskStatus);
+          const environmental = telemetry
+            ? `<br/>温度 ${telemetry.temperature_c ?? '—'} ℃ · 湿度 ${telemetry.humidity_pct ?? '—'}%<br/>采样 ${telemetry.sampled_at || '—'}`
+            : '<br/>暂无温湿度采样';
+          return `${params.name}<br/>状态：${status}${environmental}`;
+        }
         return params.name || '';
       },
     },
@@ -73,11 +93,11 @@ export function buildNortheastMapOption(snapshot) {
     },
     series: [
       {
-        name: '供销连线',
+        name: '估算运输路线',
         type: 'lines',
         coordinateSystem: 'geo',
         zlevel: 2,
-        silent: true,
+        silent: false,
         effect: { show: true, period: 6, trailLength: 0.22, symbolSize: 3, color: '#d9fbff' },
         lineStyle: { width: 1.4, opacity: 0.72, curveness: 0.18 },
         data: lines,

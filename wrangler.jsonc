@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "black-soil-loop",
+  "name": "black-soil-loop-flexibility607",
   "compatibility_date": "2026-07-31",
   "main": "cloudflare-worker.js",
   "assets": {

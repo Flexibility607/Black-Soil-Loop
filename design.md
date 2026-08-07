@@ -33,3 +33,12 @@
 - ECharts、三套字体、Natural Earth Admin-1 东北三省 GeoJSON、吉品临时图标和东北背景全部随前端构建。
 - 浏览器只请求同源 `/api/v1`；Cloudflare Worker 使用 `BACKEND_API_BASE_URL` 转发，并在服务端侧注入助手令牌。
 - 生产 `dist` 禁止出现 localhost、在线地图、Google Fonts 或 CDN 地址。
+
+## 2026-08-06 真实数据接入约定
+
+- genre：`atmospheric`；macrostructure：E01 `workbench`、E02 `map-diagram`；theme：`studied-DNA`。
+- 生产构建固定连接 `https://api.flexibility607.cn/api/v1`，不携带演示 JSON；演示快照仅由显式演示构建加入。
+- 颜色、字体、间距、圆角、阴影和动效新增值统一从 `frontdesign-v1/tokens.css` 读取。旧样式中尚存的原始颜色属于既有视觉资产兼容例外，本轮新增样式不得继续增加散落色值。
+- 数据截止时间、统计口径、单位、空态、错误态必须与图表同时展示；运输路线固定标注为经纬度估算路线。
+- 登录令牌仅驻留内存，刷新凭证由安全 Cookie 保存；会话超时与跨标签退出状态同步。
+- 信息架构不再展示已经下线的旧版整本导入入口；算法区统一承担拼车、拼仓、采购推荐与需求预测。

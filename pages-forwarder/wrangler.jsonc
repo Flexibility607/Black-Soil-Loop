@@ -1,12 +1,12 @@
 {
   "$schema": "../node_modules/wrangler/config-schema.json",
-  "name": "black-soil-loop-cn",
+  "name": "black-soil-loop-f607",
   "pages_build_output_dir": "./public",
   "compatibility_date": "2026-07-31",
   "services": [
     {
       "binding": "UPSTREAM",
-      "service": "black-soil-loop"
+      "service": "black-soil-loop-flexibility607"
     }
   ]
 }

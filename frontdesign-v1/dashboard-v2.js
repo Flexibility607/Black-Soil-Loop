@@ -14,6 +14,7 @@ import {
 } from './dashboard-format.js';
 import { buildNortheastMapOption, harbinIsNorthOfChangchun, localGeoJsonIsNortheast } from './dashboard-map.js';
 import { VOICE_STATES, VoiceQuestionController } from './dashboard-voice.js';
+import { adaptDashboardSnapshot } from './dashboard-adapter.js';
 
 const echarts = window.echarts;
 const API = window.API;
@@ -30,6 +31,8 @@ const state = {
   lastSuccessfulAt: null,
   mapReady: false,
   e01Snapshot: null,
+  eventController: null,
+  eventRefreshTimer: null,
 };
 
 function byId(id) {
@@ -267,7 +270,7 @@ async function refresh({ force = false } = {}) {
   try {
     await ensureMap();
     const result = await API.getDashboardSnapshot(state.period, false);
-    const snapshot = safeEnvelopeData(result);
+    const snapshot = adaptDashboardSnapshot(safeEnvelopeData(result));
     if (!snapshot) throw new Error(responseError(result));
     state.snapshot = snapshot;
     state.source = snapshot.demo_mode || API.isMock() ? 'demo' : 'live';
@@ -302,10 +305,20 @@ function renderAssistantChart(chartSpec) {
   byId('dv2-dialog-title').textContent = chartSpec.title;
   if (!dialog.open) dialog.showModal();
   const chart = initChart('dv2-dialog-chart');
-  const categories = chartSpec.categories || [];
-  const series = chartSpec.series || [];
+  if (chartSpec.type === 'route' || chartSpec.kind === 'route') {
+    chart.setOption(buildNortheastMapOption(state.snapshot || {}), true);
+    return;
+  }
+  const kind = chartSpec.kind || chartSpec.type || 'bar';
+  const rows = Array.isArray(chartSpec.data) ? chartSpec.data : [];
+  const categories = chartSpec.categories || rows.map((row) => row[chartSpec.category_key] ?? row.name ?? '未命名');
+  const valueKeys = chartSpec.value_keys || (chartSpec.value_key ? [chartSpec.value_key] : []);
+  const series = chartSpec.series || valueKeys.map((key) => ({
+    name: key === 'order_count' ? '订单量' : key === 'sales_amount' ? '营业额' : '数值',
+    data: rows.map((row) => Number(row[key] || 0)),
+  }));
   let option;
-  if (chartSpec.kind === 'donut') {
+  if (kind === 'donut') {
     const values = categories.map((name, index) => ({ name, value: Number(series[0]?.data?.[index] || 0), itemStyle: { color: index === 1 ? COLORS.thirdSpace : COLORS.traditional } }));
     option = { ...donutOption(values, chartSpec.unit), legend: { bottom: 24, textStyle: { color: COLORS.muted } } };
   } else {
@@ -315,7 +328,7 @@ function renderAssistantChart(chartSpec) {
       grid: { top: 68, right: 35, bottom: 55, left: 65 },
       xAxis: { type: 'category', data: categories, ...baseAxis() },
       yAxis: { type: 'value', name: chartSpec.unit, nameTextStyle: { color: COLORS.muted }, ...baseAxis() },
-      series: series.map((item, index) => ({ name: item.name, data: item.data, type: chartSpec.kind, smooth: chartSpec.kind === 'line', itemStyle: { color: index === 0 ? COLORS.thirdSpace : COLORS.traditional }, areaStyle: chartSpec.kind === 'line' ? { opacity: 0.08 } : undefined })),
+      series: series.map((item, index) => ({ name: item.name, data: item.data, type: kind, smooth: kind === 'line', itemStyle: { color: index === 0 ? COLORS.thirdSpace : COLORS.traditional }, areaStyle: kind === 'line' ? { opacity: 0.08 } : undefined })),
     };
   }
   requestAnimationFrame(() => { chart.resize(); chart.setOption(option, true); });
@@ -412,10 +425,10 @@ function renderE01Section(section, snapshot) {
 async function ensureE01Snapshot() {
   if (state.e01Snapshot) return state.e01Snapshot;
   let result = await API.getDashboardSnapshot('30d', true);
-  let snapshot = safeEnvelopeData(result);
+  let snapshot = adaptDashboardSnapshot(safeEnvelopeData(result));
   if (!snapshot) {
     result = await API.getDashboardSnapshot('30d', false);
-    snapshot = safeEnvelopeData(result);
+    snapshot = adaptDashboardSnapshot(safeEnvelopeData(result));
   }
   if (!snapshot) snapshot = await loadDemoSnapshot();
   state.e01Snapshot = snapshot;
@@ -435,11 +448,32 @@ async function activateE01Section(section) {
 function activate() {
   state.active = true;
   refresh();
+  startRealtimeEvents();
   requestAnimationFrame(() => chartInstances.forEach((chart) => chart.resize()));
 }
 
 function deactivate() {
   state.active = false;
+  state.eventController?.abort();
+  state.eventController = null;
+}
+
+function startRealtimeEvents() {
+  if (state.eventController || typeof API.subscribeDashboardEvents !== 'function') return;
+  const controller = new AbortController();
+  state.eventController = controller;
+  API.subscribeDashboardEvents(() => {
+    if (!state.active || document.hidden) return;
+    window.clearTimeout(state.eventRefreshTimer);
+    state.eventRefreshTimer = window.setTimeout(() => {
+      state.e01Snapshot = null;
+      refresh({ force: true });
+    }, 800);
+  }, controller.signal).catch(() => {
+    if (controller.signal.aborted) return;
+    state.eventController = null;
+    byId('public-sync-state').textContent = '实时连接已降级，每 30 秒轮询';
+  });
 }
 
 function bindEvents() {
@@ -452,8 +486,19 @@ function bindEvents() {
   byId('dv2-mic-button')?.addEventListener('click', () => voice.toggle(state.period, state.snapshot?.park_id));
   byId('dv2-voice-cancel')?.addEventListener('click', () => voice.cancel());
   byId('dv2-voice-retry')?.addEventListener('click', () => voice.start(state.period, state.snapshot?.park_id));
-  document.querySelectorAll('.dv2-examples button').forEach((button) => button.addEventListener('click', () => {
-    byId('dv2-voice-hint').textContent = `示例问法：${button.dataset.example}。请点击麦克风说出问题。`;
+  document.querySelectorAll('.dv2-examples button').forEach((button) => button.addEventListener('click', async () => {
+    byId('dv2-voice-state').textContent = '正在分析';
+    byId('dv2-voice-hint').textContent = `预设问题：${button.dataset.example}`;
+    const result = await API.queryDashboardAssistant(button.dataset.example, state.period, state.snapshot?.park_id);
+    const payload = safeEnvelopeData(result);
+    if (!payload) {
+      byId('dv2-voice-state').textContent = '提问失败';
+      byId('dv2-answer').textContent = responseError(result);
+      return;
+    }
+    byId('dv2-voice-state').textContent = '回答完成';
+    byId('dv2-answer').textContent = payload.answer || '已完成分析。';
+    if (payload.chart) renderAssistantChart(payload.chart);
   }));
   document.querySelector('[data-open-chart="demand"]')?.addEventListener('click', () => {
     if (!state.snapshot) return;
@@ -465,6 +510,14 @@ function bindEvents() {
   byId('dv2-dialog-close')?.addEventListener('click', () => byId('dv2-chart-dialog').close());
   byId('dv2-chart-dialog')?.addEventListener('click', (event) => { if (event.target === byId('dv2-chart-dialog')) event.target.close(); });
   window.addEventListener('resize', () => chartInstances.forEach((chart) => chart.resize()));
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) return;
+    state.e01Snapshot = null;
+    if (state.active) {
+      refresh({ force: true });
+      startRealtimeEvents();
+    }
+  });
   window.addEventListener('app:section-change', (event) => {
     const section = event.detail?.section;
     if (section === 'public') activate();

@@ -1,17 +1,18 @@
+/* Hallmark · genre: atmospheric · theme: studied-DNA · macrostructure: workbench · 2026-08-06 */
 :root {
   color-scheme: light;
-  font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
-  color: #20302b;
-  background: #f1f5f1;
-  --ink: #20302b;
-  --muted: #66756f;
-  --line: #dce6df;
-  --paper: #ffffff;
-  --forest: #174d3c;
-  --forest-soft: #e5f0ea;
-  --ochre: #c58b3a;
-  --danger: #b34e4e;
-  --shadow: 0 12px 36px rgba(38, 66, 55, 0.08);
+  font-family: var(--font-body);
+  color: var(--color-ink);
+  background: var(--color-canvas);
+  --ink: var(--color-ink);
+  --muted: var(--color-muted);
+  --line: var(--color-rule);
+  --paper: var(--color-paper);
+  --forest: var(--color-jipin-green);
+  --forest-soft: var(--color-jipin-green-soft);
+  --ochre: var(--color-corn);
+  --danger: var(--color-danger);
+  --shadow: var(--shadow-panel);
 }
 
 * { box-sizing: border-box; }
@@ -133,10 +134,13 @@ pre { min-height: 80px; margin: 14px 0 0; padding: 15px; overflow: auto; border-
 }
 @media (max-width: 860px) {
   .app-shell { display: block; }
-  .sidebar { width: 100%; height: auto; padding: 18px; }
-  .scope-note { margin: 7px 0 16px 42px; }
-  .sidebar nav { display: flex; overflow-x: auto; padding-bottom: 3px; }
-  .sidebar button { min-width: max-content; }
+  .sidebar { width: 100%; height: auto; padding: 12px 14px 10px; }
+  .brand-logo { width: 112px; height: 46px; }
+  .brand::after { margin-top: 0; font-size: 1.45rem; }
+  .scope-note { margin: 5px 0 9px; }
+  .sidebar nav { display: flex; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+  .sidebar nav::-webkit-scrollbar { display: none; }
+  .sidebar button { min-width: max-content; padding: 9px 10px; }
   .sidebar-foot { display: none; }
   .main-content { padding: 28px 18px 50px; }
   .page-header { display: block; }
