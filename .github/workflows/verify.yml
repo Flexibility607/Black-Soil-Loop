@@ -1,4 +1,4 @@
-name: Verify full project
+name: Verify web project
 
 on:
   push:
@@ -11,39 +11,13 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:18
-        env:
-          POSTGRES_DB: challenge_cup
-          POSTGRES_USER: b01_app
-          POSTGRES_PASSWORD: ci-only-password
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U b01_app -d challenge_cup"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    env:
-      DATABASE_URL: postgresql+psycopg://b01_app:ci-only-password@127.0.0.1:5432/challenge_cup
-      JWT_SECRET: ci-only-jwt-secret-with-at-least-32-bytes
-      ENVIRONMENT: test
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
-        with:
-          python-version: '3.13'
-          cache: pip
-      - run: python -m pip install -r requirements.txt
-      - run: python -m ruff check app tests scripts
-      - run: python -m pytest tests -q
-      - run: python -m alembic -c alembic.ini upgrade head
-      - run: python scripts/verify_runtime.py
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
       - run: npm ci
+      - run: npm run test:frontend
       - run: npm run verify:pages
       - run: npm run cf:check

@@ -1,26 +1,24 @@
 const RESOURCE_GROUPS = {
   enterprise: [
     { value: 'enterprises', label: '企业档案' },
-    { value: 'parks', label: '园区档案' },
-    { value: 'enterprise-tags', label: '企业标签' },
-    { value: 'partners', label: '合作方' },
-    { value: 'stores', label: '门店档案' },
+    { value: 'stores', label: '门店与第三空间' },
+    { value: 'products', label: '商品与原料' },
+    { value: 'suppliers', label: '供应商' },
   ],
   production: [
-    { value: 'production-plans', label: '生产计划' },
-    { value: 'production-orders', label: '生产订单' },
-    { value: 'preorders', label: '预订单' },
-    { value: 'boms', label: '物料清单 BOM' },
+    { value: 'transport-orders', label: '多企业运输订单' },
+    { value: 'transport-plans', label: '拼车运输计划' },
+    { value: 'products', label: '商品与原料' },
   ],
   inventory: [
-    { value: 'inventories', label: '企业库存' },
-    { value: 'sales-order-lines', label: '销售订单明细' },
-    { value: 'returns', label: '退货记录' },
-    { value: 'freezer-records', label: '冻库记录' },
+    { value: 'warehouses', label: '仓库与温区' },
+    { value: 'products', label: '商品库存维度' },
   ],
   transport: [
-    { value: 'transport-task-summaries', label: '运输任务摘要' },
-    { value: 'transport-resources', label: '运输资源' },
+    { value: 'transport-tasks', label: '运输任务实时投影' },
+    { value: 'transport-plans', label: '拼车计划' },
+    { value: 'alerts', label: '温湿度与运输报警' },
+    { value: 'vehicles', label: '车辆与司机资源' },
   ],
 };
 
@@ -28,10 +26,12 @@ const state = {
   activeSection: 'overview',
   resource: {
     enterprise: 'enterprises',
-    production: 'production-plans',
-    inventory: 'inventories',
-    transport: 'transport-task-summaries',
+    production: 'transport-orders',
+    inventory: 'warehouses',
+    transport: 'transport-tasks',
   },
+  resourcePage: { enterprise: 1, production: 1, inventory: 1, transport: 1 },
+  resourceSearch: { enterprise: '', production: '', inventory: '', transport: '' },
   importBatchId: null,
   publicEnterpriseRows: [],
   publicEnterpriseExpanded: false,
@@ -40,6 +40,7 @@ const state = {
   publicMapPanY: 0,
   publicMapSuppressClickUntil: 0,
   publicMapDragCleanup: null,
+  lastMatchRunId: null,
 };
 
 function getAPI() {
@@ -54,7 +55,10 @@ function errorOf(result) {
   const body = result && result.json;
   if (!body) return `请求失败（HTTP ${result ? result.status : '未知'}）`;
   const first = body.errors && body.errors[0];
-  return first ? `${body.code || '请求失败'}：${first.message}` : `${body.code || '请求失败'}：${body.message || `HTTP ${result.status}`}`;
+  const details = body.details && typeof body.details === 'object' ? Object.values(body.details).join('；') : '';
+  return first
+    ? `${body.code || '请求失败'}：${first.message}`
+    : `${body.code || '请求失败'}：${body.message || details || `HTTP ${result.status}`}`;
 }
 
 function formatValue(value) {
@@ -84,6 +88,67 @@ function setLoading(target, message = '加载中…') {
   if (el) el.innerHTML = `<div class="loading-state">${escapeHtml(message)}</div>`;
 }
 
+const FIELD_LABELS = {
+  enterprise_id: '企业编号', enterprise_name: '企业名称', enterprise_display_name: '企业名称', park_id: '所属园区',
+  store_id: '门店编号', store_name: '门店名称', city: '城市', channel_type: '渠道类型', reporting_authorized: '日报上报授权',
+  partner_id: '合作方编号', partner_name: '合作方名称', preorder_id: '预订单编号', order_id: '订单编号', product_id: '产品编号',
+  product_name: '产品名称', category: '品类', quantity: '数量', unit: '单位', amount: '金额', sales_amount: '营业额',
+  status: '状态', required_at: '需求日期', created_at: '创建时间', updated_at: '更新时间', source_system: '数据来源',
+  source_record_id: '来源记录编号', plan_date: '计划日期', daily_capacity: '日产能', planned_quantity: '计划数量',
+  completed_quantity: '已完成数量', warning_threshold: '预警阈值', inventory_quantity: '库存数量', freezer_capacity: '冻库容量',
+  task_id: '任务编号', origin: '起点', destination: '终点', driver_name: '司机', license_plate: '车牌号',
+  id: '记录编号', code: '业务编码', name: '名称', enabled: '是否启用', object_version: '数据版本', display_name: '显示名称',
+  channel: '渠道', latitude: '纬度', longitude: '经度', temperature_zone: '温区', plate_no: '车牌号', driver_id: '司机编号',
+  max_weight_kg: '最大载重（千克）', max_volume_m3: '最大容积（立方米）', capacity_m3: '总库容（立方米）', used_m3: '已用库容（立方米）',
+  plan_no: '计划编号', task_no: '任务编号', store_id: '门店编号', product_id: '商品编号', order_no: '订单编号', scenario_code: '演示场景',
+  departure_at: '计划发车时间', weight_kg: '重量（千克）', volume_m3: '体积（立方米）', task_id: '执行任务编号',
+  source_order_ids: '来源订单', total_weight_kg: '总重量（千克）', total_volume_m3: '总体积（立方米）', stops: '配送站点',
+  latest_telemetry: '最新温湿度', latest_location: '最新位置', route_label: '路线性质', alert_type: '报警类型', message: '报警说明', opened_at: '报警时间',
+  delivery_score: '交付能力评分', quality_score: '质量评分', category: '品类', unit: '单位', updated_at: '更新时间', created_at: '创建时间',
+  quantity_kg: '确认需求量（千克）', count: '数量', utilization_pct: '容量占用率',
+  match_run_id: '计算编号', run_id: '计算编号', rules_version: '规则版本', candidates: '候选方案', rejections: '不匹配原因',
+  order_ids: '订单记录', order_nos: '订单编号', vehicle_id: '车辆编号', planned_departure_at: '计划发车时间',
+  origin_spread_km: '始发地离散距离（千米）', destination_spread_km: '目的地离散距离（千米）',
+  departure_span_minutes: '发车时间差（分钟）', capacity_utilization_pct: '车辆容量使用率', explanation: '规则解释',
+  rules: '匹配规则', recommendation: '推荐方案', alternatives: '备选方案', weights: '评分权重',
+  forecast: '预测结果', forecast_quantity: '预测量', lower_bound: '预测下界', upper_bound: '预测上界',
+  method: '预测方法', mae: '平均绝对误差', smape: '对称平均绝对百分比误差', data_cutoff: '数据截止时间',
+  unmatched: '未匹配订单', reason: '原因', enterprise_count: '企业数量', product_count: '品类数量',
+  weight_utilization_pct: '载重使用率', volume_utilization_pct: '容积使用率', expected_quantity: '应交数量', delivery_lines: '交付明细',
+  candidate_warehouses: '候选仓库', warehouse_id: '仓库编号', warehouse_name: '仓库名称', estimated_distance_km: '估算距离（千米）',
+  available_volume_m3: '可用库容（立方米）', eligible: '是否符合规则', required_volume_m3: '所需库容（立方米）',
+  required_quantity: '采购需求量', supplier_id: '供应商编号', supplier_name: '供应商名称', unit_price: '单价', total_amount: '总金额',
+  price_score: '价格评分', composite_score: '综合评分', tier_min_quantity: '阶梯起订量', supply_capacity: '供货能力',
+  price: '价格权重', delivery: '交付权重', quality: '质量权重', data_points: '历史数据点',
+  production_plan_quantity: '生产计划数量', method_note: '方法说明',
+  origin_max_km: '始发地最大距离（千米）', destination_max_km: '目的地最大距离（千米）', departure_window_minutes: '发车时间窗（分钟）',
+  capacity_utilization_limit: '容量上限', distance_max_km: '最大距离（千米）',
+};
+
+const VALUE_LABELS = {
+  TRADITIONAL: '传统门店', TRADITIONAL_STORE: '传统门店', THIRD_SPACE: '第三空间', CONFIRMED: '已确认', COMPLETED: '已完成',
+  DRAFT: '草稿', MATCHED: '已匹配', PUBLISHED: '已发布', DRIVER_ACCEPTED: '司机已接单', PICKED_UP: '已取货', IN_TRANSIT: '运输中',
+  DELIVERED: '已送达', STORE_SIGNED: '门店已签收', IN_PROGRESS: '进行中', CANCELLED: '已取消', OPEN: '待处理', RESOLVED: '已处理',
+  ACTIVE: '有效', INACTIVE: '停用', AMBIENT: '常温', CHILLED: '冷藏', FROZEN: '冷冻',
+  COMPLETE: '完整上报', INCOMPLETE: '部分上报', MISSING: '缺报', true: '是', false: '否',
+  NO_DATA: '无历史数据', SEASONAL_EXPONENTIAL_SMOOTHING: '季节性指数平滑', WEIGHTED_MOVING_AVERAGE: '加权移动平均',
+};
+
+function displayField(key) {
+  return FIELD_LABELS[key] || '扩展信息';
+}
+
+function displayCell(value, key = '') {
+  if (value === true || value === false) return VALUE_LABELS[String(value)];
+  if (typeof value === 'string' && VALUE_LABELS[value]) return VALUE_LABELS[value];
+  if (Array.isArray(value) && ['order_ids', 'order_nos'].includes(key)) return `${value.length} 条订单`;
+  if (Array.isArray(value) && key === 'stops') return `${value.length} 个配送站点`;
+  if (value && typeof value === 'object' && ['origin', 'destination'].includes(key)) {
+    return `纬度 ${formatNumber(value.latitude, 4)}，经度 ${formatNumber(value.longitude, 4)}`;
+  }
+  return formatValue(value);
+}
+
 function renderTable(target, items, emptyMessage = '暂无数据') {
   const el = document.getElementById(target);
   if (!el) return;
@@ -92,7 +157,36 @@ function renderTable(target, items, emptyMessage = '暂无数据') {
     return;
   }
   const keys = [...new Set(items.flatMap((item) => Object.keys(item)))];
-  el.innerHTML = `<div class="table-scroll"><table><thead><tr>${keys.map((key) => `<th>${escapeHtml(key)}</th>`).join('')}</tr></thead><tbody>${items.map((item) => `<tr>${keys.map((key) => `<td>${escapeHtml(item[key])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  el.innerHTML = `<div class="table-scroll"><table><thead><tr>${keys.map((key) => `<th>${escapeHtml(displayField(key))}</th>`).join('')}</tr></thead><tbody>${items.map((item) => `<tr>${keys.map((key) => `<td>${escapeHtml(displayCell(item[key], key))}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+}
+
+function renderStructuredResult(target, data) {
+  const el = document.getElementById(target);
+  if (!el) return;
+  if (!data || typeof data !== 'object') {
+    el.textContent = formatValue(data);
+    return;
+  }
+  const hiddenMetadata = new Set(['trace_id', 'schema_version', 'generated_at']);
+  const primitiveEntries = Object.entries(data).filter(([key, value]) => !hiddenMetadata.has(key) && (value === null || ['string', 'number', 'boolean'].includes(typeof value)));
+  const listEntries = Object.entries(data).filter(([, value]) => Array.isArray(value));
+  const objectEntries = Object.entries(data).filter(([, value]) => value && typeof value === 'object' && !Array.isArray(value));
+  const cards = primitiveEntries.length
+    ? `<div class="readable-result-cards">${primitiveEntries.map(([key, value]) => `<div><span>${escapeHtml(displayField(key))}</span><strong>${escapeHtml(displayCell(value, key))}</strong></div>`).join('')}</div>`
+    : '';
+  const objects = objectEntries.map(([key, value]) => {
+    const entries = Object.entries(value).filter(([field]) => !hiddenMetadata.has(field));
+    return `<section><h4>${escapeHtml(displayField(key))}</h4><div class="readable-result-cards">${entries.map(([field, item]) => `<div><span>${escapeHtml(displayField(field))}</span><strong>${escapeHtml(displayCell(item, field))}</strong></div>`).join('')}</div></section>`;
+  }).join('');
+  const lists = listEntries.map(([key, value]) => {
+    if (!value.length) return `<section><h4>${escapeHtml(displayField(key))}</h4><p>暂无记录</p></section>`;
+    if (value.every((item) => item && typeof item === 'object' && !Array.isArray(item))) {
+      const keys = [...new Set(value.slice(0, 20).flatMap((item) => Object.keys(item)))];
+      return `<section><h4>${escapeHtml(displayField(key))}</h4><div class="table-scroll"><table><thead><tr>${keys.map((field) => `<th>${escapeHtml(displayField(field))}</th>`).join('')}</tr></thead><tbody>${value.slice(0, 20).map((item) => `<tr>${keys.map((field) => `<td>${escapeHtml(displayCell(item[field], field))}</td>`).join('')}</tr>`).join('')}</tbody></table></div></section>`;
+    }
+    return `<section><h4>${escapeHtml(displayField(key))}</h4><p>${value.map((item) => displayCell(item, key)).map(escapeHtml).join('、')}</p></section>`;
+  }).join('');
+  el.innerHTML = `${cards}${objects}${lists}<details><summary>查看原始数据（调试）</summary><pre>${escapeHtml(JSON.stringify(data, null, 2))}</pre></details>`;
 }
 
 function formatNumber(value, maximumFractionDigits = 0) {
@@ -122,6 +216,15 @@ function formatShortDate(value, includeTime = false) {
     ? { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }
     : { month: '2-digit', day: '2-digit' };
   return new Intl.DateTimeFormat('zh-CN', options).format(date).replaceAll('/', '-');
+}
+
+function formatShanghaiDateTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return formatValue(value);
+  return new Intl.DateTimeFormat('zh-CN', {
+    timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  }).format(date);
 }
 
 function renderLineChart(target, items, labelKey, valueKey, gradientId) {
@@ -204,11 +307,8 @@ function renderTrendCharts(orderItems, salesItems) {
       value,
     }));
     const currentPoints = makePoints(items.map((item) => Number(item[key]) || 0));
-    const previousValues = currentPoints.map((item, index) => item.value * (.62 + (index % 3) * .06));
-    const previousPoints = makePoints(previousValues);
     const path = (points) => points.map((item, index) => (index ? 'L' : 'M') + ' ' + item.x.toFixed(1) + ' ' + item.y.toFixed(1)).join(' ');
     const currentPath = path(currentPoints);
-    const previousPath = path(previousPoints);
     const grid = [0, 1, 2, 3, 4].map((index) => {
       const y = top + index * ((bottom - top) / 4);
       return '<line class="chart-grid-line" x1="' + left + '" y1="' + y.toFixed(1) + '" x2="' + (width - right) + '" y2="' + y.toFixed(1) + '" />';
@@ -241,13 +341,13 @@ function renderTrendCharts(orderItems, salesItems) {
       const labelPosition = placeLabel(item, labelWidth, labelHeight);
       return '<g class="trend-chart-node ' + seriesClass + '" tabindex="0" role="img" aria-label="' + escapeHtml(seriesLabel + ' ' + label) + '"><circle class="trend-chart-hit" cx="' + item.x.toFixed(1) + '" cy="' + item.y.toFixed(1) + '" r="11"></circle><circle class="trend-chart-point ' + seriesClass + '" style="--point-color:' + pointColor + '" cx="' + item.x.toFixed(1) + '" cy="' + item.y.toFixed(1) + '" r="3.5"></circle><g class="trend-hover-label" transform="translate(' + labelPosition.x.toFixed(1) + ' ' + labelPosition.y.toFixed(1) + ')" aria-hidden="true"><rect width="' + labelWidth.toFixed(1) + '" height="' + labelHeight + '" rx="3"></rect><text x="' + (labelWidth / 2).toFixed(1) + '" y="10.5" text-anchor="middle">' + escapeHtml(label) + '</text></g><title>' + escapeHtml(seriesLabel + ' ' + label) + '</title></g>';
     };
-    const dots = previousPoints.map((item) => renderNode(item, 'previous', '上一周期', '#b47be7')).join('') + currentPoints.map((item) => renderNode(item, 'current', '本期', color)).join('');
+    const dots = currentPoints.map((item) => renderNode(item, 'current', '本期', color)).join('');
     const area = currentPath + ' L ' + currentPoints.at(-1).x.toFixed(1) + ' ' + bottom + ' L ' + currentPoints[0].x.toFixed(1) + ' ' + bottom + ' Z';
     const end = currentPoints.at(-1);
     const endLabel = formatter(end.value);
     const badgePosition = placeEndLabel(end, 58, 18);
     const badge = '<g class="trend-end-label" pointer-events="none"><rect x="' + badgePosition.x.toFixed(1) + '" y="' + badgePosition.y.toFixed(1) + '" width="58" height="18" rx="4"/><text x="' + (badgePosition.x + 29).toFixed(1) + '" y="' + (badgePosition.y + 12).toFixed(1) + '" text-anchor="middle">' + escapeHtml(endLabel) + '</text></g>';
-    return '<article class="trend-chart-card"><div class="trend-chart-card-head"><span class="trend-chart-card-icon">' + escapeHtml(icon) + '</span><div><small>' + escapeHtml(tag) + '</small><strong>' + escapeHtml(title) + '</strong></div><b>峰值 ' + escapeHtml(formatter(Math.max(...currentPoints.map((item) => item.value)))) + '</b></div><div class="trend-chart-card-legend"><i style="--trend-color:' + color + '"></i>本期' + escapeHtml(title) + '（' + escapeHtml(unit) + '）<i class="previous"></i>上一周期</div><svg viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="' + escapeHtml(title + '近七日趋势') + '"><defs><linearGradient id="' + gradientId + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + color + '" stop-opacity=".3"/><stop offset="1" stop-color="' + color + '" stop-opacity="0"/></linearGradient></defs>' + grid + yLabels + '<path class="trend-chart-area" style="--trend-area:' + color + '" fill="url(#' + gradientId + ')" d="' + area + '"/><path class="trend-chart-line previous" d="' + previousPath + '"/><path class="trend-chart-line" style="--trend-color:' + color + '" d="' + currentPath + '"/>' + dots + badge + labels + '</svg></article>';
+    return '<article class="trend-chart-card"><div class="trend-chart-card-head"><span class="trend-chart-card-icon">' + escapeHtml(icon) + '</span><div><small>' + escapeHtml(tag) + '</small><strong>' + escapeHtml(title) + '</strong></div><b>峰值 ' + escapeHtml(formatter(Math.max(...currentPoints.map((item) => item.value)))) + '</b></div><div class="trend-chart-card-legend"><i style="--trend-color:' + color + '"></i>本期' + escapeHtml(title) + '（' + escapeHtml(unit) + '）</div><svg viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="' + escapeHtml(title + '近七日趋势') + '"><defs><linearGradient id="' + gradientId + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + color + '" stop-opacity=".3"/><stop offset="1" stop-color="' + color + '" stop-opacity="0"/></linearGradient></defs>' + grid + yLabels + '<path class="trend-chart-area" style="--trend-area:' + color + '" fill="url(#' + gradientId + ')" d="' + area + '"/><path class="trend-chart-line" style="--trend-color:' + color + '" d="' + currentPath + '"/>' + dots + badge + labels + '</svg></article>';
   };
   el.innerHTML = chart(orderItems, 'quantity', '订单量趋势', 'ORDER VOLUME', 'kg', '#35b9ff', 'orderTrendArea', formatNumber, '▥') + chart(salesItems, 'amount', '销售额趋势', 'SALES AMOUNT', 'CNY', '#f3bd57', 'salesTrendArea', formatMoney, '◒');
 }
@@ -406,251 +506,6 @@ function bindWheelScroll(container, contentGetter) {
   container.dataset.wheelReady = 'true';
 }
 
-function renderRouteMap(items) {
-  const el = document.getElementById('public-route-map');
-  if (!el) return;
-  const routes = (items || []).filter((item) => item.destination || (Array.isArray(item.path_points) && item.path_points.length)).slice(0, 10);
-  const tileZoom = 8;
-  const tileGridSize = 7;
-  const tileCoverage = 4.2;
-  const tileCoords = Array.from({ length: tileGridSize * tileGridSize }, (_, index) => [214 + index % tileGridSize, 90 + Math.floor(index / tileGridSize)]);
-  const geoPoint = (longitude, latitude) => {
-    const x = Math.max(4, Math.min(96, ((Number(longitude) - 124.4) / (126.7 - 124.4)) * 100));
-    const y = Math.max(4, Math.min(94, ((44.85 - Number(latitude)) / (44.85 - 43.35)) * 100));
-    return [x, y];
-  };
-  const center = geoPoint(125.305, 43.865);
-  const pointCoordinates = (point) => Array.isArray(point) ? [Number(point[0]), Number(point[1])] : [Number(point && point.longitude), Number(point && point.latitude)];
-  const validCoordinates = (point) => point.every((value) => Number.isFinite(value));
-  const fallbackPoints = (route) => {
-    const pathPoints = Array.isArray(route.path_points) ? route.path_points.map(pointCoordinates).filter(validCoordinates) : [];
-    if (pathPoints.length >= 2) return pathPoints;
-    const routePoints = Array.isArray(route.route_points) ? route.route_points.map(pointCoordinates).filter(validCoordinates) : [];
-    if (routePoints.length >= 2) return routePoints;
-    const destination = [Number(route.destination_longitude), Number(route.destination_latitude)];
-    return validCoordinates(destination) ? [[125.305, 43.865], destination] : [[125.305, 43.865], [125.42, 43.92]];
-  };
-  const toScreenPoints = (route) => {
-    return fallbackPoints(route).map((point) => geoPoint(point[0], point[1]));
-  };
-  const lineLength = (from, to) => Math.hypot(to[0] - from[0], to[1] - from[1]);
-  const pointOnRoute = (points, progress) => {
-    const lengths = points.slice(1).map((point, index) => lineLength(points[index], point));
-    const total = lengths.reduce((sum, value) => sum + value, 0) || 1;
-    let target = total * Math.max(0, Math.min(1, progress));
-    for (let index = 0; index < lengths.length; index += 1) {
-      if (target <= lengths[index]) {
-        const ratio = lengths[index] ? target / lengths[index] : 0;
-        return [points[index][0] + (points[index + 1][0] - points[index][0]) * ratio, points[index][1] + (points[index + 1][1] - points[index][1]) * ratio];
-      }
-      target -= lengths[index];
-    }
-    return points.at(-1);
-  };
-  const spreadVehiclePoints = (entries) => {
-    const placed = [];
-    const clampScreen = (value, minimum, maximum) => Math.max(minimum, Math.min(maximum, value));
-    return entries.map((geometry, index) => {
-      const original = geometry.vehicle;
-      let vehicle = [...original];
-      for (let attempt = 0; attempt < 20; attempt += 1) {
-        if (!placed.some((point) => Math.hypot(vehicle[0] - point[0], vehicle[1] - point[1]) < 6.2)) break;
-        const angle = index * 2.399963 + attempt * (Math.PI / 4);
-        const radius = 6.4 + Math.floor(attempt / 8) * 1.8;
-        vehicle = [
-          clampScreen(original[0] + Math.cos(angle) * radius, 4, 96),
-          clampScreen(original[1] + Math.sin(angle) * radius, 4, 94),
-        ];
-      }
-      placed.push(vehicle);
-      return { ...geometry, vehicle };
-    });
-  };
-  const geometries = spreadVehiclePoints(routes.map((route) => {
-    const points = toScreenPoints(route);
-    const progress = Number.isFinite(Number(route.route_progress_percent)) ? Number(route.route_progress_percent) / 100 : .42;
-    return { route, points, destination: points.at(-1), vehicle: pointOnRoute(points, progress), progress: Math.round(progress * 100) };
-  }));
-  const routePaths = geometries.map(({ route, points }) => {
-    const d = points.map((point, index) => (index ? 'L ' : 'M ') + point[0].toFixed(1) + ' ' + point[1].toFixed(1)).join(' ');
-    return '<path class="map-route-path ' + (route.anomaly ? 'abnormal' : '') + '" d="' + d + '"><title>' + escapeHtml((route.destination_district || route.destination || '目的地待确认') + ' · 模拟运输路线') + '</title></path>';
-  }).join('');
-  const routeDestination = (route) => route.destination_district || route.destination || '目的地待确认';
-  const routeDriver = (route) => route.driver_name || (route.driver_id ? '司机 ' + route.driver_id : '司机待分配');
-  const routeVehicle = (route) => route.license_plate || route.plate_no || (route.vehicle_id ? '车辆 ' + route.vehicle_id : '车牌未公开');
-  const routeType = (route) => route.vehicle_type_name || route.vehicle_type_id || '车型待确认';
-  const nodes = geometries.map(({ route, destination }) => '<button type="button" class="map-node ' + (route.anomaly ? 'abnormal' : '') + '" style="--x:' + destination[0].toFixed(1) + '%;--y:' + destination[1].toFixed(1) + '%" data-route-id="' + escapeHtml(route.task_id) + '" title="' + escapeHtml(routeDestination(route) + '：' + routeType(route) + '，' + routeDriver(route) + '，' + routeVehicle(route)) + '"><i></i><strong>' + escapeHtml(routeDestination(route)) + '</strong><small>' + escapeHtml(route.status || '状态待确认') + '</small></button>').join('');
-  const vehicles = geometries.map(({ route, vehicle, progress }) => '<button type="button" class="map-vehicle ' + (route.anomaly ? 'abnormal' : '') + '" style="--x:' + vehicle[0].toFixed(1) + '%;--y:' + vehicle[1].toFixed(1) + '%" data-route-id="' + escapeHtml(route.task_id) + '" aria-label="' + escapeHtml(routeDriver(route) + ' · ' + routeVehicle(route) + ' · 路线进度 ' + progress + '%') + '" title="' + escapeHtml(routeDriver(route) + ' · ' + routeVehicle(route) + ' · 路线进度 ' + progress + '%') + '"><span aria-hidden="true">🚚</span><small>' + escapeHtml(routeVehicle(route)) + '</small></button>').join('');
-  const tiles = tileCoords.map(([x, y]) => '<img src="https://tile.openstreetmap.org/' + tileZoom + '/' + x + '/' + y + '.png" alt="" loading="eager" draggable="false" referrerpolicy="no-referrer">').join('');
-  const mapFallback = `<svg class="map-fallback" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="长春市服务范围演示底图"><defs><linearGradient id="mapFallbackBg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0a3d69"/><stop offset="1" stop-color="#061d3b"/></linearGradient></defs><rect width="100" height="100" fill="url(#mapFallbackBg)"/><path class="map-fallback-river" d="M-4 70 C 18 61, 26 75, 43 61 S 66 35, 105 43"/><path class="map-fallback-road" d="M5 84 L28 62 L49 49 L77 19 M19 5 L38 33 L49 49 L87 84 M2 40 L30 45 L49 49 L98 53 M13 98 L35 72 L49 49 L60 3"/><path class="map-fallback-boundary" d="M8 14 L30 6 L53 12 L73 7 L94 23 L88 46 L96 69 L78 94 L54 87 L34 96 L13 79 L7 55 Z M30 6 L38 33 L30 45 L34 72 L54 87 M53 12 L49 49 L60 70 L78 94 M73 7 L66 31 L88 46 L77 63 L96 69"/><g class="map-fallback-labels"><text x="45" y="47">长春市</text><text x="60" y="28">长春新区</text><text x="76" y="46">九台区</text><text x="27" y="39">宽城区</text><text x="20" y="62">绿园区</text><text x="39" y="78">双阳区</text><text x="64" y="73">净月区</text><text x="11" y="83">公主岭市</text><text x="80" y="18">德惠市</text><text x="5" y="28">农安县</text><text x="52" y="96">榆树市</text></g><text class="map-fallback-caption" x="4" y="8">长春市服务范围 · 本地演示底图</text></svg>`;
-  const scene = '<div class="map-scene" style="--map-zoom:' + state.publicMapZoom.toFixed(2) + '">' + mapFallback + '<div class="map-tile-layer" aria-hidden="true">' + tiles + '</div><div class="map-grid-label">长春市服务范围 · 模拟路线与车辆位置</div><svg class="map-route-layer" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="长春市模拟运输路线">' + routePaths + '</svg><div class="map-center-node" style="--x:' + center[0].toFixed(1) + '%;--y:' + center[1].toFixed(1) + '%"><i></i><strong>吉品食品产业园</strong><small>长春市中心节点</small></div>' + nodes + vehicles + '</div>';
-  el.innerHTML = scene + '<div class="map-attribution">© OpenStreetMap contributors · 瓦片失败自动切换本地演示底图 · DEMO_SIMULATION</div><div id="public-route-detail" class="map-route-detail" aria-live="polite" hidden></div>';
-  const tileImages = [...el.querySelectorAll('.map-tile-layer img')];
-  const updateMapTileStatus = () => {
-    const loadedCount = tileImages.filter((image) => image.dataset.tileState === 'loaded').length;
-    const settledCount = tileImages.filter((image) => image.dataset.tileState).length;
-    el.dataset.mapTileStatus = loadedCount ? 'tiles' : settledCount === tileImages.length ? 'fallback' : 'loading';
-  };
-  tileImages.forEach((image) => {
-    const markTile = (status) => {
-      image.dataset.tileState = status;
-      image.hidden = status === 'error';
-      updateMapTileStatus();
-    };
-    image.addEventListener('error', () => markTile('error'));
-    image.addEventListener('load', () => markTile('loaded'));
-    if (image.complete) markTile(image.naturalWidth ? 'loaded' : 'error');
-  });
-  updateMapTileStatus();
-  const detail = document.getElementById('public-route-detail');
-  el.querySelectorAll('.map-node, .map-vehicle').forEach((button) => button.addEventListener('click', () => {
-    if (state.publicMapSuppressClickUntil > Date.now()) return;
-    const geometry = geometries.find((item) => item.route.task_id === button.dataset.routeId);
-    const route = geometry && geometry.route;
-    if (!route || !detail) return;
-    detail.hidden = false;
-    detail.innerHTML = '<strong>' + escapeHtml(routeDestination(route) + ' · ' + (route.destination || '目的地待确认')) + '</strong><span>任务 ' + escapeHtml(route.task_id || '未关联') + ' · 车辆 ' + escapeHtml(route.vehicle_id || '未分配') + '</span><span>' + escapeHtml(routeDriver(route)) + ' · ' + escapeHtml(routeVehicle(route)) + ' · ' + escapeHtml(routeType(route)) + '</span><span>' + escapeHtml(route.required_vehicle_count || '—') + ' 辆 · ' + escapeHtml(formatMoney(route.estimated_fee)) + ' · 路线进度 ' + escapeHtml(geometry.progress) + '% · ' + (route.anomaly ? '异常：' : '状态：') + escapeHtml(route.anomaly ? (route.anomaly_reason || '监测异常') : (route.status || '状态待确认')) + '</span>';
-  }));
-  const zoomLevel = document.getElementById('public-map-zoom-level');
-  const mapScene = el.querySelector('.map-scene');
-  const mapWidth = mapScene ? mapScene.offsetWidth : el.clientWidth;
-  const mapHeight = mapScene ? mapScene.offsetHeight : el.clientHeight;
-  const viewportWidth = el.clientWidth;
-  const viewportHeight = el.clientHeight;
-  const clampZoom = (value) => Math.max(.3, Math.min(3, value));
-  const applyMapView = () => {
-    if (mapScene) {
-      const maxPanX = Math.max(0, (mapWidth * state.publicMapZoom * tileCoverage - viewportWidth) / 2);
-      const maxPanY = Math.max(0, (mapHeight * state.publicMapZoom * tileCoverage - viewportHeight) / 2);
-      state.publicMapPanX = Math.max(-maxPanX, Math.min(maxPanX, state.publicMapPanX));
-      state.publicMapPanY = Math.max(-maxPanY, Math.min(maxPanY, state.publicMapPanY));
-      mapScene.style.transform = 'translate(' + state.publicMapPanX.toFixed(1) + 'px, ' + state.publicMapPanY.toFixed(1) + 'px) scale(' + state.publicMapZoom.toFixed(2) + ')';
-    }
-    if (zoomLevel) zoomLevel.textContent = Math.round(state.publicMapZoom * 100) + '%';
-  };
-  const zoomOut = document.getElementById('public-map-zoom-out');
-  const zoomIn = document.getElementById('public-map-zoom-in');
-  const zoomReset = document.getElementById('public-map-zoom-reset');
-  if (zoomOut) zoomOut.onclick = () => { state.publicMapZoom = clampZoom(state.publicMapZoom - .15); applyMapView(); };
-  if (zoomIn) zoomIn.onclick = () => { state.publicMapZoom = clampZoom(state.publicMapZoom + .15); applyMapView(); };
-  if (zoomReset) zoomReset.onclick = () => { state.publicMapZoom = 1.08; state.publicMapPanX = 0; state.publicMapPanY = 0; applyMapView(); };
-  const onMapWheel = (event) => {
-    event.preventDefault();
-    const previousZoom = state.publicMapZoom;
-    const nextZoom = clampZoom(previousZoom * Math.exp(-event.deltaY * .0012));
-    const bounds = el.getBoundingClientRect();
-    const pointerX = (event.clientX - bounds.left - bounds.width / 2) * (viewportWidth / bounds.width);
-    const pointerY = (event.clientY - bounds.top - bounds.height / 2) * (viewportHeight / bounds.height);
-    const ratio = nextZoom / previousZoom;
-    state.publicMapPanX = pointerX - (pointerX - state.publicMapPanX) * ratio;
-    state.publicMapPanY = pointerY - (pointerY - state.publicMapPanY) * ratio;
-    state.publicMapZoom = nextZoom;
-    applyMapView();
-  };
-  let drag = null;
-  const beginDrag = (event) => {
-    if (event.button !== 0 || event.isPrimary === false) return;
-    if (drag) return;
-    const bounds = el.getBoundingClientRect();
-    drag = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, scaleX: viewportWidth / bounds.width, scaleY: viewportHeight / bounds.height, originX: state.publicMapPanX, originY: state.publicMapPanY, moved: false };
-  };
-  const moveDrag = (event) => {
-    if (!drag || drag.pointerId !== event.pointerId) return;
-    const deltaX = (event.clientX - drag.startX) * drag.scaleX;
-    const deltaY = (event.clientY - drag.startY) * drag.scaleY;
-    if (!drag.moved && Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) > 4) {
-      drag.moved = true;
-      el.classList.add('is-dragging');
-      try { el.setPointerCapture(event.pointerId); } catch (error) { /* 指针已结束时无需继续捕获 */ }
-    }
-    if (drag.moved) {
-      event.preventDefault();
-      state.publicMapPanX = drag.originX + deltaX;
-      state.publicMapPanY = drag.originY + deltaY;
-      applyMapView();
-    }
-  };
-  const endDrag = (event) => {
-    if (!drag || drag.pointerId !== event.pointerId) return;
-    if (drag.moved) state.publicMapSuppressClickUntil = Date.now() + 220;
-    drag = null;
-    el.classList.remove('is-dragging');
-    if (el.hasPointerCapture(event.pointerId)) el.releasePointerCapture(event.pointerId);
-  };
-  const preventNativeDrag = (event) => event.preventDefault();
-  if (state.publicMapDragCleanup) state.publicMapDragCleanup();
-  const dragListeners = [
-    ['pointerdown', beginDrag], ['pointermove', moveDrag], ['pointerup', endDrag], ['pointercancel', endDrag], ['lostpointercapture', endDrag],
-    ['dragstart', preventNativeDrag], ['selectstart', preventNativeDrag], ['wheel', onMapWheel],
-  ];
-  dragListeners.forEach(([type, handler]) => el.addEventListener(type, handler, type === 'wheel' ? { passive: false } : undefined));
-  state.publicMapDragCleanup = () => {
-    dragListeners.forEach(([type, handler]) => el.removeEventListener(type, handler));
-  };
-  applyMapView();
-}
-
-function answerAssistantQuestion(question, summary, preorderItems) {
-  const normalized = String(question || '').toLowerCase();
-  const warningCount = Number(summary.warning_count || summary.inventory_alert_count || 0);
-  const preorderCount = Array.isArray(preorderItems) ? preorderItems.length : 0;
-  if (normalized.includes('库存') || normalized.includes('补货') || normalized.includes('预警')) return `规则演示：当前建议优先检查 ${warningCount || '若干'} 条库存/产能预警，补货后将缺口反馈给生产计划。`;
-  if (normalized.includes('订单') || normalized.includes('排产') || normalized.includes('计划')) return `规则演示：长春市服务范围内有 ${preorderCount} 条预订单，建议先按品类和目的地区域合并排产。`;
-  if (normalized.includes('运输') || normalized.includes('车辆') || normalized.includes('物流')) return '规则演示：运输匹配按车型温控范围、所需车辆数量、费用和路线状态综合排序。';
-  if (normalized.includes('采购') || normalized.includes('原料') || normalized.includes('供应商')) return '规则演示：集中采购建议结合历史导入的食材、数量、单价和供应商类型，优先比较园区直供与其他生产商报价。';
-  return '当前是规则演示，可继续询问库存预警、订单排产、运输匹配或集中采购。正式环境可在此接入 AI 问答接口。';
-}
-
-function appendAssistantMessage(container, role, message) {
-  const row = document.createElement('div');
-  row.className = `assistant-message ${role}`;
-  const avatar = document.createElement('div');
-  avatar.className = 'assistant-avatar';
-  avatar.setAttribute('aria-hidden', 'true');
-  avatar.textContent = role === 'user' ? '我' : '🤖';
-  const bubble = document.createElement('div');
-  bubble.className = 'assistant-bubble';
-  const label = document.createElement('small');
-  label.textContent = role === 'user' ? '当前提问' : '园区协同机器人 · 在线';
-  const answer = document.createElement('p');
-  answer.className = 'assistant-answer';
-  answer.textContent = message;
-  bubble.append(label, answer);
-  row.append(avatar, bubble);
-  container.appendChild(row);
-}
-
-function renderAssistant(summary, preorderItems) {
-  const el = document.getElementById('public-assistant');
-  if (!el) return;
-  const warningCount = Number(summary.warning_count || summary.inventory_alert_count || 0);
-  el.innerHTML = '<div id="public-assistant-messages" class="assistant-messages" aria-live="polite"></div><div class="assistant-questions"><button type="button" data-question="请列出当前库存预警。">库存预警</button><button type="button" data-question="当前订单如何排产？">订单排产</button><button type="button" data-question="运输车辆如何匹配？">运输匹配</button></div><button type="button" id="public-assistant-launcher" class="assistant-question-launcher" aria-expanded="false">＋ 输入问题</button><form id="public-assistant-form" class="assistant-question-form" hidden><input id="public-assistant-input" type="text" maxlength="120" autocomplete="off" placeholder="输入问题，例如：哪些库存需要补货？" aria-label="输入问题" /><button type="submit">发送</button></form>';
-  const messages = document.getElementById('public-assistant-messages');
-  const form = document.getElementById('public-assistant-form');
-  const input = document.getElementById('public-assistant-input');
-  const launcher = document.getElementById('public-assistant-launcher');
-  if (!messages || !form || !input || !launcher) return;
-  appendAssistantMessage(messages, 'assistant', `已接收长春市服务范围数据：${summary.enterprise_count || '—'} 家企业、${summary.order_count_total || '—'} 笔订单。当前建议优先关注 ${warningCount || '若干'} 条库存/产能预警。`);
-  launcher.addEventListener('click', () => {
-    const shouldOpen = form.hidden;
-    form.hidden = !shouldOpen;
-    el.classList.toggle('assistant-ask-open', shouldOpen);
-    launcher.setAttribute('aria-expanded', String(shouldOpen));
-    launcher.textContent = shouldOpen ? '− 收起输入' : '＋ 输入问题';
-    if (shouldOpen) input.focus();
-  });
-  const sendQuestion = (question) => {
-    const value = String(question || '').trim();
-    if (!value) return;
-    appendAssistantMessage(messages, 'user', value);
-    appendAssistantMessage(messages, 'assistant', answerAssistantQuestion(value, summary, preorderItems));
-    messages.scrollTop = messages.scrollHeight;
-    input.value = '';
-    setPublicText('public-sync-state', '协同助手已回答：' + value);
-  };
-  form.addEventListener('submit', (event) => { event.preventDefault(); sendQuestion(input.value); });
-  el.querySelectorAll('.assistant-questions button').forEach((button) => button.addEventListener('click', () => sendQuestion(button.dataset.question)));
-}
 function applyPublicScreenScale() {
   const canvas = document.getElementById('public-screen-canvas');
   if (!canvas || !document.body.classList.contains('screen-mode')) return;
@@ -701,7 +556,7 @@ function setupOverviewDetails() {
   const popover = document.getElementById('overview-detail-popover');
   const targetLabels = {
     enterprise: '主数据与企业',
-    production: '生产计划与订单',
+    production: '运输订单与拼车计划',
     inventory: '库存、销售与冻库',
     transport: '运输任务与资源',
   };
@@ -784,11 +639,12 @@ function renderAuthState(user) {
   const loginButton = document.getElementById('open-login');
   const logoutButton = document.getElementById('logout-button');
   if (user) {
-    stateEl.textContent = `${user.username} · ${user.role}`;
+    const role = { park_admin: '园区管理员', analyst: '数据分析员' }[user.role] || '已授权用户';
+    stateEl.textContent = `${user.display_name || user.username} · ${role}`;
     loginButton.hidden = true;
     logoutButton.hidden = false;
   } else {
-    stateEl.textContent = getAPI().isMock() ? 'Mock E01 会话' : '未登录';
+    stateEl.textContent = '未登录';
     loginButton.hidden = false;
     logoutButton.hidden = true;
   }
@@ -825,7 +681,7 @@ async function loadOverview() {
     if (el) el.textContent = formatValue(value);
   });
   const cutoff = result.json && result.json.data_cutoff;
-  document.getElementById('data-cutoff').textContent = formatValue(cutoff);
+  document.getElementById('data-cutoff').textContent = formatShanghaiDateTime(cutoff);
   renderTable('overview-enterprise-details', data.details || [], '暂无企业明细');
   document.getElementById('overview-body').textContent = `E01 总览已同步：预计订单 ${formatValue(data.expected_order_quantity)}，已承担订单 ${formatValue(data.committed_order_quantity)}，销售额 ${formatValue(data.sales_amount_total)}；当前未处理库存预警 ${formatValue(data.inventory_alert_count)}。`;
   setMessage('E01 总览加载完成。', 'success');
@@ -839,7 +695,13 @@ function renderOperationalAlerts(resource, items, enterpriseNames = {}) {
   const itemMarkup = (level, title, detail, action) => `<article class="operation-alert ${level}"><div><strong>${escapeHtml(title)}</strong><small>${escapeHtml(detail)}</small></div><b>${escapeHtml(action)}</b></article>`;
   let heading = '运行提醒';
   let alerts = [];
-  if (resource === 'inventories') {
+  if (resource === 'warehouses') {
+    heading = '仓库容量提醒';
+    alerts = rows.filter((item) => Number(item.capacity_m3) > 0 && Number(item.used_m3) / Number(item.capacity_m3) >= 0.8).map((item) => {
+      const occupancy = Number(item.used_m3) / Number(item.capacity_m3) * 100;
+      return itemMarkup(occupancy >= 90 ? 'critical' : 'warning', item.name || item.code || '仓库', `容量占用 ${occupancy.toFixed(1)}% · ${displayCell(item.temperature_zone)}`, occupancy >= 90 ? '暂停入库并调度拼仓' : '关注剩余库容');
+    });
+  } else if (resource === 'inventories') {
     heading = '库存预警条目';
     alerts = rows.filter((item) => {
       const current = Number(item.current_qty);
@@ -876,7 +738,7 @@ function renderOperationalAlerts(resource, items, enterpriseNames = {}) {
       return itemMarkup(occupancy >= 80 ? 'critical' : 'warning', `${enterpriseLabel(item)} · ${item.freezer_id || '冻库记录'}`, `${reasons.join('、')} · 冻品 ${formatNumber(item.frozen_goods_kg)} kg`, occupancy >= 80 ? '调整入库' : '检查温控');
     }).filter(Boolean);
   }
-  const sourceNote = rows.length ? '演示规则 · DEMO_SIMULATION' : '当前资源没有可展示的记录';
+  const sourceNote = rows.length ? '依据服务器实时记录计算' : '当前资源没有可展示的记录';
   el.innerHTML = `<div class="operation-alert-heading"><strong>${escapeHtml(heading)}</strong><span>${escapeHtml(alerts.length)} 条 · ${escapeHtml(sourceNote)}</span></div>${alerts.length ? alerts.join('') : '<div class="operation-alert-empty">当前资源暂无需要处理的预警条目。</div>'}`;
 }
 
@@ -884,16 +746,26 @@ async function loadResource(section) {
   const resource = state.resource[section];
   const resultTarget = `${section}-table`;
   setLoading(resultTarget);
-  const result = await getAPI().list(resource);
+  const page = state.resourcePage[section] || 1;
+  const keyword = state.resourceSearch[section] || '';
+  const result = await getAPI().list(resource, { page: String(page), page_size: '20', ...(keyword ? { keyword } : {}) });
   if (!result.ok) {
     requireAuth(result);
     setMessage(errorOf(result), 'error');
     return;
   }
   const data = dataOf(result) || {};
-  renderTable(resultTarget, data.items || []);
+  const visibleItems = getAPI().isMock() && keyword
+    ? (data.items || []).filter((item) => JSON.stringify(item).toLowerCase().includes(keyword.toLowerCase()))
+    : data.items || [];
+  renderTable(resultTarget, visibleItems);
   const total = document.getElementById(`${section}-total`);
-  if (total) total.textContent = `${data.total || 0} 条记录`;
+  const recordTotal = getAPI().isMock() && keyword ? visibleItems.length : Number(data.total || 0);
+  if (total) total.textContent = `${recordTotal} 条记录`;
+  const pageLabel = document.getElementById(`${section}-page`);
+  if (pageLabel) pageLabel.textContent = `第 ${page} / ${Math.max(1, Math.ceil(recordTotal / Number(data.page_size || 20)))} 页`;
+  document.getElementById(`${section}-prev`).disabled = page <= 1;
+  document.getElementById(`${section}-next`).disabled = page * Number(data.page_size || 20) >= recordTotal;
   if (section === 'inventory') {
     const enterpriseResult = await getAPI().list('enterprises');
     const enterpriseItems = enterpriseResult.ok ? (dataOf(enterpriseResult) || {}).items || [] : [];
@@ -901,73 +773,26 @@ async function loadResource(section) {
     renderOperationalAlerts(resource, data.items || [], enterpriseNames);
   }
   if (section === 'transport') {
-    const monitored = (data.items || []).filter((item) => item.telemetry && item.telemetry.length);
-    document.getElementById('transport-monitoring').textContent = monitored.length ? `当前有 ${monitored.length} 条运输任务带遥测记录，异常点将在 E02 以红色展示。` : '当前没有遥测记录；可先用 DEMO_SIMULATION 数据演示路径和温湿度异常。';
+    const rows = data.items || [];
+    const monitored = rows.filter((item) => item.latest_telemetry);
+    const openAlerts = rows.filter((item) => item.status === 'OPEN');
+    document.getElementById('transport-monitoring').textContent = resource === 'alerts'
+      ? `服务器当前返回 ${openAlerts.length} 条待处理报警；报警时间、类型和对象版本均来自 B02 投影。`
+      : monitored.length
+        ? `当前有 ${monitored.length} 条运输任务带最新温湿度采样，异常路线在 E02 以红色显示。`
+        : '当前任务投影暂无温湿度采样，页面不会生成模拟异常提示。';
   }
-}
-
-async function loadPublicDashboard() {
-  ['public-capacity', 'public-transport', 'public-order-sales-chart', 'public-route-map', 'public-policies', 'public-news', 'public-procurement-chart', 'public-enterprise-orders', 'public-assistant'].forEach((target) => setLoading(target));
-  const syncState = document.getElementById('public-sync-state');
-  if (syncState) syncState.textContent = '正在同步公开数据…';
-  const [overview, capacity, preorders, transport, policies, news] = await Promise.all([
-    getAPI().getPublicDashboard('overview'),
-    getAPI().getPublicDashboard('capacity'),
-    getAPI().getPublicDashboard('preorders'),
-    getAPI().getPublicDashboard('transport'),
-    getAPI().getPublicDashboard('policies'),
-    getAPI().getPublicDashboard('news'),
-  ]);
-  if (!overview.ok || !capacity.ok || !preorders.ok || !transport.ok || !policies.ok || !news.ok) {
-    const message = errorOf([overview, capacity, preorders, transport, policies, news].find((item) => !item.ok));
-    if (syncState) syncState.textContent = '同步失败：' + message;
-    setMessage(message, 'error');
-    return;
-  }
-  const summary = dataOf(overview) || {};
-  const transportItems = dataOf(transport) || [];
-  const transportTotal = Object.values(summary.transport_task_counts || {}).reduce((sum, item) => sum + Number(item || 0), 0);
-  const abnormalCount = transportItems.filter((item) => item.anomaly).length;
-  const orderTrend = summary.order_trend || [];
-  const salesTrend = summary.sales_trend || [];
-  setPublicText('public-enterprise-count', formatNumber(summary.enterprise_count));
-  setPublicText('public-capacity-total', formatValue(summary.capacity_occupancy_percent) + '%');
-  setPublicText('public-order-count', formatNumber(summary.order_count_total));
-  setPublicText('public-procurement-total', formatMoney(summary.procurement_amount_total));
-  setPublicText('public-transport-total', formatNumber(transportTotal || transportItems.length));
-  setPublicText('public-sales-total', formatMoney(summary.sales_amount_total));
-  setPublicText('public-capacity-occupancy', '占用 ' + formatValue(summary.capacity_occupancy_percent) + '%');
-  setPublicText('public-transport-kpi-note', abnormalCount ? abnormalCount + ' 条异常路径' : '全部运行正常');
-  setPublicText('public-order-peak', orderTrend.length ? '峰值 ' + formatNumber(Math.max(...orderTrend.map((item) => Number(item.quantity) || 0))) + ' kg' : '—');
-  setPublicText('public-sales-peak', salesTrend.length ? '峰值 ' + formatMoney(Math.max(...salesTrend.map((item) => Number(item.amount) || 0))) : '—');
-  setPublicText('public-trend-range', '近 ' + formatNumber(summary.trend_days || orderTrend.length) + ' 日 · 分图');
-  setPublicText('public-data-cutoff', overview.json && overview.json.data_cutoff);
-  renderCapacityList(dataOf(capacity) || []);
-  renderTransportSummary(transportItems);
-  renderTrendCharts(orderTrend, salesTrend);
-  renderEnterpriseOrderTable(summary.enterprise_order_details || []);
-  renderProcurementDonut(summary.procurement_pie || []);
-  renderPolicyFeed(dataOf(policies) || []);
-  renderNewsFeed(dataOf(news) || []);
-  bindWheelScroll(document.getElementById('public-capacity'), () => document.querySelector('#public-capacity .capacity-track'));
-  bindWheelScroll(document.querySelector('.policy-window'), () => document.querySelector('.policy-window > :not([hidden])'));
-  renderRouteMap(transportItems);
-  renderAssistant(summary, dataOf(preorders) || []);
-  if (syncState) syncState.textContent = '数据同步正常';
-  setMessage('E02 公开大屏已同步；长春市服务范围数据已加载。', 'success');
 }
 
 async function loadCalculation() {
   const kind = document.getElementById('calc-kind').value;
   const resultEl = document.getElementById('calculation-result');
   resultEl.textContent = '计算中…';
-  let body = {};
-  if (kind === 'routes/estimate') {
-    body = {
-      origin: document.getElementById('calc-origin').value.trim(),
-      destination: document.getElementById('calc-destination').value.trim(),
-    };
-  }
+  const body = ['carpool-preview', 'warehouse-preview'].includes(kind)
+    ? { scenario_code: document.getElementById('calc-scenario').value }
+    : kind === 'procurement'
+      ? { product_id: document.getElementById('calc-product').value, required_quantity: document.getElementById('calc-quantity').value }
+      : { enterprise_id: document.getElementById('calc-enterprise').value, product_id: document.getElementById('calc-product').value };
   const result = await getAPI().calculate(kind, body);
   if (!result.ok) {
     requireAuth(result);
@@ -975,8 +800,44 @@ async function loadCalculation() {
     setMessage(errorOf(result), 'error');
     return;
   }
-  resultEl.textContent = JSON.stringify(dataOf(result), null, 2);
-  setMessage('B01 计算接口已返回结果；请按 calculation_status 处理缺失输入或规则。', 'success');
+  const data = dataOf(result);
+  renderStructuredResult('calculation-result', data);
+  state.lastMatchRunId = kind === 'carpool-preview' ? data?.match_run_id : null;
+  document.getElementById('confirm-carpool').hidden = !state.lastMatchRunId || !(data?.candidates || []).length;
+  setMessage('计算已返回规则版本、候选方案及不匹配原因。', 'success');
+}
+
+async function confirmCarpool() {
+  if (!state.lastMatchRunId) return;
+  const result = await getAPI().confirmCarpool(state.lastMatchRunId, 1, 0);
+  if (!result.ok) {
+    document.getElementById('calculation-result').textContent = errorOf(result);
+    return;
+  }
+  document.getElementById('confirm-carpool').hidden = true;
+  renderStructuredResult('calculation-result', dataOf(result));
+  setMessage('首选拼车方案已确认，服务器正在创建执行任务。', 'success');
+}
+
+function updateCalculationFields() {
+  const kind = document.getElementById('calc-kind').value;
+  document.getElementById('scenario-fields').hidden = !['carpool-preview', 'warehouse-preview'].includes(kind);
+  document.getElementById('enterprise-fields').hidden = kind !== 'forecast';
+  document.getElementById('product-fields').hidden = !['procurement', 'forecast'].includes(kind);
+  document.getElementById('quantity-fields').hidden = kind !== 'procurement';
+  document.getElementById('confirm-carpool').hidden = true;
+  state.lastMatchRunId = null;
+}
+
+async function loadCalculationOptions() {
+  const [enterprises, products] = await Promise.all([
+    getAPI().list('enterprises', { page_size: '100' }),
+    getAPI().list('products', { page_size: '100' }),
+  ]);
+  const enterpriseRows = dataOf(enterprises)?.items || [];
+  const productRows = dataOf(products)?.items || [];
+  document.getElementById('calc-enterprise').innerHTML = enterpriseRows.map((row) => `<option value="${escapeHtml(row.id)}">${escapeHtml(row.name)}</option>`).join('');
+  document.getElementById('calc-product').innerHTML = productRows.map((row) => `<option value="${escapeHtml(row.id)}">${escapeHtml(row.name)}（${escapeHtml(row.unit)}）</option>`).join('');
 }
 
 async function handleImport(event) {
@@ -996,7 +857,7 @@ async function handleImport(event) {
   }
   const data = dataOf(result) || {};
   state.importBatchId = data.batch_id || null;
-  document.getElementById('import-result').textContent = JSON.stringify(data, null, 2);
+  renderStructuredResult('import-result', data);
   document.getElementById('confirm-import').hidden = data.status !== 'READY_TO_CONFIRM';
   setMessage(data.status === 'READY_TO_CONFIRM' ? '预检通过，请确认后整本写入。' : '预检已返回，请查看结果。', 'success');
 }
@@ -1009,7 +870,7 @@ async function confirmImport() {
     setMessage(errorOf(result), 'error');
     return;
   }
-  document.getElementById('import-result').textContent = JSON.stringify(dataOf(result), null, 2);
+  renderStructuredResult('import-result', dataOf(result));
   document.getElementById('confirm-import').hidden = true;
   setMessage('导入批次已提交；后端按整本事务处理。', 'success');
 }
@@ -1026,9 +887,24 @@ function setupResourceSelects() {
     select.value = state.resource[section];
     select.addEventListener('change', async () => {
       state.resource[section] = select.value;
+      state.resourcePage[section] = 1;
       await loadResource(section);
     });
     document.getElementById(`${section}-refresh`).addEventListener('click', () => loadResource(section));
+    const search = document.getElementById(`${section}-search`);
+    search.addEventListener('input', () => {
+      state.resourceSearch[section] = search.value.trim();
+      state.resourcePage[section] = 1;
+    });
+    search.addEventListener('keydown', (event) => { if (event.key === 'Enter') loadResource(section); });
+    document.getElementById(`${section}-prev`).addEventListener('click', () => {
+      state.resourcePage[section] = Math.max(1, state.resourcePage[section] - 1);
+      loadResource(section);
+    });
+    document.getElementById(`${section}-next`).addEventListener('click', () => {
+      state.resourcePage[section] += 1;
+      loadResource(section);
+    });
   });
 }
 
@@ -1038,18 +914,18 @@ function showSection(section) {
   document.body.classList.toggle('screen-mode', isPublic);
   document.querySelectorAll('.page-section').forEach((item) => item.classList.toggle('active', item.id === section));
   document.querySelectorAll('.sidebar button[data-section]').forEach((item) => item.classList.toggle('active', item.dataset.section === section));
-  const titles = { overview: 'E01 管理总览', enterprise: '主数据与企业', production: '生产计划与订单', inventory: '库存、销售与冻库', transport: '运输任务与资源', import: 'B01 批量导入', analytics: 'B01 计算与建议', public: 'E02 公开大屏' };
+  const titles = { overview: 'E01 管理总览', enterprise: '主数据与企业', production: '运输订单与拼车计划', inventory: '库存、销售与冻库', transport: '运输任务与资源', import: 'B01 批量导入', analytics: 'B01 计算与建议', public: 'E02 公开大屏' };
   document.getElementById('page-title').textContent = titles[section] || '黑土闭环';
   if (section === 'overview') loadOverview();
   if (RESOURCE_GROUPS[section]) loadResource(section);
   if (isPublic) {
-    applyPublicTheme(localStorage.getItem('publicTheme') === 'day' ? 'day' : 'night');
     updatePublicClock();
     requestAnimationFrame(applyPublicScreenScale);
-    loadPublicDashboard();
+    window.DashboardV2?.activate();
   } else {
     window.scrollTo({ top: 0, left: 0 });
   }
+  window.dispatchEvent(new CustomEvent('app:section-change', { detail: { section } }));
 }
 
 async function exitPublicScreen() {
@@ -1069,6 +945,7 @@ async function handleLogin(event) {
   const me = await getAPI().getCurrentUser();
   renderAuthState(dataOf(me) || { username, role: 'E01' });
   document.getElementById('auth-panel').hidden = true;
+  await loadCalculationOptions();
   setMessage('E01 登录成功。', 'success');
   showSection(state.activeSection);
 }
@@ -1080,35 +957,20 @@ async function handleLogout() {
   setMessage('已退出 E01 会话；E02 公开大屏仍可访问。', 'info');
 }
 
-function initPage() {
-  const mockToggle = document.getElementById('toggle-mock');
-  mockToggle.checked = getAPI().isMock();
-  mockToggle.addEventListener('change', () => {
-    localStorage.setItem('useMock', mockToggle.checked ? 'true' : 'false');
-    getAPI().clearTokens();
-    renderAuthState(null);
-    setMessage(mockToggle.checked ? '已切换到本地 Mock 数据。' : `已切换到 Live：${getAPI().getLiveBase()}`, 'info');
-    showSection(state.activeSection);
-  });
-
+async function initPage() {
   document.querySelectorAll('.sidebar button[data-section]').forEach((button) => button.addEventListener('click', () => showSection(button.dataset.section)));
   document.getElementById('open-login').addEventListener('click', () => { document.getElementById('auth-panel').hidden = false; });
   document.getElementById('close-login').addEventListener('click', () => { document.getElementById('auth-panel').hidden = true; });
   document.getElementById('logout-button').addEventListener('click', handleLogout);
   document.getElementById('login-form').addEventListener('submit', handleLogin);
-  document.getElementById('import-form').addEventListener('submit', handleImport);
-  document.getElementById('confirm-import').addEventListener('click', confirmImport);
-  document.getElementById('calc-kind').addEventListener('change', () => {
-    const isRoute = document.getElementById('calc-kind').value === 'routes/estimate';
-    document.getElementById('route-fields').hidden = !isRoute;
-    document.getElementById('route-fields-destination').hidden = !isRoute;
-  });
+  document.getElementById('calc-kind').addEventListener('change', updateCalculationFields);
   document.getElementById('run-calculation').addEventListener('click', loadCalculation);
-  document.getElementById('public-refresh').addEventListener('click', loadPublicDashboard);
-  document.getElementById('public-fullscreen').addEventListener('click', togglePublicFullscreen);
-  document.getElementById('public-theme-toggle').addEventListener('click', togglePublicTheme);
-  document.getElementById('public-exit').addEventListener('click', exitPublicScreen);
-  document.getElementById('public-enterprise-toggle').addEventListener('click', () => {
+  document.getElementById('confirm-carpool').addEventListener('click', confirmCarpool);
+  document.getElementById('public-refresh')?.addEventListener('click', () => window.DashboardV2?.refresh());
+  document.getElementById('public-fullscreen')?.addEventListener('click', togglePublicFullscreen);
+  document.getElementById('public-theme-toggle')?.addEventListener('click', togglePublicTheme);
+  document.getElementById('public-exit')?.addEventListener('click', exitPublicScreen);
+  document.getElementById('public-enterprise-toggle')?.addEventListener('click', () => {
     state.publicEnterpriseExpanded = !state.publicEnterpriseExpanded;
     document.getElementById('public-enterprise-toggle').textContent = state.publicEnterpriseExpanded ? '收起明细' : '轮播明细';
     renderEnterpriseOrderTable(state.publicEnterpriseRows);
@@ -1132,7 +994,20 @@ function initPage() {
   window.setInterval(updatePublicClock, 1000);
   setupResourceSelects();
   setupOverviewDetails();
-  renderAuthState(null);
+  getAPI().onAuthChange(({ user, reason }) => {
+    renderAuthState(user);
+    if (!user && reason === 'idle_timeout') {
+      document.getElementById('auth-panel').hidden = false;
+      setMessage('会话因 30 分钟无操作已自动退出，请重新登录。', 'warning');
+    }
+  });
+  ['pointerdown', 'keydown'].forEach((eventName) => document.addEventListener(eventName, getAPI().touchActivity, { passive: true }));
+  const me = await getAPI().getCurrentUser();
+  const user = me.ok ? dataOf(me) : null;
+  renderAuthState(user);
+  document.getElementById('auth-panel').hidden = Boolean(user);
+  if (user) await loadCalculationOptions();
+  updateCalculationFields();
   showSection('overview');
 }
 

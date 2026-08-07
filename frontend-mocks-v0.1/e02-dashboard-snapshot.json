@@ -1,0 +1,1339 @@
+{
+  "status": "PROCESSED",
+  "code": "OK",
+  "data": {
+    "park_id": "PARK-DEMO-001",
+    "park_name": "长春农安新安食品产业园【演示】",
+    "range_start": "2026-07-06T00:00:00+08:00",
+    "range_end": "2026-08-05T00:00:00+08:00",
+    "period": "30d",
+    "headline": {
+      "preorder_count": 450,
+      "demand_totals": [
+        {
+          "unit": "kg",
+          "quantity": 15840
+        },
+        {
+          "unit": "件",
+          "quantity": 3555
+        }
+      ],
+      "operation_order_count": 11889,
+      "sales_amount": 283744.6,
+      "currency": "CNY"
+    },
+    "channel_mix": [
+      {
+        "channel_type": "TRADITIONAL_STORE",
+        "display_name": "传统门店",
+        "preorder_count": 300,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 11195
+          },
+          {
+            "unit": "件",
+            "quantity": 2415
+          }
+        ],
+        "operation_order_count": 7435,
+        "sales_amount": 163613.8,
+        "operation_order_share": 62.54,
+        "sales_share": 57.66
+      },
+      {
+        "channel_type": "THIRD_SPACE",
+        "display_name": "第三空间",
+        "preorder_count": 150,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 4645
+          },
+          {
+            "unit": "件",
+            "quantity": 1140
+          }
+        ],
+        "operation_order_count": 4454,
+        "sales_amount": 120130.8,
+        "operation_order_share": 37.46,
+        "sales_share": 42.34
+      }
+    ],
+    "daily_trend": [
+      {
+        "date": "2026-07-05",
+        "channel_type": "TRADITIONAL_STORE",
+        "preorder_count": 8,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 342
+          },
+          {
+            "unit": "件",
+            "quantity": 73
+          }
+        ],
+        "operation_order_count": 224,
+        "sales_amount": 4793.599999999999
+      },
+      {
+        "date": "2026-07-05",
+        "channel_type": "THIRD_SPACE",
+        "preorder_count": 4,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 135
+          },
+          {
+            "unit": "件",
+            "quantity": 34
+          }
+        ],
+        "operation_order_count": 130,
+        "sales_amount": 3354
+      },
+      {
+        "date": "2026-07-06",
+        "channel_type": "TRADITIONAL_STORE",
+        "preorder_count": 9,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 353
+          },
+          {
+            "unit": "件",
+            "quantity": 76
+          }
+        ],
+        "operation_order_count": 235,
+        "sales_amount": 5170
+      },
+      {
+        "date": "2026-07-06",
+        "channel_type": "THIRD_SPACE",
+        "preorder_count": 5,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 142
+          },
+          {
+            "unit": "件",
+            "quantity": 36
+          }
+        ],
+        "operation_order_count": 138,
+        "sales_amount": 3670.8
+      },
+      {
+        "date": "2026-07-07",
+        "channel_type": "TRADITIONAL_STORE",
+        "preorder_count": 10,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 364
+          },
+          {
+            "unit": "件",
+            "quantity": 79
+          }
+        ],
+        "operation_order_count": 246,
+        "sales_amount": 5559.599999999999
+      },
+      {
+        "date": "2026-07-07",
+        "channel_type": "THIRD_SPACE",
+        "preorder_count": 6,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 149
+          },
+          {
+            "unit": "件",
+            "quantity": 38
+          }
+        ],
+        "operation_order_count": 146,
+        "sales_amount": 4000.4
+      },
+      {
+        "date": "2026-07-08",
+        "channel_type": "TRADITIONAL_STORE",
+        "preorder_count": 11,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 375
+          },
+          {
+            "unit": "件",
+            "quantity": 82
+          }
+        ],
+        "operation_order_count": 245,
+        "sales_amount": 5243
+      },
+      {
+        "date": "2026-07-08",
+        "channel_type": "THIRD_SPACE",
+        "preorder_count": 4,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 156
+          },
+          {
+            "unit": "件",
+            "quantity": 40
+          }
+        ],
+        "operation_order_count": 154,
+        "sales_amount": 4342.8
+      },
+      {
+        "date": "2026-07-09",
+        "channel_type": "TRADITIONAL_STORE",
+        "preorder_count": 12,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 386
+          },
+          {
+            "unit": "件",
+            "quantity": 85
+          }
+        ],
+        "operation_order_count": 256,
+        "sales_amount": 5632
+      },
+      {
+        "date": "2026-07-09",
+        "channel_type": "THIRD_SPACE",
+        "preorder_count": 5,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 163
+          },
+          {
+            "unit": "件",
+            "quantity": 42
+          }
+        ],
+        "operation_order_count": 150,
+        "sales_amount": 3870
+      },
+      {
+        "date": "2026-07-10",
+        "channel_type": "TRADITIONAL_STORE",
+        "preorder_count": 8,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 397
+          },
+          {
+            "unit": "件",
+            "quantity": 88
+          }
+        ],
+        "operation_order_count": 267,
+        "sales_amount": 6034.2
+      },
+      {
+        "date": "2026-07-10",
+        "channel_type": "THIRD_SPACE",
+        "preorder_count": 6,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 170
+          },
+          {
+            "unit": "件",
+            "quantity": 34
+          }
+        ],
+        "operation_order_count": 158,
+        "sales_amount": 4202.8
+      },
+      {
+        "date": "2026-07-11",
+        "channel_type": "TRADITIONAL_STORE",
+        "preorder_count": 9,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 408
+          },
+          {
+            "unit": "件",
+            "quantity": 73
+          }
+        ],
+        "operation_order_count": 266,
+        "sales_amount": 5692.4
+      },
+      {
+        "date": "2026-07-11",
+        "channel_type": "THIRD_SPACE",
+        "preorder_count": 4,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 177
+          },
+          {
+            "unit": "件",
+            "quantity": 36
+          }
+        ],
+        "operation_order_count": 166,
+        "sales_amount": 4548.400000000001
+      },
+      {
+        "date": "2026-07-12",
+        "channel_type": "TRADITIONAL_STORE",
+        "preorder_count": 10,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 342
+          },
+          {
+            "unit": "件",
+            "quantity": 76
+          }
+        ],
+        "operation_order_count": 228,
+        "sales_amount": 5016
+      },
+      {
+        "date": "2026-07-12",
+        "channel_type": "THIRD_SPACE",
+        "preorder_count": 5,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 135
+          },
+          {
+            "unit": "件",
+            "quantity": 38
+          }
+        ],
+        "operation_order_count": 139,
+        "sales_amount": 3919.8
+      },
+      {
+        "date": "2026-07-13",
+        "channel_type": "TRADITIONAL_STORE",
+        "preorder_count": 11,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 353
+          },
+          {
+            "unit": "件",
+            "quantity": 79
+          }
+        ],
+        "operation_order_count": 239,
+        "sales_amount": 5401.4
+      },
+      {
+        "date": "2026-07-13",
+        "channel_type": "THIRD_SPACE",
+        "preorder_count": 6,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 142
+          },
+          {
+            "unit": "件",
+            "quantity": 40
+          }
+        ],
+        "operation_order_count": 135,
+        "sales_amount": 3483
+      },
+      {
+        "date": "2026-07-14",
+        "channel_type": "TRADITIONAL_STORE",
+        "preorder_count": 12,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 364
+          },
+          {
+            "unit": "件",
+            "quantity": 82
+          }
+        ],
+        "operation_order_count": 238,
+        "sales_amount": 5093.2
+      },
+      {
+        "date": "2026-07-14",
+        "channel_type": "THIRD_SPACE",
+        "preorder_count": 4,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 149
+          },
+          {
+            "unit": "件",
+            "quantity": 42
+          }
+        ],
+        "operation_order_count": 143,
+        "sales_amount": 3803.8
+      },
+      {
+        "date": "2026-07-15",
+        "channel_type": "TRADITIONAL_STORE",
+        "preorder_count": 8,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 375
+          },
+          {
+            "unit": "件",
+            "quantity": 85
+          }
+        ],
+        "operation_order_count": 249,
+        "sales_amount": 5478
+      },
+      {
+        "date": "2026-07-15",
+        "channel_type": "THIRD_SPACE",
+        "preorder_count": 5,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 156
+          },
+          {
+            "unit": "件",
+            "quantity": 34
+          }
+        ],
+        "operation_order_count": 151,
+        "sales_amount": 4137.400000000001
+      },
+      {
+        "date": "2026-07-16",
+        "channel_type": "TRADITIONAL_STORE",
+        "preorder_count": 9,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 386
+          },
+          {
+            "unit": "件",
+            "quantity": 88
+          }
+        ],
+        "operation_order_count": 260,
+        "sales_amount": 5875.999999999999
+      },
+      {
+        "date": "2026-07-16",
+        "channel_type": "THIRD_SPACE",
+        "preorder_count": 6,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 163
+          },
+          {
+            "unit": "件",
+            "quantity": 36
+          }
+        ],
+        "operation_order_count": 159,
+        "sales_amount": 4483.8
+      },
+      {
+        "date": "2026-07-17",
+        "channel_type": "TRADITIONAL_STORE",
+        "preorder_count": 10,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 397
+          },
+          {
+            "unit": "件",
+            "quantity": 73
+          }
+        ],
+        "operation_order_count": 259,
+        "sales_amount": 5542.599999999999
+      },
+      {
+        "date": "2026-07-17",
+        "channel_type": "THIRD_SPACE",
+        "preorder_count": 4,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 170
+          },
+          {
+            "unit": "件",
+            "quantity": 38
+          }
+        ],
+        "operation_order_count": 155,
+        "sales_amount": 3999
+      },
+      {
+        "date": "2026-07-18",
+        "channel_type": "TRADITIONAL_STORE",
+        "preorder_count": 11,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 408
+          },
+          {
+            "unit": "件",
+            "quantity": 76
+          }
+        ],
+        "operation_order_count": 270,
+        "sales_amount": 5940
+      },
+      {
+        "date": "2026-07-18",
+        "channel_type": "THIRD_SPACE",
+        "preorder_count": 5,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 177
+          },
+          {
+            "unit": "件",
+            "quantity": 40
+          }
+        ],
+        "operation_order_count": 163,
+        "sales_amount": 4335.8
+      },
+      {
+        "date": "2026-07-19",
+        "channel_type": "TRADITIONAL_STORE",
+        "preorder_count": 12,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 342
+          },
+          {
+            "unit": "件",
+            "quantity": 79
+          }
+        ],
+        "operation_order_count": 232,
+        "sales_amount": 5243.2
+      },
+      {
+        "date": "2026-07-19",
+        "channel_type": "THIRD_SPACE",
+        "preorder_count": 6,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 135
+          },
+          {
+            "unit": "件",
+            "quantity": 42
+          }
+        ],
+        "operation_order_count": 136,
+        "sales_amount": 3726.4
+      },
+      {
+        "date": "2026-07-20",
+        "channel_type": "TRADITIONAL_STORE",
+        "preorder_count": 8,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 353
+          },
+          {
+            "unit": "件",
+            "quantity": 82
+          }
+        ],
+        "operation_order_count": 231,
+        "sales_amount": 4943.4
+      },
+      {
+        "date": "2026-07-20",
+        "channel_type": "THIRD_SPACE",
+        "preorder_count": 4,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 142
+          },
+          {
+            "unit": "件",
+            "quantity": 34
+          }
+        ],
+        "operation_order_count": 144,
+        "sales_amount": 4060.8
+      },
+      {
+        "date": "2026-07-21",
+        "channel_type": "TRADITIONAL_STORE",
+        "preorder_count": 9,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 364
+          },
+          {
+            "unit": "件",
+            "quantity": 85
+          }
+        ],
+        "operation_order_count": 242,
+        "sales_amount": 5324
+      },
+      {
+        "date": "2026-07-21",
+        "channel_type": "THIRD_SPACE",
+        "preorder_count": 5,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 149
+          },
+          {
+            "unit": "件",
+            "quantity": 36
+          }
+        ],
+        "operation_order_count": 140,
+        "sales_amount": 3612
+      },
+      {
+        "date": "2026-07-22",
+        "channel_type": "TRADITIONAL_STORE",
+        "preorder_count": 10,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 375
+          },
+          {
+            "unit": "件",
+            "quantity": 88
+          }
+        ],
+        "operation_order_count": 253,
+        "sales_amount": 5717.799999999999
+      },
+      {
+        "date": "2026-07-22",
+        "channel_type": "THIRD_SPACE",
+        "preorder_count": 6,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 156
+          },
+          {
+            "unit": "件",
+            "quantity": 38
+          }
+        ],
+        "operation_order_count": 148,
+        "sales_amount": 3936.8
+      },
+      {
+        "date": "2026-07-23",
+        "channel_type": "TRADITIONAL_STORE",
+        "preorder_count": 11,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 386
+          },
+          {
+            "unit": "件",
+            "quantity": 73
+          }
+        ],
+        "operation_order_count": 252,
+        "sales_amount": 5392.799999999999
+      },
+      {
+        "date": "2026-07-23",
+        "channel_type": "THIRD_SPACE",
+        "preorder_count": 4,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 163
+          },
+          {
+            "unit": "件",
+            "quantity": 40
+          }
+        ],
+        "operation_order_count": 156,
+        "sales_amount": 4274.400000000001
+      },
+      {
+        "date": "2026-07-24",
+        "channel_type": "TRADITIONAL_STORE",
+        "preorder_count": 12,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 397
+          },
+          {
+            "unit": "件",
+            "quantity": 76
+          }
+        ],
+        "operation_order_count": 263,
+        "sales_amount": 5786
+      },
+      {
+        "date": "2026-07-24",
+        "channel_type": "THIRD_SPACE",
+        "preorder_count": 5,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 170
+          },
+          {
+            "unit": "件",
+            "quantity": 42
+          }
+        ],
+        "operation_order_count": 164,
+        "sales_amount": 4624.8
+      },
+      {
+        "date": "2026-07-25",
+        "channel_type": "TRADITIONAL_STORE",
+        "preorder_count": 8,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 408
+          },
+          {
+            "unit": "件",
+            "quantity": 79
+          }
+        ],
+        "operation_order_count": 274,
+        "sales_amount": 6192.4
+      },
+      {
+        "date": "2026-07-25",
+        "channel_type": "THIRD_SPACE",
+        "preorder_count": 6,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 177
+          },
+          {
+            "unit": "件",
+            "quantity": 34
+          }
+        ],
+        "operation_order_count": 160,
+        "sales_amount": 4128
+      },
+      {
+        "date": "2026-07-26",
+        "channel_type": "TRADITIONAL_STORE",
+        "preorder_count": 9,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 342
+          },
+          {
+            "unit": "件",
+            "quantity": 82
+          }
+        ],
+        "operation_order_count": 224,
+        "sales_amount": 4793.599999999999
+      },
+      {
+        "date": "2026-07-26",
+        "channel_type": "THIRD_SPACE",
+        "preorder_count": 4,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 135
+          },
+          {
+            "unit": "件",
+            "quantity": 36
+          }
+        ],
+        "operation_order_count": 133,
+        "sales_amount": 3537.8
+      },
+      {
+        "date": "2026-07-27",
+        "channel_type": "TRADITIONAL_STORE",
+        "preorder_count": 10,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 353
+          },
+          {
+            "unit": "件",
+            "quantity": 85
+          }
+        ],
+        "operation_order_count": 235,
+        "sales_amount": 5170
+      },
+      {
+        "date": "2026-07-27",
+        "channel_type": "THIRD_SPACE",
+        "preorder_count": 5,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 142
+          },
+          {
+            "unit": "件",
+            "quantity": 38
+          }
+        ],
+        "operation_order_count": 141,
+        "sales_amount": 3863.4
+      },
+      {
+        "date": "2026-07-28",
+        "channel_type": "TRADITIONAL_STORE",
+        "preorder_count": 11,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 364
+          },
+          {
+            "unit": "件",
+            "quantity": 88
+          }
+        ],
+        "operation_order_count": 246,
+        "sales_amount": 5559.599999999999
+      },
+      {
+        "date": "2026-07-28",
+        "channel_type": "THIRD_SPACE",
+        "preorder_count": 6,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 149
+          },
+          {
+            "unit": "件",
+            "quantity": 40
+          }
+        ],
+        "operation_order_count": 149,
+        "sales_amount": 4201.8
+      },
+      {
+        "date": "2026-07-29",
+        "channel_type": "TRADITIONAL_STORE",
+        "preorder_count": 12,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 375
+          },
+          {
+            "unit": "件",
+            "quantity": 73
+          }
+        ],
+        "operation_order_count": 245,
+        "sales_amount": 5243
+      },
+      {
+        "date": "2026-07-29",
+        "channel_type": "THIRD_SPACE",
+        "preorder_count": 4,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 156
+          },
+          {
+            "unit": "件",
+            "quantity": 42
+          }
+        ],
+        "operation_order_count": 145,
+        "sales_amount": 3741
+      },
+      {
+        "date": "2026-07-30",
+        "channel_type": "TRADITIONAL_STORE",
+        "preorder_count": 8,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 386
+          },
+          {
+            "unit": "件",
+            "quantity": 76
+          }
+        ],
+        "operation_order_count": 256,
+        "sales_amount": 5632
+      },
+      {
+        "date": "2026-07-30",
+        "channel_type": "THIRD_SPACE",
+        "preorder_count": 5,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 163
+          },
+          {
+            "unit": "件",
+            "quantity": 34
+          }
+        ],
+        "operation_order_count": 153,
+        "sales_amount": 4069.8
+      },
+      {
+        "date": "2026-07-31",
+        "channel_type": "TRADITIONAL_STORE",
+        "preorder_count": 9,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 397
+          },
+          {
+            "unit": "件",
+            "quantity": 79
+          }
+        ],
+        "operation_order_count": 267,
+        "sales_amount": 6034.2
+      },
+      {
+        "date": "2026-07-31",
+        "channel_type": "THIRD_SPACE",
+        "preorder_count": 6,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 170
+          },
+          {
+            "unit": "件",
+            "quantity": 36
+          }
+        ],
+        "operation_order_count": 161,
+        "sales_amount": 4411.400000000001
+      },
+      {
+        "date": "2026-08-01",
+        "channel_type": "TRADITIONAL_STORE",
+        "preorder_count": 10,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 408
+          },
+          {
+            "unit": "件",
+            "quantity": 82
+          }
+        ],
+        "operation_order_count": 266,
+        "sales_amount": 5692.4
+      },
+      {
+        "date": "2026-08-01",
+        "channel_type": "THIRD_SPACE",
+        "preorder_count": 4,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 177
+          },
+          {
+            "unit": "件",
+            "quantity": 38
+          }
+        ],
+        "operation_order_count": 169,
+        "sales_amount": 4765.8
+      },
+      {
+        "date": "2026-08-02",
+        "channel_type": "TRADITIONAL_STORE",
+        "preorder_count": 11,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 342
+          },
+          {
+            "unit": "件",
+            "quantity": 85
+          }
+        ],
+        "operation_order_count": 228,
+        "sales_amount": 5016
+      },
+      {
+        "date": "2026-08-02",
+        "channel_type": "THIRD_SPACE",
+        "preorder_count": 5,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 135
+          },
+          {
+            "unit": "件",
+            "quantity": 40
+          }
+        ],
+        "operation_order_count": 130,
+        "sales_amount": 3354
+      },
+      {
+        "date": "2026-08-03",
+        "channel_type": "TRADITIONAL_STORE",
+        "preorder_count": 12,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 353
+          },
+          {
+            "unit": "件",
+            "quantity": 88
+          }
+        ],
+        "operation_order_count": 239,
+        "sales_amount": 5401.4
+      },
+      {
+        "date": "2026-08-03",
+        "channel_type": "THIRD_SPACE",
+        "preorder_count": 6,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 142
+          },
+          {
+            "unit": "件",
+            "quantity": 42
+          }
+        ],
+        "operation_order_count": 138,
+        "sales_amount": 3670.8
+      }
+    ],
+    "third_spaces": [
+      {
+        "store_id": "STORE-DEMO-THIRD-001",
+        "store_name": "有山城市书房【演示】",
+        "city": "长春市",
+        "longitude": 125.326,
+        "latitude": 43.879,
+        "preorder_count": 63,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 1951
+          },
+          {
+            "unit": "件",
+            "quantity": 479
+          }
+        ],
+        "operation_order_count": 1871,
+        "sales_amount": 54058.86,
+        "last_report_date": "2026-08-04",
+        "last_report_status": "COMPLETE",
+        "is_demo": true
+      },
+      {
+        "store_id": "STORE-DEMO-THIRD-002",
+        "store_name": "长春冰雪新天地【演示】",
+        "city": "长春市",
+        "longitude": 125.506,
+        "latitude": 43.816,
+        "preorder_count": 51,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 1579
+          },
+          {
+            "unit": "件",
+            "quantity": 388
+          }
+        ],
+        "operation_order_count": 1514,
+        "sales_amount": 39643.16,
+        "last_report_date": "2026-08-04",
+        "last_report_status": "COMPLETE",
+        "is_demo": true
+      },
+      {
+        "store_id": "STORE-DEMO-THIRD-003",
+        "store_name": "这有山文旅空间【演示】",
+        "city": "长春市",
+        "longitude": 125.296,
+        "latitude": 43.862,
+        "preorder_count": 36,
+        "demand_totals": [
+          {
+            "unit": "kg",
+            "quantity": 1115
+          },
+          {
+            "unit": "件",
+            "quantity": 274
+          }
+        ],
+        "operation_order_count": 1069,
+        "sales_amount": 26428.78,
+        "last_report_date": "2026-08-04",
+        "last_report_status": "INCOMPLETE",
+        "is_demo": true
+      }
+    ],
+    "map_nodes": [
+      {
+        "node_id": "PARK-DEMO-001",
+        "node_type": "PARK",
+        "display_name": "长春农安新安食品产业园【演示】",
+        "city": "长春市农安县",
+        "longitude": 125.182,
+        "latitude": 44.432
+      },
+      {
+        "node_id": "STORE-DEMO-TRAD-001",
+        "node_type": "TRADITIONAL_STORE",
+        "display_name": "哈尔滨中央大街门店【演示】",
+        "city": "哈尔滨市",
+        "longitude": 126.618,
+        "latitude": 45.759
+      },
+      {
+        "node_id": "STORE-DEMO-TRAD-002",
+        "node_type": "TRADITIONAL_STORE",
+        "display_name": "沈阳中街门店【演示】",
+        "city": "沈阳市",
+        "longitude": 123.461,
+        "latitude": 41.803
+      },
+      {
+        "node_id": "STORE-DEMO-THIRD-001",
+        "node_type": "THIRD_SPACE",
+        "display_name": "有山城市书房【演示】",
+        "city": "长春市",
+        "longitude": 125.326,
+        "latitude": 43.879
+      },
+      {
+        "node_id": "STORE-DEMO-THIRD-002",
+        "node_type": "THIRD_SPACE",
+        "display_name": "长春冰雪新天地【演示】",
+        "city": "长春市",
+        "longitude": 125.506,
+        "latitude": 43.816
+      },
+      {
+        "node_id": "STORE-DEMO-THIRD-003",
+        "node_type": "THIRD_SPACE",
+        "display_name": "这有山文旅空间【演示】",
+        "city": "长春市",
+        "longitude": 125.296,
+        "latitude": 43.862
+      }
+    ],
+    "map_edges": [
+      {
+        "source_id": "PARK-DEMO-001",
+        "target_id": "STORE-DEMO-TRAD-001",
+        "channel_type": "TRADITIONAL_STORE"
+      },
+      {
+        "source_id": "PARK-DEMO-001",
+        "target_id": "STORE-DEMO-TRAD-002",
+        "channel_type": "TRADITIONAL_STORE"
+      },
+      {
+        "source_id": "PARK-DEMO-001",
+        "target_id": "STORE-DEMO-THIRD-001",
+        "channel_type": "THIRD_SPACE"
+      },
+      {
+        "source_id": "PARK-DEMO-001",
+        "target_id": "STORE-DEMO-THIRD-002",
+        "channel_type": "THIRD_SPACE"
+      },
+      {
+        "source_id": "PARK-DEMO-001",
+        "target_id": "STORE-DEMO-THIRD-003",
+        "channel_type": "THIRD_SPACE"
+      }
+    ],
+    "data_quality": {
+      "store_count": 5,
+      "reporting_store_count": 5,
+      "missing_store_classification_count": 1,
+      "missing_coordinate_count": 0,
+      "missing_report_count": 2,
+      "report_coverage": 98.7,
+      "excluded_preorder_count": 3,
+      "excluded_demand_totals": [
+        {
+          "unit": "kg",
+          "quantity": 96
+        }
+      ],
+      "expected_report_count": 150,
+      "received_report_count": 148,
+      "warnings": [
+        "1 家历史门店缺少渠道分类，相关预订单未计入正式总量。",
+        "2 个门店日报日次缺报。"
+      ]
+    },
+    "data_cutoff": "2026-08-04T21:30:00+08:00",
+    "demo_mode": true,
+    "internal": {
+      "capacity": [
+        {
+          "label": "玉米深加工",
+          "value": 82,
+          "unit": "%",
+          "status": "正常"
+        },
+        {
+          "label": "淀粉糖产线",
+          "value": 76,
+          "unit": "%",
+          "status": "正常"
+        },
+        {
+          "label": "预制菜产线",
+          "value": 91,
+          "unit": "%",
+          "status": "偏紧"
+        }
+      ],
+      "inventory_alerts": [
+        {
+          "label": "玉米淀粉",
+          "value": 3,
+          "unit": "项",
+          "status": "预警"
+        },
+        {
+          "label": "包装材料",
+          "value": 1,
+          "unit": "项",
+          "status": "关注"
+        }
+      ],
+      "freezer": [
+        {
+          "label": "一号冻库",
+          "value": 78,
+          "unit": "%",
+          "status": "正常"
+        },
+        {
+          "label": "二号冻库",
+          "value": 64,
+          "unit": "%",
+          "status": "正常"
+        }
+      ],
+      "transport": [
+        {
+          "label": "在途",
+          "value": 12,
+          "unit": "车",
+          "status": "IN_PROGRESS"
+        },
+        {
+          "label": "待发车",
+          "value": 5,
+          "unit": "车",
+          "status": "DRAFT"
+        },
+        {
+          "label": "已完成",
+          "value": 38,
+          "unit": "车",
+          "status": "COMPLETED"
+        },
+        {
+          "label": "异常",
+          "value": 1,
+          "unit": "车",
+          "status": "ALERT"
+        }
+      ]
+    }
+  },
+  "errors": [],
+  "trace_id": "TRACE-DEMO-DASHBOARD-001",
+  "data_cutoff": "2026-08-04T21:30:00+08:00"
+}

@@ -1,0 +1,25 @@
+/* Hallmark design tokens · atmospheric / studied-DNA / 2026-08-06 */
+:root {
+  --color-ink: oklch(30% 0.055 226);
+  --color-muted: oklch(53% 0.028 220);
+  --color-rule: oklch(88% 0.025 198);
+  --color-paper: oklch(99% 0.006 185);
+  --color-canvas: oklch(96% 0.014 178);
+  --color-jipin-green: oklch(43% 0.105 160);
+  --color-jipin-green-soft: oklch(93% 0.035 158);
+  --color-corn: oklch(66% 0.125 77);
+  --color-danger: oklch(54% 0.16 25);
+  --font-body: "Noto Sans SC Variable", "Microsoft YaHei", sans-serif;
+  --font-display: "ZCOOL QingKe HuangYou", "Noto Sans SC Variable", sans-serif;
+  --font-numeric: "JetBrains Mono Variable", monospace;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --radius-control: 9px;
+  --radius-panel: 16px;
+  --shadow-panel: 0 12px 36px oklch(30% 0.04 170 / 0.08);
+  --motion-fast: 180ms ease;
+}
