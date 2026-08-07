@@ -1,6 +1,6 @@
 # E01 / E02 前端 Mock v0.1
 
-这些 JSON 用于后端实现前的页面开发和状态展示。统一响应外壳、字段类型和接口路径以 `../openapi-v0.1.json` 为准，批量导入字段以 `../web-import-template-v0.1.xlsx` 为准。
+这些 JSON 仅用于显式执行 `npm run build:demo` 时的页面开发和状态展示。正式契约由私有服务器仓库 `Flexibility607/Black-Soil-Loop-server` 中导出的 B01/B02 OpenAPI 与 JSON Schema 管理，生产构建不会包含本目录。
 
 ## 文件对应关系
 
@@ -22,7 +22,7 @@
 
 ## 前端使用约束
 
-1. 开发基础地址暂定 `http://localhost:8000/api/v1`，建议通过前端环境变量覆盖。
+1. 正式基础地址为 `https://api.flexibility607.cn/api/v1`；本地 Worker 联调地址通过 `.dev.vars` 配置。
 2. E01 请求除登录、刷新外携带 `Authorization: Bearer <access_token>`。
 3. E02 只访问 `/public/dashboard/*`；不要调用 E01 详情接口拼接大屏。
 4. `PATCH` 必须把当前 `object_version` 放在事件外壳中，`payload` 只放发生变化的字段。
