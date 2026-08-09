@@ -24,7 +24,8 @@ a { color: var(--forest); font-weight: 700; }
 .app-shell { display: flex; min-height: 100vh; }
 .sidebar { width: 252px; flex: 0 0 252px; display: flex; flex-direction: column; padding: 28px 18px; color: #eaf4ee; background: var(--forest); }
 .brand { display: flex; align-items: center; }
-.brand-logo { display: block; width: 148px; height: 62px; border-radius: 9px; object-fit: cover; object-position: center; background: #fff; }
+.brand-mark { display: block; width: 62px; height: 62px; flex: 0 0 62px; border: 1px solid rgba(255,255,255,.28); border-radius: 50%; overflow: hidden; background: #fff; box-shadow: 0 8px 20px rgba(0,0,0,.14); }
+.brand-logo { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center; transform: scale(1.17); }
 .scope-note { margin: 10px 0 28px 42px; color: #a9c8b7; font-size: 12px; }
 .sidebar nav { display: grid; gap: 6px; }
 .sidebar button { border: 1px solid transparent; border-radius: 10px; padding: 12px 14px; color: #cce0d4; text-align: left; background: transparent; transition: .18s ease; }
@@ -135,7 +136,7 @@ pre { min-height: 80px; margin: 14px 0 0; padding: 15px; overflow: auto; border-
 @media (max-width: 860px) {
   .app-shell { display: block; }
   .sidebar { width: 100%; height: auto; padding: 12px 14px 10px; }
-  .brand-logo { width: 112px; height: 46px; }
+  .brand-mark { width: 52px; height: 52px; flex-basis: 52px; }
   .brand::after { margin-top: 0; font-size: 1.45rem; }
   .scope-note { margin: 5px 0 9px; }
   .sidebar nav { display: flex; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }

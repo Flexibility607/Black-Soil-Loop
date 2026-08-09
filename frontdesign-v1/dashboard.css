@@ -295,6 +295,78 @@ body {
   font-family: var(--dv2-body-font);
 }
 
+body.screen-mode.screen-day .dashboard-v2 {
+  --dv2-ink: #17324a;
+  --dv2-muted: #56778e;
+  --dv2-night: #eef6fb;
+  --dv2-panel: rgba(235, 247, 253, 0.88);
+  --dv2-panel-solid: #f5fbfe;
+  --dv2-border: rgba(45, 137, 196, 0.32);
+  --dv2-blue: #1677b8;
+  --dv2-green: #168553;
+  --dv2-yellow: #9a690f;
+  --dv2-red: #c43d3b;
+  --dv2-purple: #7651b9;
+  --dv2-shadow: rgba(34, 91, 126, 0.16);
+  --dv2-background-top: rgba(242, 250, 254, 0.74);
+  --dv2-background-bottom: rgba(219, 238, 248, 0.9);
+  --dv2-background-halo: rgba(74, 157, 201, 0.16);
+  --dv2-grid-line: rgba(52, 124, 164, 0.07);
+  --dv2-title-glow: rgba(22, 119, 184, 0.14);
+  --dv2-title-depth: rgba(255, 255, 255, 0.76);
+  --dv2-control-surface: rgba(255, 255, 255, 0.78);
+  --dv2-control-active: rgba(45, 137, 196, 0.17);
+  --dv2-header-rule: rgba(45, 137, 196, 0.2);
+  --dv2-live-surface: rgba(222, 242, 251, 0.92);
+  --dv2-demo-border: rgba(154, 105, 15, 0.42);
+  --dv2-demo-surface: rgba(250, 238, 204, 0.82);
+  --dv2-card-surface: rgba(248, 253, 255, 0.94);
+  --dv2-inset-glow: rgba(255, 255, 255, 0.9);
+  --dv2-edge-glow: rgba(22, 119, 184, 0.12);
+  --dv2-edge-tail: rgba(22, 133, 83, 0.08);
+  --dv2-subtle-text: #68879b;
+  --dv2-demand-divider: rgba(154, 105, 15, 0.28);
+  --dv2-panel-rule: rgba(45, 137, 196, 0.18);
+  --dv2-row-rule: rgba(45, 137, 196, 0.13);
+  --dv2-third-outline: rgba(22, 133, 83, 0.36);
+  --dv2-track: rgba(79, 130, 159, 0.18);
+  --dv2-caption: #58788c;
+  --dv2-chip-border: rgba(45, 137, 196, 0.28);
+  --dv2-chip-surface: rgba(230, 244, 251, 0.78);
+  --dv2-mic-border: rgba(22, 133, 83, 0.56);
+  --dv2-mic-core: rgba(22, 133, 83, 0.68);
+  --dv2-mic-shell: rgba(238, 248, 253, 0.96);
+  --dv2-mic-ring: rgba(22, 133, 83, 0.08);
+  --dv2-mic-glow: rgba(22, 133, 83, 0.24);
+  --dv2-recording-core: rgba(196, 61, 59, 0.82);
+  --dv2-recording-shell: rgba(248, 252, 254, 0.96);
+  --dv2-recording-ring: rgba(196, 61, 59, 0.08);
+  --dv2-recording-glow: rgba(196, 61, 59, 0.3);
+  --dv2-recording-ring-wide: rgba(196, 61, 59, 0.02);
+  --dv2-recording-glow-wide: rgba(196, 61, 59, 0.34);
+  --dv2-answer-surface: rgba(236, 247, 252, 0.82);
+  --dv2-footer-text: #58788c;
+  --dv2-dialog-shadow: rgba(34, 91, 126, 0.26);
+  --dv2-dialog-backdrop: rgba(20, 48, 67, 0.35);
+  color: var(--dv2-ink);
+  color-scheme: light;
+  border-color: var(--dv2-border);
+  background-color: var(--dv2-night);
+  background-image:
+    linear-gradient(180deg, var(--dv2-background-top), var(--dv2-background-bottom)),
+    radial-gradient(circle at 50% 48%, var(--dv2-background-halo), transparent 45%),
+    url("assets/backgrounds/northeast-winter-corn-v1.webp");
+  box-shadow: inset 0 0 70px rgba(45, 137, 196, 0.08);
+}
+
+body.screen-mode.screen-day .dashboard-v2::before {
+  border: 0;
+  background-image:
+    linear-gradient(var(--dv2-grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--dv2-grid-line) 1px, transparent 1px);
+  box-shadow: none;
+}
+
 .dashboard-v2::before {
   position: absolute;
   inset: 0;
@@ -314,7 +386,7 @@ body {
 
 .dv2-header {
   display: grid;
-  grid-template-columns: 360px 1fr 460px;
+  grid-template-columns: 360px 1fr 560px;
   align-items: center;
   min-height: 84px;
 }
@@ -325,11 +397,30 @@ body {
   gap: 13px;
 }
 
-.dv2-brand img {
+.dv2-brand-mark {
+  display: block;
   width: 52px;
   height: 52px;
+  flex: 0 0 52px;
   border: 1px solid var(--dv2-border);
-  object-fit: contain;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 0 22px var(--dv2-edge-glow);
+}
+
+.dv2-brand-mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  transform: scale(1.12);
+  transition: transform 180ms ease;
+}
+
+body.screen-mode.screen-day .dv2-brand-mark img {
+  transform: scale(1.17);
 }
 
 .dv2-brand div {

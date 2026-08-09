@@ -1,4 +1,4 @@
-import { COLORS } from './dashboard-format.js';
+import { SCREEN_PALETTES } from './dashboard-format.js?v=20260809-jipin-theme-1';
 
 export const REFERENCE_CITIES = [
   { name: '哈尔滨市', value: [126.642, 45.757] },
@@ -17,10 +17,10 @@ export function localGeoJsonIsNortheast(geojson) {
   return ['黑龙江省', '吉林省', '辽宁省'].every((name) => names.has(name));
 }
 
-function nodeColor(type) {
-  if (type === 'PARK') return COLORS.demand;
-  if (type === 'THIRD_SPACE') return COLORS.thirdSpace;
-  return COLORS.traditional;
+function nodeColor(type, palette) {
+  if (type === 'PARK') return palette.demand;
+  if (type === 'THIRD_SPACE') return palette.thirdSpace;
+  return palette.traditional;
 }
 
 function statusLabel(status) {
@@ -31,7 +31,8 @@ function statusLabel(status) {
   }[status] || '状态待同步';
 }
 
-export function buildNortheastMapOption(snapshot) {
+export function buildNortheastMapOption(snapshot, palette = SCREEN_PALETTES.night) {
+  const colors = { ...SCREEN_PALETTES.night, ...palette };
   const nodeById = new Map((snapshot.map_nodes || []).map((node) => [node.node_id, node]));
   const lines = (snapshot.map_edges || []).map((edge) => {
     const source = nodeById.get(edge.source_id);
@@ -43,14 +44,14 @@ export function buildNortheastMapOption(snapshot) {
       taskStatus: edge.status,
       telemetry: edge.latest_telemetry,
       abnormal: edge.abnormal,
-      lineStyle: { color: edge.abnormal ? '#ff6b68' : edge.channel_type === 'THIRD_SPACE' ? COLORS.thirdSpace : COLORS.traditional },
+      lineStyle: { color: edge.abnormal ? colors.danger : edge.channel_type === 'THIRD_SPACE' ? colors.thirdSpace : colors.traditional },
     };
   }).filter(Boolean);
 
   const storeNodes = (snapshot.map_nodes || []).map((node) => ({
     name: node.display_name,
     value: [Number(node.longitude), Number(node.latitude), node.node_type],
-    itemStyle: { color: nodeColor(node.node_type) },
+    itemStyle: { color: nodeColor(node.node_type, colors) },
     symbolSize: node.node_type === 'PARK' ? 19 : node.node_type === 'THIRD_SPACE' ? 12 : 9,
   }));
 
@@ -58,9 +59,9 @@ export function buildNortheastMapOption(snapshot) {
     animation: false,
     tooltip: {
       trigger: 'item',
-      backgroundColor: 'rgba(8, 31, 55, .96)',
-      borderColor: COLORS.traditional,
-      textStyle: { color: COLORS.text },
+      backgroundColor: colors.tooltipBackground,
+      borderColor: colors.tooltipBorder,
+      textStyle: { color: colors.text },
       formatter(params) {
         if (params.seriesName === '节点') return `${params.name}<br/>${params.value?.[2] === 'PARK' ? '园区中心' : params.value?.[2] === 'THIRD_SPACE' ? '第三空间' : '传统门店'}`;
         if (params.seriesName === '估算运输路线') {
@@ -81,15 +82,15 @@ export function buildNortheastMapOption(snapshot) {
       center: [125.2, 44.1],
       layoutCenter: ['50%', '51%'],
       layoutSize: '101%',
-      label: { show: true, color: '#9ad8ec', fontSize: 13 },
+      label: { show: true, color: colors.mapLabel, fontSize: 13 },
       itemStyle: {
-        areaColor: 'rgba(17, 66, 105, .66)',
-        borderColor: '#5acbff',
+        areaColor: colors.mapArea,
+        borderColor: colors.mapBorder,
         borderWidth: 1.2,
-        shadowColor: 'rgba(39, 177, 232, .35)',
+        shadowColor: colors.mapShadow,
         shadowBlur: 16,
       },
-      emphasis: { itemStyle: { areaColor: 'rgba(31, 103, 143, .82)' }, label: { color: '#fff' } },
+      emphasis: { itemStyle: { areaColor: colors.mapEmphasis }, label: { color: colors.text } },
     },
     series: [
       {
@@ -98,7 +99,7 @@ export function buildNortheastMapOption(snapshot) {
         coordinateSystem: 'geo',
         zlevel: 2,
         silent: false,
-        effect: { show: true, period: 6, trailLength: 0.22, symbolSize: 3, color: '#d9fbff' },
+        effect: { show: true, period: 6, trailLength: 0.22, symbolSize: 3, color: colors.mapEffect },
         lineStyle: { width: 1.4, opacity: 0.72, curveness: 0.18 },
         data: lines,
       },
@@ -113,9 +114,9 @@ export function buildNortheastMapOption(snapshot) {
           formatter: '{b}',
           position: 'right',
           distance: 8,
-          color: COLORS.text,
+          color: colors.text,
           fontSize: 11,
-          textBorderColor: '#071a2d',
+          textBorderColor: colors.mapTextBorder,
           textBorderWidth: 3,
         },
         data: storeNodes,
@@ -127,8 +128,8 @@ export function buildNortheastMapOption(snapshot) {
         zlevel: 1,
         symbolSize: 5,
         silent: true,
-        itemStyle: { color: '#799dad' },
-        label: { show: true, formatter: '{b}', position: 'top', color: '#799dad', fontSize: 10 },
+        itemStyle: { color: colors.mapReference },
+        label: { show: true, formatter: '{b}', position: 'top', color: colors.mapReference, fontSize: 10 },
         data: REFERENCE_CITIES,
       },
     ],

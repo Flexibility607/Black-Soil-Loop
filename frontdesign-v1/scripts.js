@@ -536,19 +536,46 @@ async function togglePublicFullscreen() {
   }
 }
 
+function normalizePublicTheme(theme) {
+  return theme === 'day' ? 'day' : 'night';
+}
+
+function readStoredPublicTheme() {
+  try {
+    return normalizePublicTheme(localStorage.getItem('publicTheme'));
+  } catch {
+    return 'night';
+  }
+}
+
+function storePublicTheme(theme) {
+  try {
+    localStorage.setItem('publicTheme', normalizePublicTheme(theme));
+  } catch {
+    // The theme still applies for the current page when storage is unavailable.
+  }
+}
+
 function applyPublicTheme(theme) {
-  const isDay = theme === 'day';
+  const normalizedTheme = normalizePublicTheme(theme);
+  const isDay = normalizedTheme === 'day';
   document.body.classList.toggle('screen-day', isDay);
+  const logo = document.getElementById('dv2-brand-logo');
+  const logoSource = isDay ? logo?.dataset.daySrc : logo?.dataset.nightSrc;
+  if (logo && logoSource && logo.getAttribute('src') !== logoSource) logo.setAttribute('src', logoSource);
   const button = document.getElementById('public-theme-toggle');
-  if (!button) return;
-  button.textContent = isDay ? '夜间模式' : '日间模式';
-  button.title = isDay ? '切换到夜间模式' : '切换到日间模式';
-  button.setAttribute('aria-pressed', String(isDay));
+  if (button) {
+    button.textContent = isDay ? '夜间模式' : '日间模式';
+    button.title = isDay ? '切换到夜间模式' : '切换到日间模式';
+    button.setAttribute('aria-pressed', String(isDay));
+  }
+  window.dispatchEvent(new CustomEvent('app:public-theme-change', { detail: { theme: normalizedTheme } }));
+  return normalizedTheme;
 }
 
 function togglePublicTheme() {
   const theme = document.body.classList.contains('screen-day') ? 'night' : 'day';
-  localStorage.setItem('publicTheme', theme);
+  storePublicTheme(theme);
   applyPublicTheme(theme);
 }
 
@@ -958,6 +985,7 @@ async function handleLogout() {
 }
 
 async function initPage() {
+  applyPublicTheme(readStoredPublicTheme());
   document.querySelectorAll('.sidebar button[data-section]').forEach((button) => button.addEventListener('click', () => showSection(button.dataset.section)));
   document.getElementById('open-login').addEventListener('click', () => { document.getElementById('auth-panel').hidden = false; });
   document.getElementById('close-login').addEventListener('click', () => { document.getElementById('auth-panel').hidden = true; });

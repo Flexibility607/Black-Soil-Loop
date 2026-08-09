@@ -2,6 +2,7 @@ import {
   CHANNEL_LABELS,
   COLORS,
   channelValues,
+  dashboardPalette,
   demandSeries,
   formatCurrency,
   formatDate,
@@ -11,8 +12,8 @@ import {
   responseError,
   safeEnvelopeData,
   sortDemandTotals,
-} from './dashboard-format.js';
-import { buildNortheastMapOption, harbinIsNorthOfChangchun, localGeoJsonIsNortheast } from './dashboard-map.js';
+} from './dashboard-format.js?v=20260809-jipin-theme-1';
+import { buildNortheastMapOption, harbinIsNorthOfChangchun, localGeoJsonIsNortheast } from './dashboard-map.js?v=20260809-jipin-theme-1';
 import { VOICE_STATES, VoiceQuestionController } from './dashboard-voice.js';
 import { adaptDashboardSnapshot } from './dashboard-adapter.js';
 
@@ -33,6 +34,8 @@ const state = {
   e01Snapshot: null,
   eventController: null,
   eventRefreshTimer: null,
+  theme: 'night',
+  dialogContent: null,
 };
 
 function byId(id) {
@@ -56,21 +59,25 @@ function initChart(id) {
   return chart;
 }
 
-function baseAxis() {
+function baseAxis(palette = COLORS) {
   return {
-    axisLine: { lineStyle: { color: 'rgba(105, 184, 219, .28)' } },
-    axisLabel: { color: COLORS.muted, fontSize: 10 },
-    splitLine: { lineStyle: { color: COLORS.grid } },
+    axisLine: { lineStyle: { color: palette.axis || 'rgba(105, 184, 219, .28)' } },
+    axisLabel: { color: palette.muted, fontSize: 10 },
+    splitLine: { lineStyle: { color: palette.grid } },
   };
 }
 
-function tooltip() {
+function tooltip(palette = COLORS) {
   return {
     trigger: 'axis',
-    backgroundColor: 'rgba(8, 31, 55, .96)',
-    borderColor: COLORS.traditional,
-    textStyle: { color: COLORS.text, fontSize: 11 },
+    backgroundColor: palette.tooltipBackground || 'rgba(8, 31, 55, .96)',
+    borderColor: palette.tooltipBorder || palette.traditional,
+    textStyle: { color: palette.text, fontSize: 11 },
   };
+}
+
+function screenPalette() {
+  return dashboardPalette(state.theme);
 }
 
 function recomputeSnapshot(source, period) {
@@ -175,18 +182,18 @@ function renderHeadline(snapshot) {
   byId('public-data-cutoff').textContent = new Intl.DateTimeFormat('zh-CN', { dateStyle: 'short', timeStyle: 'medium', hour12: false }).format(new Date(snapshot.data_cutoff));
 }
 
-function renderDemandChart(snapshot, target = 'dv2-demand-chart') {
+function renderDemandChart(snapshot, target = 'dv2-demand-chart', palette = screenPalette()) {
   const chart = initChart(target);
   if (!chart) return;
   const data = demandSeries(snapshot.daily_trend);
   chart.setOption({
     animationDuration: 350,
-    color: [COLORS.demand, COLORS.traditional, COLORS.thirdSpace, '#b18bff'],
-    tooltip: tooltip(),
-    legend: { top: 5, right: 8, textStyle: { color: COLORS.muted, fontSize: 10 } },
+    color: [palette.demand, palette.traditional, palette.thirdSpace, palette.alternate],
+    tooltip: tooltip(palette),
+    legend: { top: 5, right: 8, textStyle: { color: palette.muted, fontSize: 10 } },
     grid: { top: 40, right: 18, bottom: 28, left: 45 },
-    xAxis: { type: 'category', data: data.dates.map(formatDate), boundaryGap: false, ...baseAxis(), axisLabel: { color: COLORS.muted, fontSize: 9, interval: Math.max(0, Math.floor(data.dates.length / 6) - 1) } },
-    yAxis: { type: 'value', ...baseAxis(), name: '按单位', nameTextStyle: { color: COLORS.muted, fontSize: 9 } },
+    xAxis: { type: 'category', data: data.dates.map(formatDate), boundaryGap: false, ...baseAxis(palette), axisLabel: { color: palette.muted, fontSize: 9, interval: Math.max(0, Math.floor(data.dates.length / 6) - 1) } },
+    yAxis: { type: 'value', ...baseAxis(palette), name: '按单位', nameTextStyle: { color: palette.muted, fontSize: 9 } },
     series: data.series.map((series, index) => ({
       ...series,
       type: 'line',
@@ -199,26 +206,27 @@ function renderDemandChart(snapshot, target = 'dv2-demand-chart') {
   }, true);
 }
 
-function donutOption(values, centerLabel) {
+function donutOption(values, centerLabel, palette = COLORS) {
   const total = values.reduce((sum, item) => sum + Number(item.value || 0), 0);
   return {
     animationDuration: 350,
-    tooltip: { trigger: 'item', formatter: '{b}<br/>{c} · {d}%', backgroundColor: 'rgba(8, 31, 55, .96)', borderColor: COLORS.traditional, textStyle: { color: COLORS.text } },
-    title: { text: total ? formatNumber(total) : '0', subtext: centerLabel, left: 'center', top: '37%', textStyle: { color: COLORS.text, fontFamily: 'JetBrains Mono Variable', fontSize: 18 }, subtextStyle: { color: COLORS.muted, fontSize: 10 } },
+    tooltip: { trigger: 'item', formatter: '{b}<br/>{c} · {d}%', backgroundColor: palette.tooltipBackground || 'rgba(8, 31, 55, .96)', borderColor: palette.tooltipBorder || palette.traditional, textStyle: { color: palette.text } },
+    title: { text: total ? formatNumber(total) : '0', subtext: centerLabel, left: 'center', top: '37%', textStyle: { color: palette.text, fontFamily: 'JetBrains Mono Variable', fontSize: 18 }, subtextStyle: { color: palette.muted, fontSize: 10 } },
     series: [{
       type: 'pie', radius: ['57%', '77%'], center: ['50%', '48%'], startAngle: 90,
       label: { show: false }, emphasis: { scale: true, scaleSize: 5 },
-      itemStyle: { borderColor: '#0b263e', borderWidth: 2 },
+      itemStyle: { borderColor: palette.pieBorder || '#0b263e', borderWidth: 2 },
       data: values,
     }],
   };
 }
 
 function renderMix(snapshot) {
-  initChart('dv2-order-donut')?.setOption(donutOption(channelValues(snapshot.channel_mix, 'operation_order_count'), '订单'), true);
-  initChart('dv2-sales-donut')?.setOption(donutOption(channelValues(snapshot.channel_mix, 'sales_amount'), '营业额'), true);
+  const palette = screenPalette();
+  initChart('dv2-order-donut')?.setOption(donutOption(channelValues(snapshot.channel_mix, 'operation_order_count', palette), '订单', palette), true);
+  initChart('dv2-sales-donut')?.setOption(donutOption(channelValues(snapshot.channel_mix, 'sales_amount', palette), '营业额', palette), true);
   byId('dv2-mix-legend').innerHTML = snapshot.channel_mix.map((item) => {
-    const color = item.channel_type === 'THIRD_SPACE' ? COLORS.thirdSpace : COLORS.traditional;
+    const color = item.channel_type === 'THIRD_SPACE' ? palette.thirdSpace : palette.traditional;
     return `<div style="--legend-color:${color}"><strong>${htmlEscape(item.display_name)}</strong><small>订单 ${htmlEscape(formatPercent(item.operation_order_share))} · 营业额 ${htmlEscape(formatPercent(item.sales_share))}</small></div>`;
   }).join('');
 }
@@ -249,7 +257,7 @@ function renderQuality(snapshot) {
 function renderMap(snapshot) {
   const chart = initChart('dv2-map-chart');
   if (!chart) return;
-  chart.setOption(buildNortheastMapOption(snapshot), true);
+  chart.setOption(buildNortheastMapOption(snapshot, screenPalette()), true);
 }
 
 function renderSnapshot(snapshot) {
@@ -299,14 +307,16 @@ async function refresh({ force = false } = {}) {
   }
 }
 
-function renderAssistantChart(chartSpec) {
+function renderAssistantChart(chartSpec, { remember = true } = {}) {
   if (!chartSpec) return;
+  if (remember) state.dialogContent = { type: 'assistant', chartSpec };
   const dialog = byId('dv2-chart-dialog');
   byId('dv2-dialog-title').textContent = chartSpec.title;
   if (!dialog.open) dialog.showModal();
   const chart = initChart('dv2-dialog-chart');
+  const palette = screenPalette();
   if (chartSpec.type === 'route' || chartSpec.kind === 'route') {
-    chart.setOption(buildNortheastMapOption(state.snapshot || {}), true);
+    chart.setOption(buildNortheastMapOption(state.snapshot || {}, palette), true);
     return;
   }
   const kind = chartSpec.kind || chartSpec.type || 'bar';
@@ -319,19 +329,39 @@ function renderAssistantChart(chartSpec) {
   }));
   let option;
   if (kind === 'donut') {
-    const values = categories.map((name, index) => ({ name, value: Number(series[0]?.data?.[index] || 0), itemStyle: { color: index === 1 ? COLORS.thirdSpace : COLORS.traditional } }));
-    option = { ...donutOption(values, chartSpec.unit), legend: { bottom: 24, textStyle: { color: COLORS.muted } } };
+    const values = categories.map((name, index) => ({ name, value: Number(series[0]?.data?.[index] || 0), itemStyle: { color: index === 1 ? palette.thirdSpace : palette.traditional } }));
+    option = { ...donutOption(values, chartSpec.unit, palette), legend: { bottom: 24, textStyle: { color: palette.muted } } };
   } else {
     option = {
-      tooltip: tooltip(),
-      legend: { top: 18, textStyle: { color: COLORS.muted } },
+      tooltip: tooltip(palette),
+      legend: { top: 18, textStyle: { color: palette.muted } },
       grid: { top: 68, right: 35, bottom: 55, left: 65 },
-      xAxis: { type: 'category', data: categories, ...baseAxis() },
-      yAxis: { type: 'value', name: chartSpec.unit, nameTextStyle: { color: COLORS.muted }, ...baseAxis() },
-      series: series.map((item, index) => ({ name: item.name, data: item.data, type: kind, smooth: kind === 'line', itemStyle: { color: index === 0 ? COLORS.thirdSpace : COLORS.traditional }, areaStyle: kind === 'line' ? { opacity: 0.08 } : undefined })),
+      xAxis: { type: 'category', data: categories, ...baseAxis(palette) },
+      yAxis: { type: 'value', name: chartSpec.unit, nameTextStyle: { color: palette.muted }, ...baseAxis(palette) },
+      series: series.map((item, index) => ({ name: item.name, data: item.data, type: kind, smooth: kind === 'line', itemStyle: { color: index === 0 ? palette.thirdSpace : palette.traditional }, areaStyle: kind === 'line' ? { opacity: 0.08 } : undefined })),
     };
   }
   requestAnimationFrame(() => { chart.resize(); chart.setOption(option, true); });
+}
+
+function renderStoredDialog() {
+  const dialog = byId('dv2-chart-dialog');
+  if (!dialog?.open || !state.dialogContent) return;
+  if (state.dialogContent.type === 'demand') {
+    renderDemandChart(state.snapshot || { daily_trend: [] }, 'dv2-dialog-chart');
+    return;
+  }
+  renderAssistantChart(state.dialogContent.chartSpec, { remember: false });
+}
+
+function setTheme(theme) {
+  state.theme = theme === 'day' ? 'day' : 'night';
+  if (state.snapshot) {
+    renderDemandChart(state.snapshot);
+    renderMix(state.snapshot);
+    renderMap(state.snapshot);
+  }
+  renderStoredDialog();
 }
 
 const voiceLabels = {
@@ -447,6 +477,7 @@ async function activateE01Section(section) {
 
 function activate() {
   state.active = true;
+  state.theme = document.body.classList.contains('screen-day') ? 'day' : 'night';
   refresh();
   startRealtimeEvents();
   requestAnimationFrame(() => chartInstances.forEach((chart) => chart.resize()));
@@ -502,14 +533,17 @@ function bindEvents() {
   }));
   document.querySelector('[data-open-chart="demand"]')?.addEventListener('click', () => {
     if (!state.snapshot) return;
+    state.dialogContent = { type: 'demand' };
     const dialog = byId('dv2-chart-dialog');
     byId('dv2-dialog-title').textContent = '每日分单位需求';
     if (!dialog.open) dialog.showModal();
     requestAnimationFrame(() => renderDemandChart(state.snapshot, 'dv2-dialog-chart'));
   });
   byId('dv2-dialog-close')?.addEventListener('click', () => byId('dv2-chart-dialog').close());
+  byId('dv2-chart-dialog')?.addEventListener('close', () => { state.dialogContent = null; });
   byId('dv2-chart-dialog')?.addEventListener('click', (event) => { if (event.target === byId('dv2-chart-dialog')) event.target.close(); });
   window.addEventListener('resize', () => chartInstances.forEach((chart) => chart.resize()));
+  window.addEventListener('app:public-theme-change', (event) => setTheme(event.detail?.theme));
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) return;
     state.e01Snapshot = null;
@@ -537,4 +571,4 @@ if (!echarts) {
   window.setInterval(() => { if (state.active) refresh(); }, REFRESH_INTERVAL_MS);
 }
 
-window.DashboardV2 = { activate, deactivate, refresh, getState: () => ({ ...state }) };
+window.DashboardV2 = { activate, deactivate, refresh, setTheme, getState: () => ({ ...state }) };

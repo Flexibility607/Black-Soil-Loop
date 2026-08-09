@@ -27,11 +27,11 @@ async function requireOk(path) {
 }
 
 const html = await (await requireOk('/')).text();
-for (const marker of ['id="toggle-mock"', 'id="public-screen-canvas"', 'id="dv2-order-donut"', 'id="dv2-sales-donut"', 'id="dv2-mic-button"']) {
+for (const marker of ['id="public-screen-canvas"', 'id="public-theme-toggle"', 'id="dv2-brand-logo"', 'id="dv2-order-donut"', 'id="dv2-sales-donut"', 'id="dv2-mic-button"']) {
   if (!html.includes(marker)) throw new Error(`The deployed page is missing ${marker}.`);
 }
 
-for (const path of ['/styles.css', '/dashboard.css', '/api.js', '/scripts.js', '/dashboard-v2.js', '/jipin-logo.jpg', '/vendor/echarts/echarts.min.js', '/assets/maps/northeast-china-admin1.geojson', '/assets/backgrounds/northeast-winter-corn-v1.webp']) {
+for (const path of ['/styles.css', '/dashboard.css', '/api.js', '/scripts.js', '/dashboard-v2.js', '/assets/brand/jipin-screen-light-d0308f92.jpg', '/assets/brand/jipin-web-green-e90c36ef.jpg', '/assets/brand/jipin-screen-dark-e041ecf5.jpg', '/vendor/echarts/echarts.min.js', '/assets/maps/northeast-china-admin1.geojson', '/assets/backgrounds/northeast-winter-corn-v1.webp']) {
   const content = await (await requireOk(path)).text();
   if (content.length < 100) throw new Error(`${path} is unexpectedly empty.`);
 }
