@@ -54,3 +54,35 @@ test('真实任务生成估算路线并携带温湿度异常', () => {
   assert.equal(snapshot.map_edges[0].abnormal, true);
   assert.equal(snapshot.map_nodes.find((node) => node.node_id === 'store-s1').node_type, 'THIRD_SPACE');
 });
+
+test('响应生成时间不会替代空的业务数据截止时间', () => {
+  const snapshot = adaptDashboardSnapshot({
+    generated_at: '2026-08-08T08:00:00Z',
+    data_cutoff: null,
+    data_cutoff_note: '暂无业务数据',
+    summary: {}, charts: {}, data_quality: {}, alerts: [], map: { stores: [], routes: [] },
+  });
+  assert.equal(snapshot.generated_at, '2026-08-08T08:00:00Z');
+  assert.equal(snapshot.data_cutoff, null);
+  assert.equal(snapshot.data_cutoff_note, '暂无业务数据');
+});
+
+test('温湿度报警独立于最新遥测异常字段进入地图状态', () => {
+  const snapshot = adaptDashboardSnapshot({
+    summary: {}, charts: {}, data_quality: {},
+    alerts: [{ id: 'a1', task_id: 't1', alert_type: 'TEMPERATURE', status: 'OPEN', message: '温度超限' }],
+    map: {
+      stores: [{ id: 's1', name: '门店一', channel: 'TRADITIONAL', latitude: 43.8, longitude: 125.3 }],
+      routes: [{
+        task_id: 't1', task_no: '任务一', status: 'IN_TRANSIT', plate_no: '黑A12345',
+        origin: { latitude: 43.9, longitude: 125.2 },
+        stops: [{ store_id: 's1', latitude: 43.8, longitude: 125.3 }],
+        latest_telemetry: { anomaly_code: null },
+        latest_location: { latitude: 43.85, longitude: 125.25, speed_mps: 10, accuracy_m: 5 },
+      }],
+    },
+  });
+  assert.equal(snapshot.map_edges[0].abnormal, true);
+  assert.equal(snapshot.map_edges[0].environmental_alerts[0].id, 'a1');
+  assert.equal(snapshot.map_edges[0].plate_no, '黑A12345');
+});

@@ -8,18 +8,24 @@ import {
   formatDate,
   formatNumber,
   formatPercent,
+  formatUnit,
   operationTrendSeries,
   responseError,
   safeEnvelopeData,
   sortDemandTotals,
-} from './dashboard-format.js?v=20260809-jipin-theme-1';
-import { buildNortheastMapOption, harbinIsNorthOfChangchun, localGeoJsonIsNortheast } from './dashboard-map.js?v=20260809-jipin-theme-1';
+} from './dashboard-format.js?v=20260809-jipin-theme-2';
+import {
+  applyDashboardMapDictionaries,
+  buildNortheastMapOption,
+  harbinIsNorthOfChangchun,
+  localGeoJsonIsNortheast,
+} from './dashboard-map.js?v=20260809-jipin-theme-2';
 import { VOICE_STATES, VoiceQuestionController } from './dashboard-voice.js';
-import { adaptDashboardSnapshot } from './dashboard-adapter.js';
+import { adaptDashboardSnapshot, applyDashboardDictionaries } from './dashboard-adapter.js';
+import { eventTargets, RealtimeCoordinator } from './dashboard-realtime.js';
 
 const echarts = window.echarts;
 const API = window.API;
-const REFRESH_INTERVAL_MS = 30_000;
 const DEMO_FIXTURE = './frontend-mocks-v0.1/e02-dashboard-snapshot.json';
 const MAP_FIXTURE = './assets/maps/northeast-china-admin1.geojson';
 const chartInstances = new Map();
@@ -32,11 +38,13 @@ const state = {
   lastSuccessfulAt: null,
   mapReady: false,
   e01Snapshot: null,
-  eventController: null,
+  currentSection: 'overview',
   eventRefreshTimer: null,
+  pendingEventTargets: new Set(),
   theme: 'night',
   dialogContent: null,
 };
+let realtimeCoordinator = null;
 
 function byId(id) {
   return document.getElementById(id);
@@ -78,6 +86,15 @@ function tooltip(palette = COLORS) {
 
 function screenPalette() {
   return dashboardPalette(state.theme);
+}
+
+function formatSnapshotTime(value, emptyText) {
+  if (!value) return emptyText;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return emptyText;
+  return new Intl.DateTimeFormat('zh-CN', {
+    dateStyle: 'short', timeStyle: 'medium', hour12: false,
+  }).format(parsed);
 }
 
 function recomputeSnapshot(source, period) {
@@ -177,9 +194,10 @@ function renderHeadline(snapshot) {
   byId('dv2-third-space-count').textContent = formatNumber(snapshot.third_spaces.length);
   const totals = sortDemandTotals(snapshot.headline.demand_totals);
   byId('dv2-demand-totals').innerHTML = totals.length
-    ? totals.map((item) => `<b>${htmlEscape(formatNumber(item.quantity, 2))} ${htmlEscape(item.unit)}</b>`).join('')
+    ? totals.map((item) => `<b>${htmlEscape(formatNumber(item.quantity, 2))} ${htmlEscape(formatUnit(item.unit))}</b>`).join('')
     : '<b>暂无需求</b>';
-  byId('public-data-cutoff').textContent = new Intl.DateTimeFormat('zh-CN', { dateStyle: 'short', timeStyle: 'medium', hour12: false }).format(new Date(snapshot.data_cutoff));
+  byId('public-data-cutoff').textContent = formatSnapshotTime(snapshot.data_cutoff, snapshot.data_cutoff_note || '暂无业务数据');
+  byId('public-generated-at').textContent = formatSnapshotTime(snapshot.generated_at, '响应时间未知');
 }
 
 function renderDemandChart(snapshot, target = 'dv2-demand-chart', palette = screenPalette()) {
@@ -309,17 +327,18 @@ async function refresh({ force = false } = {}) {
 
 function renderAssistantChart(chartSpec, { remember = true } = {}) {
   if (!chartSpec) return;
+  const kind = chartSpec.kind || chartSpec.type || 'bar';
+  if (!['bar', 'line', 'donut', 'route'].includes(kind)) return;
   if (remember) state.dialogContent = { type: 'assistant', chartSpec };
   const dialog = byId('dv2-chart-dialog');
   byId('dv2-dialog-title').textContent = chartSpec.title;
   if (!dialog.open) dialog.showModal();
   const chart = initChart('dv2-dialog-chart');
   const palette = screenPalette();
-  if (chartSpec.type === 'route' || chartSpec.kind === 'route') {
+  if (kind === 'route') {
     chart.setOption(buildNortheastMapOption(state.snapshot || {}, palette), true);
     return;
   }
-  const kind = chartSpec.kind || chartSpec.type || 'bar';
   const rows = Array.isArray(chartSpec.data) ? chartSpec.data : [];
   const categories = chartSpec.categories || rows.map((row) => row[chartSpec.category_key] ?? row.name ?? '未命名');
   const valueKeys = chartSpec.value_keys || (chartSpec.value_key ? [chartSpec.value_key] : []);
@@ -485,26 +504,55 @@ function activate() {
 
 function deactivate() {
   state.active = false;
-  state.eventController?.abort();
-  state.eventController = null;
+}
+
+function flushRealtimeRefresh() {
+  state.eventRefreshTimer = null;
+  const targets = [...state.pendingEventTargets];
+  state.pendingEventTargets.clear();
+  state.e01Snapshot = null;
+  if (state.active) refresh({ force: true });
+  if (targets.includes(state.currentSection)) activateE01Section(state.currentSection);
+  window.dispatchEvent(new CustomEvent('blacksoil:e01-realtime-refresh', { detail: { targets } }));
+}
+
+function queueRealtimeRefresh(targets) {
+  targets.forEach((target) => state.pendingEventTargets.add(target));
+  window.clearTimeout(state.eventRefreshTimer);
+  state.eventRefreshTimer = window.setTimeout(flushRealtimeRefresh, 800);
 }
 
 function startRealtimeEvents() {
-  if (state.eventController || typeof API.subscribeDashboardEvents !== 'function') return;
-  const controller = new AbortController();
-  state.eventController = controller;
-  API.subscribeDashboardEvents(() => {
-    if (!state.active || document.hidden) return;
-    window.clearTimeout(state.eventRefreshTimer);
-    state.eventRefreshTimer = window.setTimeout(() => {
-      state.e01Snapshot = null;
-      refresh({ force: true });
-    }, 800);
-  }, controller.signal).catch(() => {
-    if (controller.signal.aborted) return;
-    state.eventController = null;
-    byId('public-sync-state').textContent = '实时连接已降级，每 30 秒轮询';
+  if (realtimeCoordinator || typeof API.subscribeDashboardEvents !== 'function') return;
+  realtimeCoordinator = new RealtimeCoordinator({
+    subscribe: API.subscribeDashboardEvents,
+    onEvent: (event) => queueRealtimeRefresh(eventTargets(event.topic)),
+    onPoll: () => queueRealtimeRefresh(['overview', 'enterprise', 'production', 'inventory', 'transport']),
+    onState: (connectionState) => {
+      if (!state.active) return;
+      byId('public-sync-state').textContent = connectionState === 'connected'
+        ? 'SSE 实时连接正常'
+        : 'SSE 已断线，当前每 30 秒轮询并尝试重连';
+    },
   });
+  realtimeCoordinator.start();
+}
+
+async function submitAssistantQuestion(question, sourceLabel = '文字问题') {
+  const normalized = String(question || '').trim();
+  if (normalized.length < 2) return;
+  byId('dv2-voice-state').textContent = '正在分析';
+  byId('dv2-voice-hint').textContent = `${sourceLabel}：${normalized}`;
+  const result = await API.queryDashboardAssistant(normalized, state.period, state.snapshot?.park_id);
+  const payload = safeEnvelopeData(result);
+  if (!payload) {
+    byId('dv2-voice-state').textContent = '提问失败';
+    byId('dv2-answer').textContent = responseError(result);
+    return;
+  }
+  byId('dv2-voice-state').textContent = '回答完成';
+  byId('dv2-answer').textContent = payload.answer || '已完成分析。';
+  if (payload.chart) renderAssistantChart(payload.chart);
 }
 
 function bindEvents() {
@@ -517,19 +565,13 @@ function bindEvents() {
   byId('dv2-mic-button')?.addEventListener('click', () => voice.toggle(state.period, state.snapshot?.park_id));
   byId('dv2-voice-cancel')?.addEventListener('click', () => voice.cancel());
   byId('dv2-voice-retry')?.addEventListener('click', () => voice.start(state.period, state.snapshot?.park_id));
+  byId('dv2-assistant-form')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    await submitAssistantQuestion(byId('dv2-assistant-input').value);
+  });
   document.querySelectorAll('.dv2-examples button').forEach((button) => button.addEventListener('click', async () => {
-    byId('dv2-voice-state').textContent = '正在分析';
-    byId('dv2-voice-hint').textContent = `预设问题：${button.dataset.example}`;
-    const result = await API.queryDashboardAssistant(button.dataset.example, state.period, state.snapshot?.park_id);
-    const payload = safeEnvelopeData(result);
-    if (!payload) {
-      byId('dv2-voice-state').textContent = '提问失败';
-      byId('dv2-answer').textContent = responseError(result);
-      return;
-    }
-    byId('dv2-voice-state').textContent = '回答完成';
-    byId('dv2-answer').textContent = payload.answer || '已完成分析。';
-    if (payload.chart) renderAssistantChart(payload.chart);
+    byId('dv2-assistant-input').value = button.dataset.example;
+    await submitAssistantQuestion(button.dataset.example, '预设问题');
   }));
   document.querySelector('[data-open-chart="demand"]')?.addEventListener('click', () => {
     if (!state.snapshot) return;
@@ -546,14 +588,12 @@ function bindEvents() {
   window.addEventListener('app:public-theme-change', (event) => setTheme(event.detail?.theme));
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) return;
-    state.e01Snapshot = null;
-    if (state.active) {
-      refresh({ force: true });
-      startRealtimeEvents();
-    }
+    queueRealtimeRefresh(['overview', 'enterprise', 'production', 'inventory', 'transport']);
+    startRealtimeEvents();
   });
   window.addEventListener('app:section-change', (event) => {
     const section = event.detail?.section;
+    state.currentSection = section || 'overview';
     if (section === 'public') activate();
     else {
       deactivate();
@@ -562,13 +602,38 @@ function bindEvents() {
   });
 }
 
+async function initializeDashboard() {
+  try {
+    const result = await API.getDictionaries?.();
+    const dictionaries = safeEnvelopeData(result);
+    if (dictionaries) {
+      applyDashboardDictionaries(dictionaries);
+      applyDashboardMapDictionaries(dictionaries);
+    }
+  } catch {
+    // 内置中文词典继续提供确定性显示。
+  }
+  bindEvents();
+  setTheme(document.body.classList.contains('screen-day') ? 'day' : 'night');
+  startRealtimeEvents();
+  activateE01Section('overview');
+  if (document.body.classList.contains('screen-mode')) activate();
+}
+
 if (!echarts) {
   byId('public-sync-state').textContent = '本地 ECharts 资源未加载';
 } else {
-  bindEvents();
-  activateE01Section('overview');
-  if (document.body.classList.contains('screen-mode')) activate();
-  window.setInterval(() => { if (state.active) refresh(); }, REFRESH_INTERVAL_MS);
+  initializeDashboard();
 }
 
-window.DashboardV2 = { activate, deactivate, refresh, setTheme, getState: () => ({ ...state }) };
+window.DashboardV2 = {
+  activate,
+  deactivate,
+  refresh,
+  setTheme,
+  refreshE01(section = state.currentSection) {
+    state.e01Snapshot = null;
+    return activateE01Section(section);
+  },
+  getState: () => ({ ...state }),
+};

@@ -3,42 +3,40 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="黑土闭环 B01 网页后端的 E01 管理台与 E02 公开大屏" />
-  <title>黑土闭环 · E01 / E02</title>
+  <meta name="description" content="黑土循环 B01 网页管理与经营服务的 E01 园区管理台和 E02 公开产销协同大屏" />
+  <title>黑土循环 · E01 园区管理台 / E02 公开产销协同大屏</title>
   <link rel="stylesheet" href="tokens.css?v=20260806-real-api-1" />
-  <link rel="stylesheet" href="styles.css?v=20260809-jipin-theme-1" />
+  <link rel="stylesheet" href="styles.css?v=20260809-jipin-theme-2" />
   <link rel="stylesheet" href="vendor/fonts/noto-sans-sc/index.css" />
   <link rel="stylesheet" href="vendor/fonts/zcool-qingke-huangyou/400.css" />
   <link rel="stylesheet" href="vendor/fonts/jetbrains-mono/index.css" />
-  <link rel="stylesheet" href="dashboard.css?v=20260809-jipin-theme-1" />
+  <link rel="stylesheet" href="dashboard.css?v=20260809-jipin-theme-2" />
 </head>
 <body>
   <div class="app-shell">
     <aside class="sidebar">
       <div class="brand"><span class="brand-mark"><img class="brand-logo" src="assets/brand/jipin-web-green-e90c36ef.jpg" alt="吉品品牌徽标" /></span></div>
-      <div class="scope-note">B01 网页端 · E01 / E02</div>
       <nav aria-label="功能导航">
         <button type="button" data-section="overview" class="active">总览</button>
         <button type="button" data-section="enterprise">主数据与企业</button>
         <button type="button" data-section="production">运输订单与拼车计划</button>
         <button type="button" data-section="inventory">库存、销售与冻库</button>
         <button type="button" data-section="transport">运输任务与资源</button>
-        <button type="button" data-section="analytics">B01 计算与建议</button>
-        <button type="button" data-section="public">E02 公开大屏</button>
+        <button type="button" data-section="analytics">B01 网页管理服务</button>
+        <button type="button" data-section="public">E02 公开产销协同大屏</button>
       </nav>
-      <div class="sidebar-foot">B02 小程序不在本维护范围</div>
+      <div class="sidebar-foot">B02 移动履约与设备服务 · 小程序源码不在本轮范围</div>
     </aside>
 
     <main class="main-content">
       <header class="page-header">
         <div>
           <p class="eyebrow">黑土循环 · 网页管理端</p>
-          <h1 id="page-title">E01 管理总览</h1>
-          <p class="subtitle">以统一接口契约维护园区主数据、业务协同和公开展示。</p>
+          <h1 id="page-title">E01 园区管理台 · 管理总览</h1>
         </div>
         <div class="header-actions">
           <span id="auth-state" class="auth-state">正在检查会话</span>
-          <button id="open-login" class="button secondary" type="button">E01 登录</button>
+          <button id="open-login" class="button secondary" type="button">登录 E01 园区管理台</button>
           <button id="logout-button" class="button secondary" type="button" hidden>退出登录</button>
         </div>
       </header>
@@ -47,7 +45,7 @@
 
       <section id="auth-panel" class="auth-panel" hidden>
         <div>
-          <p class="eyebrow">E01 身份认证</p>
+          <p class="eyebrow">E01 园区管理台 · 身份认证</p>
           <h2>登录管理端</h2>
           <p class="muted">登录后会隐藏输入区域；30 分钟无操作将自动退出，多个标签页同步会话状态。</p>
         </div>
@@ -60,7 +58,7 @@
       </section>
 
       <section id="overview" class="page-section active">
-        <div class="section-heading"><div><p class="eyebrow">E01 数据看板</p><h2>园区协同总览</h2></div><span class="data-cutoff">数据时刻：<strong id="data-cutoff">—</strong></span></div>
+        <div class="section-heading"><div><p class="eyebrow">E01 园区管理台 · 数据看板</p><h2>园区协同总览</h2></div><span class="data-cutoff">数据时刻：<strong id="data-cutoff">—</strong></span></div>
         <div class="card-grid six">
           <div class="metric-card detail-card" role="button" tabindex="0" aria-expanded="false" aria-controls="overview-detail-popover" data-detail="企业档案与企业负责人权限范围" data-target-section="enterprise" data-target-resource="enterprises"><span>企业</span><strong id="kpi-enterprise-count">—</strong><small>悬停提示，点击打开详情</small></div>
           <div class="metric-card detail-card" role="button" tabindex="0" aria-expanded="false" aria-controls="overview-detail-popover" data-detail="已确认企业需求与待运输订单" data-target-section="production" data-target-resource="orders"><span>企业需求</span><strong id="kpi-production-count">—</strong><small>悬停提示，点击打开详情</small></div>
@@ -72,7 +70,7 @@
         <div id="overview-detail-popover" class="detail-popover" hidden></div>
         <div class="e01-visual-grid" aria-label="园区经营可视化">
           <article class="e01-chart-card wide"><div class="e01-chart-head"><div><small>按原始单位统计</small><h3>分单位需求趋势</h3></div><span>仅统计已确认与已完成预订单</span></div><div id="e01-demand-chart" class="e01-chart" role="img" aria-label="分单位需求堆叠柱图"></div></article>
-          <article class="e01-chart-card"><div class="e01-chart-head"><div><small>门店经营日报</small><h3>日经营订单与营业额</h3></div><span>B02 日报</span></div><div id="e01-operation-chart" class="e01-chart" role="img" aria-label="日经营订单和营业额趋势图"></div></article>
+          <article class="e01-chart-card"><div class="e01-chart-head"><div><small>门店经营日报</small><h3>日经营订单与营业额</h3></div><span>B02 移动履约与经营日报</span></div><div id="e01-operation-chart" class="e01-chart" role="img" aria-label="日经营订单和营业额趋势图"></div></article>
           <article class="e01-chart-card"><div class="e01-chart-head"><div><small>渠道构成</small><h3>渠道经营占比</h3></div><span>传统门店 / 第三空间</span></div><div id="e01-channel-chart" class="e01-chart" role="img" aria-label="传统门店与第三空间营业额占比图"></div></article>
           <article class="e01-chart-card"><div class="e01-chart-head"><div><small>第三空间</small><h3>第三空间销售排行</h3></div><span>吉品绿重点展示</span></div><div id="e01-third-space-chart" class="e01-chart" role="img" aria-label="第三空间销售排行图"></div></article>
         </div>
@@ -81,21 +79,28 @@
       </section>
 
       <section id="enterprise" class="page-section">
-        <div class="section-heading"><div><p class="eyebrow">E01 主数据</p><h2>主数据与企业</h2></div><span id="enterprise-total" class="data-count">—</span></div>
+        <div class="section-heading"><div><p class="eyebrow">E01 园区管理台 · 主数据</p><h2>主数据与企业</h2></div><span id="enterprise-total" class="data-count">—</span></div>
         <div class="e01-section-chart"><div><small>主数据质量</small><h3>园区主数据完整度</h3><p>门店归属、渠道分类、坐标与日报覆盖率</p></div><div id="e01-enterprise-chart" class="e01-inline-chart" role="img" aria-label="园区主数据完整度图"></div></div>
         <div class="toolbar"><label>资源<select id="enterprise-resource"></select></label><label>筛选<input id="enterprise-search" placeholder="名称或编号" /></label><button id="enterprise-refresh" class="button secondary" type="button">刷新</button><div class="e01-pager"><button id="enterprise-prev" type="button">上一页</button><span id="enterprise-page">第 1 页</span><button id="enterprise-next" type="button">下一页</button></div></div>
         <div id="enterprise-table" class="table-card"></div>
       </section>
 
       <section id="production" class="page-section">
-        <div class="section-heading"><div><p class="eyebrow">B01 订单与计划</p><h2>运输订单与拼车计划</h2></div><span id="production-total" class="data-count">—</span></div>
+        <div class="section-heading"><div><p class="eyebrow">B01 网页管理与经营服务 · 订单与计划</p><h2>运输订单与拼车计划</h2></div><span id="production-total" class="data-count">—</span></div>
         <div class="e01-section-chart"><div><small>企业需求量</small><h3>多企业确认需求</h3><p>统计已确认与已完成订单的重量，不跨单位误加</p></div><div id="e01-production-chart" class="e01-inline-chart" role="img" aria-label="企业需求量图"></div></div>
         <div class="toolbar"><label>资源<select id="production-resource"></select></label><label>筛选<input id="production-search" placeholder="名称或编号" /></label><button id="production-refresh" class="button secondary" type="button">刷新</button><div class="e01-pager"><button id="production-prev" type="button">上一页</button><span id="production-page">第 1 页</span><button id="production-next" type="button">下一页</button></div></div>
         <div id="production-table" class="table-card"></div>
       </section>
 
       <section id="inventory" class="page-section">
-        <div class="section-heading"><div><p class="eyebrow">B01 库存投影</p><h2>库存、销售与冻库</h2></div><span id="inventory-total" class="data-count">—</span></div>
+        <div id="operations-summary" class="operations-summary" aria-live="polite">
+          <article class="operations-chart-card"><header><div><small>签收结果</small><h3>全量、差异与拒收</h3></div><span id="operations-receipt-meta">统计周期：全部</span></header><div id="operations-receipt-chart" class="operations-chart" role="img" aria-label="签收结果状态图"></div><p id="operations-receipt-state" class="operations-chart-state">正在读取签收投影</p></article>
+          <article class="operations-chart-card"><header><div><small>缺货需求</small><h3>缺货商品排行</h3></div><span id="operations-stockout-meta">统计周期：全部</span></header><div id="operations-stockout-chart" class="operations-chart" role="img" aria-label="缺货商品排行图"></div><p id="operations-stockout-state" class="operations-chart-state">正在读取缺货需求投影</p></article>
+          <article class="operations-chart-card"><header><div><small>第三空间</small><h3>缺货需求汇总</h3></div><span id="operations-third-space-meta">统计周期：全部</span></header><div id="operations-third-space-chart" class="operations-chart" role="img" aria-label="第三空间缺货需求汇总图"></div><p id="operations-third-space-state" class="operations-chart-state">正在读取第三空间经营投影</p></article>
+          <article class="operations-chart-card"><header><div><small>库存流水</small><h3>商品库存变化摘要</h3></div><span id="operations-inventory-meta">统计周期：全部</span></header><div id="operations-inventory-chart" class="operations-chart" role="img" aria-label="库存变化摘要图"></div><p id="operations-inventory-state" class="operations-chart-state">正在读取库存流水投影</p></article>
+          <footer id="operations-timestamps" class="operations-timestamps">响应生成时间：—　业务数据截止：—</footer>
+        </div>
+        <div class="section-heading"><div><p class="eyebrow">B01 网页管理与经营服务 · 库存投影</p><h2>库存、销售与冻库</h2></div><span id="inventory-total" class="data-count">—</span></div>
         <div class="e01-section-chart"><div><small>库存与冻库</small><h3>库存风险与冻库占用</h3><p>库存预警和冻库容量分别统计</p></div><div id="e01-inventory-chart" class="e01-inline-chart" role="img" aria-label="库存风险和冻库占用图"></div></div>
         <div class="toolbar"><label>资源<select id="inventory-resource"></select></label><label>筛选<input id="inventory-search" placeholder="名称或编号" /></label><button id="inventory-refresh" class="button secondary" type="button">刷新</button><div class="e01-pager"><button id="inventory-prev" type="button">上一页</button><span id="inventory-page">第 1 页</span><button id="inventory-next" type="button">下一页</button></div></div>
         <div id="inventory-table" class="table-card"></div>
@@ -103,7 +108,7 @@
       </section>
 
       <section id="transport" class="page-section">
-        <div class="section-heading"><div><p class="eyebrow">B01 运输履约</p><h2>运输任务与资源</h2></div><span id="transport-total" class="data-count">—</span></div>
+        <div class="section-heading"><div><p class="eyebrow">B01 网页管理与经营服务 · 运输履约</p><h2>运输任务与资源</h2></div><span id="transport-total" class="data-count">—</span></div>
         <div class="e01-section-chart"><div><small>运输状态</small><h3>运输任务状态</h3><p>接单、取货、在途、送达、签收与异常任务</p></div><div id="e01-transport-chart" class="e01-inline-chart" role="img" aria-label="运输任务状态图"></div></div>
         <div class="toolbar"><label>资源<select id="transport-resource"></select></label><label>筛选<input id="transport-search" placeholder="名称或编号" /></label><button id="transport-refresh" class="button secondary" type="button">刷新</button><div class="e01-pager"><button id="transport-prev" type="button">上一页</button><span id="transport-page">第 1 页</span><button id="transport-next" type="button">下一页</button></div></div>
         <div id="transport-table" class="table-card"></div>
@@ -111,17 +116,17 @@
       </section>
 
       <section id="analytics" class="page-section">
-        <div class="section-heading"><div><p class="eyebrow">B01 智能计算</p><h2>拼车、拼仓、采购与预测</h2></div><span class="data-count">保留输入、规则版本、候选方案和解释</span></div>
-        <div class="toolbar analytics-toolbar"><label>计算<select id="calc-kind"><option value="carpool-preview">拼车匹配</option><option value="warehouse-preview">拼仓匹配</option><option value="procurement">采购推荐</option><option value="forecast">需求预测</option></select></label><label id="scenario-fields">演示场景<select id="calc-scenario"><option value="SCENARIO_1">复杂场景一</option><option value="SCENARIO_2">复杂场景二</option><option value="SCENARIO_3">复杂场景三</option></select></label><label id="enterprise-fields" hidden>企业<select id="calc-enterprise"></select></label><label id="product-fields" hidden>商品<select id="calc-product"></select></label><label id="quantity-fields" hidden>采购数量<input id="calc-quantity" type="number" min="1" value="1000" /></label><button id="run-calculation" class="button primary" type="button">运行计算</button><button id="confirm-carpool" class="button secondary" type="button" hidden>确认首选拼车方案</button></div>
-        <div class="result-card"><h3>计算结果</h3><div id="calculation-result" class="readable-result">选择计算类型后运行。</div></div>
+        <div class="section-heading"><div><p class="eyebrow">B01 网页管理与经营服务 · 智能计算</p><h2>拼车、拼仓、采购与预测</h2></div><span class="data-count">保留输入、规则版本、候选方案和解释</span></div>
+        <div class="toolbar analytics-toolbar"><label>计算<select id="calc-kind"><option value="carpool-preview">拼车匹配</option><option value="warehouse-preview">拼仓匹配</option><option value="procurement">采购自动汇总</option><option value="forecast">需求预测</option></select></label><label id="scenario-fields">演示场景<select id="calc-scenario"><option value="SCENARIO_1">复杂场景一</option><option value="SCENARIO_2">复杂场景二</option><option value="SCENARIO_3">复杂场景三</option></select></label><label id="enterprise-fields" hidden>企业<select id="calc-enterprise"></select></label><label id="product-fields" hidden>商品<select id="calc-product"></select></label><label id="quantity-fields" hidden>授权调整首项数量<input id="calc-quantity" type="number" min="0" placeholder="自动汇总" /></label><button id="run-calculation" class="button primary" type="button">运行计算</button><button id="confirm-carpool" class="button secondary" type="button" hidden>确认首选拼车方案</button><button id="confirm-warehouse" class="button secondary" type="button" hidden>确认首选拼仓方案</button><button id="refresh-warehouse-plan" class="button secondary" type="button" hidden>刷新拼仓状态</button><button id="occupy-warehouse" class="button secondary" type="button" hidden>确认入仓占用</button><button id="cancel-warehouse" class="button secondary" type="button" hidden>取消拼仓</button><button id="release-warehouse" class="button secondary" type="button" hidden>释放库容</button><button id="confirm-procurement" class="button secondary" type="button" hidden>确认首项采购汇总</button></div>
+        <div class="result-card"><h3>计算结果</h3><div id="calculation-result" class="readable-result">选择计算类型后运行。</div><div id="procurement-aggregation-board" class="procurement-aggregation-board" hidden></div><div id="forecast-aggregation-board" class="forecast-aggregation-board" hidden></div></div>
       </section>
 
-      <section id="public" class="page-section public-screen-stage" aria-label="E02 公开数字化大屏">
+      <section id="public" class="page-section public-screen-stage" aria-label="E02 公开产销协同大屏">
         <div id="public-screen-canvas" class="public-screen-canvas dashboard-v2">
           <header class="dv2-header">
             <div class="dv2-brand"><span class="dv2-brand-mark"><img id="dv2-brand-logo" src="assets/brand/jipin-screen-dark-e041ecf5.jpg" data-day-src="assets/brand/jipin-screen-light-d0308f92.jpg" data-night-src="assets/brand/jipin-screen-dark-e041ecf5.jpg" alt="吉品品牌徽标" /></span><div><strong>吉品</strong><small>食品产业协同园区</small></div></div>
             <div class="dv2-title"><span>园区协同 · 生产 · 采购 · 供销</span><h2>黑土寻味产销协同大屏</h2><i aria-hidden="true"></i></div>
-            <div class="dv2-actions"><div class="dv2-periods" role="group" aria-label="统计周期"><button type="button" data-period="7d">7 日</button><button type="button" data-period="30d" class="active">30 日</button><button type="button" data-period="month">本月</button></div><button id="public-theme-toggle" type="button" aria-pressed="false" title="切换到日间模式">日间模式</button><button id="public-refresh" type="button">刷新</button><button id="public-fullscreen" type="button">全屏</button><button id="public-exit" type="button">返回 E01</button></div>
+            <div class="dv2-actions"><div class="dv2-periods" role="group" aria-label="统计周期"><button type="button" data-period="7d">7 日</button><button type="button" data-period="30d" class="active">30 日</button><button type="button" data-period="month">本月</button></div><button id="public-theme-toggle" type="button" aria-pressed="false" title="切换到日间模式">日间模式</button><button id="public-refresh" type="button">刷新</button><button id="public-fullscreen" type="button">全屏</button><button id="public-exit" type="button">返回 E01 园区管理台</button></div>
           </header>
 
           <div class="dv2-status-row"><span id="dv2-source-state" class="dv2-source live">连接中</span><strong id="dv2-park-name">长春农安新安食品产业园</strong><time id="public-clock">--:--:--</time><span id="public-date">----</span><mark id="dv2-demo-badge" hidden>演示数据</mark></div>
@@ -129,8 +134,8 @@
           <div class="dv2-kpi-grid">
             <article class="dv2-kpi warm"><span>园区有效预订单</span><strong id="dv2-preorder-count">—</strong><small>传统门店与第三空间需求笔数</small></article>
             <article class="dv2-kpi demand"><span>园区需求量</span><div id="dv2-demand-totals" class="dv2-demand-chips"><b>—</b></div><small>公斤、件、箱等按单位拆分</small></article>
-            <article class="dv2-kpi"><span>终端经营订单</span><strong id="dv2-operation-orders">—</strong><small>B02 门店经营日报汇总</small></article>
-            <article class="dv2-kpi"><span>终端营业额</span><strong id="dv2-sales-amount">—</strong><small>人民币 · B02 日报</small></article>
+            <article class="dv2-kpi"><span>终端经营订单</span><strong id="dv2-operation-orders">—</strong><small>B02 移动履约与设备服务 · 门店经营日报汇总</small></article>
+            <article class="dv2-kpi"><span>终端营业额</span><strong id="dv2-sales-amount">—</strong><small>人民币 · B02 移动履约与经营日报</small></article>
             <article class="dv2-kpi green"><span>第三空间触点</span><strong id="dv2-third-space-count">—</strong><small>重点渠道销售节点</small></article>
           </div>
 
@@ -144,12 +149,22 @@
             <section class="dv2-panel dv2-map-panel"><header><div><small>东北供销网络</small><h3>东北三省供销网络</h3></div><div class="dv2-map-legend"><span class="park">园区</span><span class="store">传统门店</span><span class="third">第三空间</span></div></header><div id="dv2-map-chart" class="dv2-map-chart" role="img" aria-label="东北三省园区和门店供销地图"></div><div class="dv2-map-caption"><span>经纬度坐标 · 哈尔滨位于长春北侧 · 路线均为估算</span><a href="https://www.naturalearthdata.com/downloads/50m-cultural-vectors/50m-admin-1-states-provinces/" target="_blank" rel="noopener noreferrer">边界数据：自然地球省级边界</a></div></section>
 
             <div class="dv2-right-stack">
-              <section class="dv2-panel dv2-mix-panel"><header><div><small>渠道构成</small><h3>终端经营渠道占比</h3></div><span>仅 B02 日报</span></header><div class="dv2-donut-grid"><div><div id="dv2-order-donut" class="dv2-donut" role="img" aria-label="传统门店与第三空间经营订单量占比"></div><b>经营订单量占比</b></div><div><div id="dv2-sales-donut" class="dv2-donut" role="img" aria-label="传统门店与第三空间营业额占比"></div><b>营业额占比</b></div></div><div id="dv2-mix-legend" class="dv2-mix-legend"></div></section>
-              <section class="dv2-panel dv2-voice-panel"><header><div><small>数据智能助手</small><h3>智能语音助手</h3></div><span id="dv2-voice-state">等待提问</span></header><p id="dv2-voice-hint">点击麦克风开始录音，再次点击结束。最长 30 秒；预设问题可直接点击。</p><div class="dv2-examples"><span>可问</span><button type="button" data-example="第三空间营业额占比是多少？">第三空间营业额占比</button><button type="button" data-example="最近的需求趋势如何？">最近需求趋势</button><button type="button" data-example="第三空间销售排行">第三空间排行</button></div><div class="dv2-mic-zone"><button id="dv2-mic-button" class="dv2-mic" type="button" aria-label="开始语音提问"><i></i><span>开始提问</span></button><button id="dv2-voice-cancel" class="dv2-voice-secondary" type="button" hidden>取消</button><button id="dv2-voice-retry" class="dv2-voice-secondary" type="button" hidden>重试</button></div><div id="dv2-transcript" class="dv2-transcript" hidden></div><div id="dv2-answer" class="dv2-answer" aria-live="polite">助手会依据当前园区汇总数据回答，并可打开受控图表。</div></section>
+              <section class="dv2-panel dv2-mix-panel"><header><div><small>渠道构成</small><h3>终端经营渠道占比</h3></div><span>仅 B02 移动履约与经营日报</span></header><div class="dv2-donut-grid"><div><div id="dv2-order-donut" class="dv2-donut" role="img" aria-label="传统门店与第三空间经营订单量占比"></div><b>经营订单量占比</b></div><div><div id="dv2-sales-donut" class="dv2-donut" role="img" aria-label="传统门店与第三空间营业额占比"></div><b>营业额占比</b></div></div><div id="dv2-mix-legend" class="dv2-mix-legend"></div></section>
+              <section class="dv2-panel dv2-voice-panel">
+                <header><div><small>数据智能助手</small><h3>文字与语音助手</h3></div><span id="dv2-voice-state">等待提问</span></header>
+                <p id="dv2-voice-hint">输入文字、选择预设问题或使用最长 30 秒的语音提问。</p>
+                <form id="dv2-assistant-form" class="dv2-assistant-form">
+                  <label for="dv2-assistant-input">自由提问</label>
+                  <div><input id="dv2-assistant-input" maxlength="500" minlength="2" placeholder="例如：当前有多少条未处理运输报警？" required /><button type="submit">发送</button></div>
+                </form>
+                <div class="dv2-examples"><span>可问</span><button type="button" data-example="第三空间营业额占比是多少？">第三空间营业额占比</button><button type="button" data-example="最近的需求趋势如何？">最近需求趋势</button><button type="button" data-example="第三空间销售排行">第三空间排行</button></div>
+                <div class="dv2-mic-zone"><button id="dv2-mic-button" class="dv2-mic" type="button" aria-label="开始语音提问"><i></i><span>开始提问</span></button><button id="dv2-voice-cancel" class="dv2-voice-secondary" type="button" hidden>取消</button><button id="dv2-voice-retry" class="dv2-voice-secondary" type="button" hidden>重试</button></div>
+                <div id="dv2-transcript" class="dv2-transcript" hidden></div><div id="dv2-answer" class="dv2-answer" aria-live="polite">助手仅使用受控业务查询，并可打开条形图、折线图、环图或路线摘要。</div>
+              </section>
             </div>
           </main>
 
-          <footer class="dv2-footer"><span><i></i><b id="public-sync-state">等待同步</b></span><span>数据截止：<b id="public-data-cutoff">—</b></span><span>每 30 秒刷新 · 真实数据与本地演示快照不会混合</span></footer>
+          <footer class="dv2-footer"><span><i></i><b id="public-sync-state">等待同步</b></span><span>业务数据截止：<b id="public-data-cutoff">—</b></span><span>响应生成：<b id="public-generated-at">—</b></span><span>SSE 实时更新 · 断线时每 30 秒轮询</span></footer>
 
           <dialog id="dv2-chart-dialog" class="dv2-chart-dialog"><header><div><small>数据详情</small><h3 id="dv2-dialog-title">数据图表</h3></div><button id="dv2-dialog-close" type="button" aria-label="关闭图表">关闭</button></header><div id="dv2-dialog-chart" class="dv2-dialog-chart"></div></dialog>
         </div>
@@ -158,8 +173,8 @@
   </div>
   <script src="runtime-config.js"></script>
   <script src="api.js?v=20260806-real-api-1"></script>
-  <script src="scripts.js?v=20260809-jipin-theme-1"></script>
+  <script src="scripts.js?v=20260809-jipin-theme-2"></script>
   <script src="vendor/echarts/echarts.min.js"></script>
-  <script type="module" src="dashboard-v2.js?v=20260809-jipin-theme-1"></script>
+  <script type="module" src="dashboard-v2.js?v=20260809-jipin-theme-2"></script>
 </body>
 </html>

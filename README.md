@@ -2,7 +2,7 @@
 
 本仓库是 `Flexibility607/Black-Soil-Loop` fork 的网页交付仓库，维护以下内容：
 
-- `frontdesign-v1/`：E01 后台管理网页和 E02 产销协同大屏。
+- `frontdesign-v1/`：E01 园区管理台和 E02 公开产销协同大屏。
 - `cloudflare-worker.js`、`wrangler.jsonc`：Cloudflare Worker 发布入口。
 - `pages-forwarder/`：Cloudflare Pages 自定义域入口。
 - `frontdesign-v1/tests/`：前端数据契约、格式化、地图、语音和代理测试。
@@ -36,6 +36,8 @@ npm run cf:check
 ```powershell
 npm run build
 ```
+
+E02 助手支持自由文字、预设问题和语音提问；服务器未配置 OpenAI 或调用失败时，继续使用确定性业务问答。图表输出只接受条形图、折线图、环图和路线摘要。
 
 只有显式执行以下命令才会打包开发演示数据：
 

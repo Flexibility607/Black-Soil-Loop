@@ -14,6 +14,7 @@
   let idleTimeoutMs = 30 * 60 * 1000;
   let idleTimer = null;
   let refreshing = null;
+  const recentDashboardEventIds = new Set();
 
   const ROUTES = {
     enterprises: '/web/master-data/enterprises',
@@ -26,6 +27,12 @@
     'transport-plans': '/web/transport/plans',
     'transport-tasks': '/web/transport/tasks',
     alerts: '/web/alerts',
+    'telemetry-issues': '/web/telemetry-issues',
+    receipts: '/web/receipts',
+    'inventory-movements': '/web/inventory-movements',
+    'stockout-demands': '/web/stockout-demands',
+    'store-daily-reports': '/web/store-daily-reports',
+    'procurement-aggregations': '/web/procurement/aggregations',
   };
 
   function response(ok, status, json) {
@@ -211,13 +218,25 @@
     return withData(result, overviewFromSnapshot(result.json));
   }
 
-  async function getDashboardSnapshot(_period = '30d', authenticated = false) {
+  async function getDashboardSnapshot(period = '30d', authenticated = false) {
     if (demoMode) {
       const res = await fetch(demoSnapshotUrl, { cache: 'no-store' });
       return response(res.ok, res.status, await readJson(res));
     }
-    const result = await rawRequest(authenticated ? '/web/dashboard/snapshot' : '/public/dashboard/snapshot');
+    const route = authenticated ? '/web/dashboard/snapshot' : '/public/dashboard/snapshot';
+    const result = await rawRequest(`${route}?${new URLSearchParams({ period })}`);
     return withData(result, result.json);
+  }
+
+  async function getOperationsSummary(period = '30d') {
+    const result = await rawRequest(`/web/operations/summary?${new URLSearchParams({ period })}`);
+    return withData(result, result.json);
+  }
+
+  async function getDictionaries() {
+    const route = accessToken ? '/web/dictionaries' : '/public/dictionaries';
+    const result = await rawRequest(route);
+    return withData(result, result.json?.dictionaries);
   }
 
   async function transcribeDashboardAudio(blob, durationSeconds, filename = 'question.webm') {
@@ -261,6 +280,81 @@
     return withData(result, result.json);
   }
 
+  async function confirmWarehousePool(matchRunId, candidateIndex, warehouseId, warehouseObjectVersion, key) {
+    const result = await rawRequest(
+      `/web/algorithms/warehouse-pool/runs/${encodeURIComponent(matchRunId)}/confirm`,
+      {
+        method: 'POST',
+        headers: { 'Idempotency-Key': key },
+        body: JSON.stringify({
+          match_run_id: matchRunId,
+          candidate_index: candidateIndex,
+          warehouse_id: warehouseId,
+          warehouse_object_version: warehouseObjectVersion,
+        }),
+      },
+    );
+    return withData(result, result.json);
+  }
+
+  async function getWarehousePoolPlan(planId) {
+    const result = await rawRequest(`/web/warehouse-pool/plans/${encodeURIComponent(planId)}`);
+    return withData(result, result.json);
+  }
+
+  async function requestWarehousePoolAction(planId, action, objectVersion, key, reason = null) {
+    const body = { object_version: objectVersion };
+    if (action === 'cancel') body.reason = reason || '网页端取消拼仓计划';
+    const result = await rawRequest(
+      `/web/warehouse-pool/plans/${encodeURIComponent(planId)}/${encodeURIComponent(action)}`,
+      {
+        method: 'POST',
+        headers: { 'Idempotency-Key': key },
+        body: JSON.stringify(body),
+      },
+    );
+    return withData(result, result.json);
+  }
+
+  async function generateProcurementAggregation(cycleStart = null, key) {
+    const result = await rawRequest('/web/procurement/aggregations/generate', {
+      method: 'POST',
+      headers: { 'Idempotency-Key': key },
+      body: JSON.stringify({ cycle_start: cycleStart }),
+    });
+    return withData(result, result.json);
+  }
+
+  async function confirmProcurementAggregation(aggregationId, objectVersion, adjustedQuantity, reason, key) {
+    const body = { object_version: objectVersion };
+    if (adjustedQuantity !== null) {
+      body.adjusted_quantity = adjustedQuantity;
+      body.adjustment_reason = reason;
+    }
+    const result = await rawRequest(
+      `/web/procurement/aggregations/${encodeURIComponent(aggregationId)}/confirm`,
+      {
+        method: 'POST',
+        headers: { 'Idempotency-Key': key },
+        body: JSON.stringify(body),
+      },
+    );
+    return withData(result, result.json);
+  }
+
+  async function generateNextWeekForecast(key) {
+    const result = await rawRequest('/web/forecasts/next-week/generate', {
+      method: 'POST',
+      headers: { 'Idempotency-Key': key },
+    });
+    return withData(result, result.json);
+  }
+
+  async function getNextWeekForecast() {
+    const result = await rawRequest('/web/forecasts/next-week');
+    return withData(result, result.json);
+  }
+
   async function precheckImport() {
     return response(false, 501, { code: 'IMPORT_RETIRED', message: '新服务器不再接收旧版整本导入，请使用订单和主数据 API' });
   }
@@ -269,15 +363,19 @@
     return precheckImport();
   }
 
-  async function subscribeDashboardEvents(onEvent, signal) {
-    const cursor = sessionStorage.getItem('blacksoil.dashboard.cursor') || '0';
+  async function subscribeDashboardEvents(onEvent, signal, onOpen = null) {
+    let cursor = Number(sessionStorage.getItem('blacksoil.dashboard.cursor') || '0');
     const result = await fetch(`${baseUrl}/dashboard/events?cursor=${encodeURIComponent(cursor)}`, {
-      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+      headers: {
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        ...(cursor > 0 ? { 'Last-Event-ID': String(cursor) } : {}),
+      },
       credentials: 'include',
       cache: 'no-store',
       signal,
     });
     if (!result.ok || !result.body) throw new Error(`实时事件连接失败（HTTP ${result.status}）`);
+    onOpen?.();
     const reader = result.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
@@ -290,20 +388,38 @@
       for (const packet of packets) {
         const id = packet.match(/^id:\s*(.+)$/m)?.[1];
         const data = packet.match(/^data:\s*(.+)$/m)?.[1];
-        if (id) sessionStorage.setItem('blacksoil.dashboard.cursor', id);
-        if (data) onEvent(JSON.parse(data), id);
+        const nextCursor = Number(id || 0);
+        const event = data ? JSON.parse(data) : null;
+        if (!event || nextCursor <= cursor || recentDashboardEventIds.has(event.event_id)) continue;
+        cursor = nextCursor;
+        sessionStorage.setItem('blacksoil.dashboard.cursor', String(cursor));
+        recentDashboardEventIds.add(event.event_id);
+        if (recentDashboardEventIds.size > 500) {
+          const oldest = recentDashboardEventIds.values().next().value;
+          recentDashboardEventIds.delete(oldest);
+        }
+        onEvent(event, String(cursor));
       }
     }
+    throw new Error('实时事件连接已结束');
   }
 
   window.API = {
     calculate,
     clearTokens: () => clearSession('cleared'),
     confirmCarpool,
+    confirmProcurementAggregation,
+    confirmWarehousePool,
     confirmImport,
     getCurrentUser,
     getDashboard,
+    getDictionaries,
     getDashboardSnapshot,
+    generateProcurementAggregation,
+    generateNextWeekForecast,
+    getOperationsSummary,
+    getNextWeekForecast,
+    getWarehousePoolPlan,
     getLiveBase: () => baseUrl,
     getSession: () => ({ user: currentUser, authenticated: Boolean(currentUser), idleTimeoutMs }),
     isMock: () => demoMode,
@@ -317,6 +433,7 @@
     precheckImport,
     queryDashboardAssistant,
     request,
+    requestWarehousePoolAction,
     subscribeDashboardEvents,
     touchActivity,
     transcribeDashboardAudio,

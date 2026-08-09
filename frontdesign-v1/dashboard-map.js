@@ -1,4 +1,4 @@
-import { SCREEN_PALETTES } from './dashboard-format.js?v=20260809-jipin-theme-1';
+import { SCREEN_PALETTES } from './dashboard-format.js?v=20260809-jipin-theme-2';
 
 export const REFERENCE_CITIES = [
   { name: '哈尔滨市', value: [126.642, 45.757] },
@@ -23,12 +23,20 @@ function nodeColor(type, palette) {
   return palette.traditional;
 }
 
+const TRANSPORT_STATUS_LABELS = {
+  DRAFT: '草稿', MATCHED: '已匹配', CONFIRMED: '已确认', READY: '执行任务已就绪',
+  PUBLISH_REQUESTED: '发布处理中', PUBLISHED: '已发布', DRIVER_ACCEPTED: '司机已接单',
+  PICKED_UP: '已取货', IN_TRANSIT: '运输中', DELIVERED: '已送达', STORE_SIGNED: '门店已签收',
+  COMPLETED: '已完成', CANCELLATION_REQUESTED: '取消处理中', CANCELLATION_REJECTED: '取消申请被拒绝',
+  CANCELLED: '已取消',
+};
+
+export function applyDashboardMapDictionaries(dictionaries) {
+  Object.assign(TRANSPORT_STATUS_LABELS, dictionaries?.transport_status || {});
+}
+
 function statusLabel(status) {
-  return {
-    DRAFT: '草稿', MATCHED: '已匹配', CONFIRMED: '已确认', PUBLISHED: '已发布', DRIVER_ACCEPTED: '司机已接单',
-    PICKED_UP: '已取货', IN_TRANSIT: '运输中', DELIVERED: '已送达', STORE_SIGNED: '门店已签收',
-    COMPLETED: '已完成', CANCELLED: '已取消',
-  }[status] || '状态待同步';
+  return TRANSPORT_STATUS_LABELS[status] || `未知类型（${status || '空值'}）`;
 }
 
 export function buildNortheastMapOption(snapshot, palette = SCREEN_PALETTES.night) {
@@ -38,11 +46,18 @@ export function buildNortheastMapOption(snapshot, palette = SCREEN_PALETTES.nigh
     const source = nodeById.get(edge.source_id);
     const target = nodeById.get(edge.target_id);
     if (!source || !target) return null;
+    const location = edge.latest_location;
+    const start = location
+      ? [Number(location.longitude), Number(location.latitude)]
+      : [Number(source.longitude), Number(source.latitude)];
     return {
-      name: `${edge.task_no || edge.task_id || '运输任务'} · ${edge.route_label || '经纬度估算路线'}`,
-      coords: [[Number(source.longitude), Number(source.latitude)], [Number(target.longitude), Number(target.latitude)]],
+      name: `${edge.task_no || edge.task_id || '运输任务'} · ${location ? '车辆当前位置至站点估算路线' : edge.route_label || '经纬度估算路线'}`,
+      coords: [start, [Number(target.longitude), Number(target.latitude)]],
       taskStatus: edge.status,
       telemetry: edge.latest_telemetry,
+      location,
+      environmentalAlerts: edge.environmental_alerts || [],
+      locationFallback: !location,
       abnormal: edge.abnormal,
       lineStyle: { color: edge.abnormal ? colors.danger : edge.channel_type === 'THIRD_SPACE' ? colors.thirdSpace : colors.traditional },
     };
@@ -54,6 +69,21 @@ export function buildNortheastMapOption(snapshot, palette = SCREEN_PALETTES.nigh
     itemStyle: { color: nodeColor(node.node_type, colors) },
     symbolSize: node.node_type === 'PARK' ? 19 : node.node_type === 'THIRD_SPACE' ? 12 : 9,
   }));
+
+  const vehicleByTask = new Map();
+  for (const edge of snapshot.map_edges || []) {
+    const location = edge.latest_location;
+    if (!location || vehicleByTask.has(edge.task_id)) continue;
+    vehicleByTask.set(edge.task_id, {
+      name: edge.plate_no || edge.task_no || edge.task_id || '运输车辆',
+      value: [Number(location.longitude), Number(location.latitude)],
+      taskId: edge.task_id,
+      speedMps: location.speed_mps,
+      accuracyM: location.accuracy_m,
+      recordedAt: location.recorded_at,
+    });
+  }
+  const vehicleNodes = [...vehicleByTask.values()];
 
   return {
     animation: false,
@@ -67,10 +97,21 @@ export function buildNortheastMapOption(snapshot, palette = SCREEN_PALETTES.nigh
         if (params.seriesName === '估算运输路线') {
           const telemetry = params.data?.telemetry;
           const status = statusLabel(params.data?.taskStatus);
+          const location = params.data?.location;
+          const locationText = location
+            ? `<br/>车辆位置采样 ${location.recorded_at || '—'} · 速度 ${location.speed_mps ?? '—'} 米/秒 · 精度 ${location.accuracy_m ?? '—'} 米`
+            : '<br/>暂无车辆位置，当前从任务起点绘制经纬度估算路线';
+          const alerts = params.data?.environmentalAlerts || [];
+          const alertText = alerts.length
+            ? `<br/>独立温湿度报警：${alerts.map((item) => item.message || item.alert_type).join('；')}`
+            : '<br/>独立温湿度报警：无';
           const environmental = telemetry
             ? `<br/>温度 ${telemetry.temperature_c ?? '—'} ℃ · 湿度 ${telemetry.humidity_pct ?? '—'}%<br/>采样 ${telemetry.sampled_at || '—'}`
             : '<br/>暂无温湿度采样';
-          return `${params.name}<br/>状态：${status}${environmental}`;
+          return `${params.name}<br/>状态：${status}${locationText}${environmental}${alertText}`;
+        }
+        if (params.seriesName === '车辆当前位置') {
+          return `${params.name}<br/>位置采样：${params.data.recordedAt || '—'}<br/>速度：${params.data.speedMps ?? '—'} 米/秒 · 定位精度：${params.data.accuracyM ?? '—'} 米`;
         }
         return params.name || '';
       },
@@ -120,6 +161,18 @@ export function buildNortheastMapOption(snapshot, palette = SCREEN_PALETTES.nigh
           textBorderWidth: 3,
         },
         data: storeNodes,
+      },
+      {
+        name: '车辆当前位置',
+        type: 'effectScatter',
+        coordinateSystem: 'geo',
+        zlevel: 5,
+        symbol: 'diamond',
+        symbolSize: 15,
+        rippleEffect: { scale: 3.2, brushType: 'stroke' },
+        itemStyle: { color: colors.vehicle, borderColor: colors.vehicleBorder, borderWidth: 1 },
+        label: { show: true, formatter: '{b}', position: 'top', color: colors.vehicleLabel, fontSize: 10 },
+        data: vehicleNodes,
       },
       {
         name: '城市参照',

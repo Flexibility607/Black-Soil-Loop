@@ -1,6 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { channelValues, dashboardPalette, demandSeries, SCREEN_PALETTES } from '../dashboard-format.js';
+import {
+  channelValues,
+  dashboardPalette,
+  demandSeries,
+  formatCurrency,
+  formatUnit,
+  SCREEN_PALETTES,
+} from '../dashboard-format.js';
 
 test('需求趋势保持单位拆分，不把公斤与件相加', () => {
   const result = demandSeries([
@@ -8,7 +15,13 @@ test('需求趋势保持单位拆分，不把公斤与件相加', () => {
     { date: '2026-08-01', channel_type: 'THIRD_SPACE', demand_totals: [{ unit: 'kg', quantity: 4 }, { unit: '件', quantity: 2 }] },
   ]);
   assert.deepEqual(result.dates, ['2026-08-01']);
-  assert.deepEqual(Object.fromEntries(result.series.map((item) => [item.name, item.data])), { kg: [14], 件: [5] });
+  assert.deepEqual(Object.fromEntries(result.series.map((item) => [item.name, item.data])), { 公斤: [14], 件: [5] });
+});
+
+test('大屏统一中文单位与人民币格式', () => {
+  assert.equal(formatUnit('kg'), '公斤');
+  assert.equal(formatUnit('m3'), '立方米');
+  assert.equal(formatCurrency(12345), '人民币 1.23 万');
 });
 
 test('零分母的渠道环图保持两个渠道和零值', () => {

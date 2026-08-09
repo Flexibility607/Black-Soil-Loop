@@ -11,6 +11,10 @@ const RESOURCE_GROUPS = {
     { value: 'products', label: '商品与原料' },
   ],
   inventory: [
+    { value: 'receipts', label: '签收结果' },
+    { value: 'inventory-movements', label: '库存流水' },
+    { value: 'stockout-demands', label: '缺货需求' },
+    { value: 'store-daily-reports', label: '第三空间经营日报' },
     { value: 'warehouses', label: '仓库与温区' },
     { value: 'products', label: '商品库存维度' },
   ],
@@ -18,6 +22,7 @@ const RESOURCE_GROUPS = {
     { value: 'transport-tasks', label: '运输任务实时投影' },
     { value: 'transport-plans', label: '拼车计划' },
     { value: 'alerts', label: '温湿度与运输报警' },
+    { value: 'telemetry-issues', label: '遥测异常与状态不一致' },
     { value: 'vehicles', label: '车辆与司机资源' },
   ],
 };
@@ -41,7 +46,17 @@ const state = {
   publicMapSuppressClickUntil: 0,
   publicMapDragCleanup: null,
   lastMatchRunId: null,
+  lastWarehouseRunId: null,
+  lastWarehouseCandidate: null,
+  warehousePlan: null,
+  procurementAggregation: null,
+  forecastBatch: null,
 };
+
+function newIdempotencyKey(prefix) {
+  const suffix = window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return `${prefix}-${suffix}`;
+}
 
 function getAPI() {
   return window.API;
@@ -63,7 +78,8 @@ function errorOf(result) {
 
 function formatValue(value) {
   if (value === null || value === undefined || value === '') return '—';
-  if (typeof value === 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return `${value.length} 项`;
+  if (typeof value === 'object') return `${Object.keys(value).length} 项结构化信息`;
   return String(value);
 }
 
@@ -89,6 +105,13 @@ function setLoading(target, message = '加载中…') {
 }
 
 const FIELD_LABELS = {
+  source_receipt_id: '来源签收单', receipt_status: '签收状态', receipt_status_label: '签收状态',
+  expected_total: '应收数量', received_total: '实收数量', difference_total: '差异数量', rejected_line_count: '拒收明细数',
+  source_movement_id: '来源库存流水', movement_type: '流水类型', movement_type_label: '流水类型',
+  quantity_before: '变更前数量', quantity_delta: '变更数量', quantity_after: '变更后数量',
+  source_stockout_id: '来源缺货需求', requested_quantity: '缺货需求量', status_label: '状态', business_at: '业务发生时间',
+  source_report_id: '来源经营日报', report_date: '日报日期', order_count: '经营订单数',
+  authorized_for_dashboard: '经营数据展示授权', product_unit: '商品单位', store_channel: '门店类型',
   enterprise_id: '企业编号', enterprise_name: '企业名称', enterprise_display_name: '企业名称', park_id: '所属园区',
   store_id: '门店编号', store_name: '门店名称', city: '城市', channel_type: '渠道类型', reporting_authorized: '日报上报授权',
   partner_id: '合作方编号', partner_name: '合作方名称', preorder_id: '预订单编号', order_id: '订单编号', product_id: '产品编号',
@@ -99,13 +122,16 @@ const FIELD_LABELS = {
   task_id: '任务编号', origin: '起点', destination: '终点', driver_name: '司机', license_plate: '车牌号',
   id: '记录编号', code: '业务编码', name: '名称', enabled: '是否启用', object_version: '数据版本', display_name: '显示名称',
   channel: '渠道', latitude: '纬度', longitude: '经度', temperature_zone: '温区', plate_no: '车牌号', driver_id: '司机编号',
-  max_weight_kg: '最大载重（千克）', max_volume_m3: '最大容积（立方米）', capacity_m3: '总库容（立方米）', used_m3: '已用库容（立方米）',
+  max_weight_kg: '最大载重（公斤）', max_volume_m3: '最大容积（立方米）', capacity_m3: '总库容（立方米）', used_m3: '已用库容（立方米）',
   plan_no: '计划编号', task_no: '任务编号', store_id: '门店编号', product_id: '商品编号', order_no: '订单编号', scenario_code: '演示场景',
-  departure_at: '计划发车时间', weight_kg: '重量（千克）', volume_m3: '体积（立方米）', task_id: '执行任务编号',
-  source_order_ids: '来源订单', total_weight_kg: '总重量（千克）', total_volume_m3: '总体积（立方米）', stops: '配送站点',
+  departure_at: '计划发车时间', weight_kg: '重量（公斤）', volume_m3: '体积（立方米）', task_id: '执行任务编号',
+  source_order_ids: '来源订单', total_weight_kg: '总重量（公斤）', total_volume_m3: '总体积（立方米）', stops: '配送站点',
   latest_telemetry: '最新温湿度', latest_location: '最新位置', route_label: '路线性质', alert_type: '报警类型', message: '报警说明', opened_at: '报警时间',
+  source_issue_id: '来源问题记录', issue_type: '问题类型', issue_type_label: '问题类型', source_type: '上报来源',
+  severity: '严重程度', task_status: '任务状态', expected_vehicle_id: '任务车辆', actual_vehicle_id: '上报车辆',
+  expected_driver_id: '任务司机', actual_driver_id: '上报司机', status_label: '处理状态', business_at: '业务发生时间',
   delivery_score: '交付能力评分', quality_score: '质量评分', category: '品类', unit: '单位', updated_at: '更新时间', created_at: '创建时间',
-  quantity_kg: '确认需求量（千克）', count: '数量', utilization_pct: '容量占用率',
+  quantity_kg: '确认需求量（公斤）', count: '数量', utilization_pct: '容量占用率',
   match_run_id: '计算编号', run_id: '计算编号', rules_version: '规则版本', candidates: '候选方案', rejections: '不匹配原因',
   order_ids: '订单记录', order_nos: '订单编号', vehicle_id: '车辆编号', planned_departure_at: '计划发车时间',
   origin_spread_km: '始发地离散距离（千米）', destination_spread_km: '目的地离散距离（千米）',
@@ -121,8 +147,12 @@ const FIELD_LABELS = {
   price_score: '价格评分', composite_score: '综合评分', tier_min_quantity: '阶梯起订量', supply_capacity: '供货能力',
   price: '价格权重', delivery: '交付权重', quality: '质量权重', data_points: '历史数据点',
   production_plan_quantity: '生产计划数量', method_note: '方法说明',
+  method_label: '预测方法', algorithm_type: '算法类型', algorithm_type_label: '算法类型', role_label: '用户角色',
   origin_max_km: '始发地最大距离（千米）', destination_max_km: '目的地最大距离（千米）', departure_window_minutes: '发车时间窗（分钟）',
   capacity_utilization_limit: '容量上限', distance_max_km: '最大距离（千米）',
+  pairwise_checks: '候选组两两距离校验', route_points: '确定性估算路线点',
+  merged_route_estimated_km: '合并路线估算里程（千米）', independent_route_estimated_km: '独立运输估算里程（千米）',
+  detour_estimated_km: '估算绕行距离（千米）', mileage_benefit_estimated_km: '估算合单里程收益（千米）',
 };
 
 const VALUE_LABELS = {
@@ -134,19 +164,92 @@ const VALUE_LABELS = {
   NO_DATA: '无历史数据', SEASONAL_EXPONENTIAL_SMOOTHING: '季节性指数平滑', WEIGHTED_MOVING_AVERAGE: '加权移动平均',
 };
 
+const UNIT_LABELS = {
+  kg: '公斤', kilogram: '公斤', kilograms: '公斤',
+  m3: '立方米', cubic_meter: '立方米',
+  celsius: '摄氏度', pct: '百分比', percent: '百分比',
+  cny: '人民币', rmb: '人民币', item: '件', items: '件', box: '箱',
+};
+
+function applyServerDictionaries(dictionaries) {
+  if (!dictionaries || typeof dictionaries !== 'object') return;
+  Object.values(dictionaries).forEach((mapping) => {
+    if (!mapping || typeof mapping !== 'object' || Array.isArray(mapping)) return;
+    Object.assign(VALUE_LABELS, mapping);
+  });
+}
+
+async function loadServerDictionaries() {
+  if (typeof getAPI().getDictionaries !== 'function') return;
+  try {
+    const result = await getAPI().getDictionaries();
+    if (result.ok) applyServerDictionaries(dataOf(result));
+  } catch {
+    // 网络不可用时继续使用内置中文词典。
+  }
+}
+
 function displayField(key) {
-  return FIELD_LABELS[key] || '扩展信息';
+  return FIELD_LABELS[key] || `未识别字段（${key}）`;
 }
 
 function displayCell(value, key = '') {
   if (value === true || value === false) return VALUE_LABELS[String(value)];
   if (typeof value === 'string' && VALUE_LABELS[value]) return VALUE_LABELS[value];
-  if (Array.isArray(value) && ['order_ids', 'order_nos'].includes(key)) return `${value.length} 条订单`;
+  if (typeof value === 'string' && UNIT_LABELS[value.toLowerCase()]) return UNIT_LABELS[value.toLowerCase()];
+  if (typeof value === 'string' && /^[A-Z][A-Z0-9_+.-]*$/.test(value)) return `未知类型（${value}）`;
+  if (Array.isArray(value) && ['order_ids', 'order_nos', 'source_order_ids'].includes(key)) return `${value.length} 条订单`;
   if (Array.isArray(value) && key === 'stops') return `${value.length} 个配送站点`;
+  if (Array.isArray(value)) {
+    if (!value.length) return '暂无记录';
+    if (value.every((item) => ['string', 'number', 'boolean'].includes(typeof item))) {
+      const visible = value.slice(0, 8).map((item) => displayCell(item, key)).join('、');
+      return value.length > 8 ? `${visible}等 ${value.length} 项` : visible;
+    }
+    return `${value.length} 项结构化记录`;
+  }
   if (value && typeof value === 'object' && ['origin', 'destination'].includes(key)) {
     return `纬度 ${formatNumber(value.latitude, 4)}，经度 ${formatNumber(value.longitude, 4)}`;
   }
+  if (value && typeof value === 'object' && key === 'latest_location') {
+    return `纬度 ${formatNumber(value.latitude, 4)}，经度 ${formatNumber(value.longitude, 4)}；速度 ${formatNumber(value.speed_mps, 1)} 米/秒；精度 ${formatNumber(value.accuracy_m, 1)} 米；采样 ${formatDateTime(value.sampled_at)}`;
+  }
+  if (value && typeof value === 'object' && key === 'latest_telemetry') {
+    return `温度 ${formatNumber(value.temperature_c, 1)} ℃；湿度 ${formatNumber(value.humidity_pct, 1)}%；采样 ${formatDateTime(value.sampled_at)}`;
+  }
+  if (value && typeof value === 'object' && /window$/.test(key)) {
+    return `${formatDateTime(value.start)} 至 ${formatDateTime(value.end)}`;
+  }
+  if (value && typeof value === 'object' && key === 'weights') {
+    return `价格 ${formatNumber(Number(value.price) * 100, 0)}%，交付 ${formatNumber(Number(value.delivery) * 100, 0)}%，质量 ${formatNumber(Number(value.quality) * 100, 0)}%`;
+  }
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value).filter(([, item]) => item === null || ['string', 'number', 'boolean'].includes(typeof item));
+    if (!entries.length) return `${Object.keys(value).length} 项结构化信息`;
+    return entries.slice(0, 4).map(([field, item]) => `${displayField(field)}：${displayCell(item, field)}`).join('；');
+  }
+  const number = Number(value);
+  if (value !== '' && Number.isFinite(number)) {
+    if (/(^|_)(sales_amount|total_amount|unit_price|amount|order_amount)$/.test(key)) return formatMoney(number);
+    if (/_kg$/.test(key)) return `${formatNumber(number, 2)} 公斤`;
+    if (/_m3$/.test(key)) return `${formatNumber(number, 2)} 立方米`;
+    if (key === 'temperature_c') return `${formatNumber(number, 1)} ℃`;
+    if (key === 'humidity_pct' || /_pct$/.test(key) || key === 'smape') return `${formatNumber(number, 2)}%`;
+    if (/_km$/.test(key)) return `${formatNumber(number, 2)} 千米`;
+    if (/_minutes$/.test(key)) return `${formatNumber(number, 0)} 分钟`;
+    if (key === 'speed_mps') return `${formatNumber(number, 1)} 米/秒`;
+    if (key === 'accuracy_m') return `${formatNumber(number, 1)} 米`;
+  }
   return formatValue(value);
+}
+
+function formatDateTime(value) {
+  if (!value) return '—';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return String(value);
+  return new Intl.DateTimeFormat('zh-CN', {
+    dateStyle: 'short', timeStyle: 'medium', hour12: false,
+  }).format(parsed);
 }
 
 function renderTable(target, items, emptyMessage = '暂无数据') {
@@ -186,7 +289,7 @@ function renderStructuredResult(target, data) {
     }
     return `<section><h4>${escapeHtml(displayField(key))}</h4><p>${value.map((item) => displayCell(item, key)).map(escapeHtml).join('、')}</p></section>`;
   }).join('');
-  el.innerHTML = `${cards}${objects}${lists}<details><summary>查看原始数据（调试）</summary><pre>${escapeHtml(JSON.stringify(data, null, 2))}</pre></details>`;
+  el.innerHTML = `${cards}${objects}${lists}`;
 }
 
 function formatNumber(value, maximumFractionDigits = 0) {
@@ -349,7 +452,7 @@ function renderTrendCharts(orderItems, salesItems) {
     const badge = '<g class="trend-end-label" pointer-events="none"><rect x="' + badgePosition.x.toFixed(1) + '" y="' + badgePosition.y.toFixed(1) + '" width="58" height="18" rx="4"/><text x="' + (badgePosition.x + 29).toFixed(1) + '" y="' + (badgePosition.y + 12).toFixed(1) + '" text-anchor="middle">' + escapeHtml(endLabel) + '</text></g>';
     return '<article class="trend-chart-card"><div class="trend-chart-card-head"><span class="trend-chart-card-icon">' + escapeHtml(icon) + '</span><div><small>' + escapeHtml(tag) + '</small><strong>' + escapeHtml(title) + '</strong></div><b>峰值 ' + escapeHtml(formatter(Math.max(...currentPoints.map((item) => item.value)))) + '</b></div><div class="trend-chart-card-legend"><i style="--trend-color:' + color + '"></i>本期' + escapeHtml(title) + '（' + escapeHtml(unit) + '）</div><svg viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="' + escapeHtml(title + '近七日趋势') + '"><defs><linearGradient id="' + gradientId + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + color + '" stop-opacity=".3"/><stop offset="1" stop-color="' + color + '" stop-opacity="0"/></linearGradient></defs>' + grid + yLabels + '<path class="trend-chart-area" style="--trend-area:' + color + '" fill="url(#' + gradientId + ')" d="' + area + '"/><path class="trend-chart-line" style="--trend-color:' + color + '" d="' + currentPath + '"/>' + dots + badge + labels + '</svg></article>';
   };
-  el.innerHTML = chart(orderItems, 'quantity', '订单量趋势', 'ORDER VOLUME', 'kg', '#35b9ff', 'orderTrendArea', formatNumber, '▥') + chart(salesItems, 'amount', '销售额趋势', 'SALES AMOUNT', 'CNY', '#f3bd57', 'salesTrendArea', formatMoney, '◒');
+  el.innerHTML = chart(orderItems, 'quantity', '订单量趋势', 'ORDER VOLUME', '公斤', '#35b9ff', 'orderTrendArea', formatNumber, '▥') + chart(salesItems, 'amount', '销售额趋势', 'SALES AMOUNT', '人民币', '#f3bd57', 'salesTrendArea', formatMoney, '◒');
 }
 
 function renderEnterpriseOrderTable(items) {
@@ -361,7 +464,7 @@ function renderEnterpriseOrderTable(items) {
     el.innerHTML = '<div class="empty-state">暂无企业订单明细</div>';
     return;
   }
-  const renderRows = (duplicate = false) => rows.map((item) => '<button class="enterprise-order-row" type="button" data-enterprise="' + escapeHtml(item.enterprise_label) + '" title="点击查看 ' + escapeHtml(item.enterprise_label) + ' 订单明细"' + (duplicate ? ' tabindex="-1" aria-hidden="true"' : '') + '><span><strong>' + escapeHtml(item.enterprise_label) + '</strong><small>' + escapeHtml(item.category) + '</small></span><b>' + formatNumber(item.committed_order_quantity) + ' kg</b><i><em style="width:' + Math.max(4, Math.min(100, Number(item.completion_percent) || 0)) + '%"></em></i><mark class="' + (item.status === '库存预警' || item.status === '产能紧张' ? 'warn' : '') + '">' + escapeHtml(item.status) + '</mark></button>').join('');
+  const renderRows = (duplicate = false) => rows.map((item) => '<button class="enterprise-order-row" type="button" data-enterprise="' + escapeHtml(item.enterprise_label) + '" title="点击查看 ' + escapeHtml(item.enterprise_label) + ' 订单明细"' + (duplicate ? ' tabindex="-1" aria-hidden="true"' : '') + '><span><strong>' + escapeHtml(item.enterprise_label) + '</strong><small>' + escapeHtml(item.category) + '</small></span><b>' + formatNumber(item.committed_order_quantity) + ' 公斤</b><i><em style="width:' + Math.max(4, Math.min(100, Number(item.completion_percent) || 0)) + '%"></em></i><mark class="' + (item.status === '库存预警' || item.status === '产能紧张' ? 'warn' : '') + '">' + escapeHtml(item.status) + '</mark></button>').join('');
   const trackRows = renderRows() + (state.publicEnterpriseExpanded ? renderRows(true) : '');
   el.innerHTML = '<div class="enterprise-order-head"><span>企业 / 品类</span><span>订单量</span><span>完成</span><span>状态</span></div><div class="enterprise-order-window' + (state.publicEnterpriseExpanded ? ' is-expanded' : '') + '"><div class="enterprise-order-track' + (state.publicEnterpriseExpanded ? ' is-scrolling' : '') + '">' + trackRows + '</div></div>';
   if (state.publicEnterpriseExpanded) {
@@ -455,7 +558,7 @@ function renderEnterpriseDonut(items) {
     return `${colors[index]} ${start.toFixed(2)}% ${cursor.toFixed(2)}%`;
   });
   const legend = rows.map((item, index) => `<div title="${escapeHtml(item.enterprise_label)}：${escapeHtml(formatNumber(item.committed_order_quantity))}"><i style="--legend-color:${colors[index]}"></i><span>${escapeHtml(item.enterprise_label)}</span><strong>${escapeHtml((Number(item.committed_order_quantity || 0) / total * 100).toFixed(1))}%</strong></div>`).join('');
-  el.innerHTML = `<div class="donut-visual" style="background:conic-gradient(${segments.join(',')})"><div class="donut-center"><strong>${escapeHtml(formatNumber(total))}</strong><span>订单总量 kg</span></div></div><div class="donut-legend">${legend}</div>`;
+  el.innerHTML = `<div class="donut-visual" style="background:conic-gradient(${segments.join(',')})"><div class="donut-center"><strong>${escapeHtml(formatNumber(total))}</strong><span>订单总量 公斤</span></div></div><div class="donut-legend">${legend}</div>`;
 }
 
 function renderPreorderList(items) {
@@ -552,7 +655,7 @@ function storePublicTheme(theme) {
   try {
     localStorage.setItem('publicTheme', normalizePublicTheme(theme));
   } catch {
-    // The theme still applies for the current page when storage is unavailable.
+    // Storage can be blocked; the selected theme still applies to this page.
   }
 }
 
@@ -666,7 +769,7 @@ function renderAuthState(user) {
   const loginButton = document.getElementById('open-login');
   const logoutButton = document.getElementById('logout-button');
   if (user) {
-    const role = { park_admin: '园区管理员', analyst: '数据分析员' }[user.role] || '已授权用户';
+    const role = user.role_label || VALUE_LABELS[user.role] || `未知类型（${user.role || '空值'}）`;
     stateEl.textContent = `${user.display_name || user.username} · ${role}`;
     loginButton.hidden = true;
     logoutButton.hidden = false;
@@ -680,7 +783,7 @@ function renderAuthState(user) {
 function requireAuth(result) {
   if (result && result.status === 401 && !getAPI().isMock()) {
     document.getElementById('auth-panel').hidden = false;
-    setMessage('E01 接口需要登录，请先输入后端账号。', 'warning');
+    setMessage('E01 园区管理台接口需要登录，请先输入后端账号。', 'warning');
     return true;
   }
   return false;
@@ -710,8 +813,8 @@ async function loadOverview() {
   const cutoff = result.json && result.json.data_cutoff;
   document.getElementById('data-cutoff').textContent = formatShanghaiDateTime(cutoff);
   renderTable('overview-enterprise-details', data.details || [], '暂无企业明细');
-  document.getElementById('overview-body').textContent = `E01 总览已同步：预计订单 ${formatValue(data.expected_order_quantity)}，已承担订单 ${formatValue(data.committed_order_quantity)}，销售额 ${formatValue(data.sales_amount_total)}；当前未处理库存预警 ${formatValue(data.inventory_alert_count)}。`;
-  setMessage('E01 总览加载完成。', 'success');
+  document.getElementById('overview-body').textContent = `E01 园区管理台总览已同步：预计订单 ${formatValue(data.expected_order_quantity)}，已承担订单 ${formatValue(data.committed_order_quantity)}，销售额 ${formatMoney(data.sales_amount_total)}；当前未处理库存预警 ${formatValue(data.inventory_alert_count)}。`;
+  setMessage('E01 园区管理台总览加载完成。', 'success');
 }
 
 function renderOperationalAlerts(resource, items, enterpriseNames = {}) {
@@ -762,11 +865,105 @@ function renderOperationalAlerts(resource, items, enterpriseNames = {}) {
       if (occupancy >= 80) reasons.push(`容量占用 ${occupancy.toFixed(1)}%`);
       if (Number.isFinite(temperature) && temperature > -16) reasons.push(`温度 ${temperature.toFixed(1)}℃偏高`);
       if (!reasons.length) return null;
-      return itemMarkup(occupancy >= 80 ? 'critical' : 'warning', `${enterpriseLabel(item)} · ${item.freezer_id || '冻库记录'}`, `${reasons.join('、')} · 冻品 ${formatNumber(item.frozen_goods_kg)} kg`, occupancy >= 80 ? '调整入库' : '检查温控');
+      return itemMarkup(occupancy >= 80 ? 'critical' : 'warning', `${enterpriseLabel(item)} · ${item.freezer_id || '冻库记录'}`, `${reasons.join('、')} · 冻品 ${formatNumber(item.frozen_goods_kg)} 公斤`, occupancy >= 80 ? '调整入库' : '检查温控');
     }).filter(Boolean);
   }
   const sourceNote = rows.length ? '依据服务器实时记录计算' : '当前资源没有可展示的记录';
   el.innerHTML = `<div class="operation-alert-heading"><strong>${escapeHtml(heading)}</strong><span>${escapeHtml(alerts.length)} 条 · ${escapeHtml(sourceNote)}</span></div>${alerts.length ? alerts.join('') : '<div class="operation-alert-empty">当前资源暂无需要处理的预警条目。</div>'}`;
+}
+
+function operationChart(target) {
+  const element = document.getElementById(target);
+  if (!element || !window.echarts) return null;
+  return window.echarts.getInstanceByDom(element) || window.echarts.init(element, null, { renderer: 'canvas' });
+}
+
+function operationTime(value) {
+  if (!value) return '暂无业务数据';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return String(value);
+  return new Intl.DateTimeFormat('zh-CN', {
+    timeZone: 'Asia/Shanghai', dateStyle: 'medium', timeStyle: 'medium', hour12: false,
+  }).format(parsed);
+}
+
+function setOperationState(kind, message, error = false) {
+  const element = document.getElementById(`operations-${kind}-state`);
+  if (!element) return;
+  element.textContent = message;
+  element.classList.toggle('error', error);
+}
+
+function setOperationMeta(kind, period, unit) {
+  const element = document.getElementById(`operations-${kind}-meta`);
+  if (element) element.textContent = `统计周期：${period === 'all' ? '全部' : period}　单位：${unit}`;
+}
+
+function renderOperationBar(target, rows, nameKey, valueKey, seriesName, color) {
+  const chart = operationChart(target);
+  if (!chart) return;
+  chart.clear();
+  chart.setOption({
+    color: [color],
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    grid: { top: 20, right: 24, bottom: 28, left: 105 },
+    xAxis: { type: 'value' },
+    yAxis: { type: 'category', data: rows.map((item) => item[nameKey]) },
+    series: [{ name: seriesName, type: 'bar', barMaxWidth: 16, data: rows.map((item) => Number(item[valueKey] || 0)) }],
+  }, true);
+}
+
+function renderOperationsSummary(data) {
+  const period = data.period || 'all';
+  const receiptRows = data.receipts?.status || [];
+  setOperationMeta('receipt', period, data.receipts?.unit || '单');
+  const receipt = operationChart('operations-receipt-chart');
+  receipt?.clear();
+  if (receiptRows.length) {
+    receipt?.setOption({
+      tooltip: { trigger: 'item' },
+      legend: { bottom: 0 },
+      series: [{
+        name: '签收结果', type: 'pie', radius: ['45%', '68%'], center: ['50%', '43%'],
+        data: receiptRows.map((item) => ({ name: item.label, value: item.count })),
+      }],
+    }, true);
+    setOperationState(
+      'receipt',
+      `差异签收 ${data.receipts.difference_count || 0} 单，拒收 ${data.receipts.rejected_count || 0} 单，差异数量 ${formatNumber(data.receipts.difference_quantity || 0, 2)}`,
+    );
+  } else {
+    setOperationState('receipt', '当前统计周期暂无签收数据');
+  }
+
+  const stockoutRows = (data.stockouts?.ranking || []).slice(0, 8).reverse();
+  setOperationMeta('stockout', period, data.stockouts?.unit || '商品基础单位');
+  renderOperationBar('operations-stockout-chart', stockoutRows, 'product_name', 'quantity', '缺货需求量', '#c58b3a');
+  setOperationState('stockout', stockoutRows.length ? `展示缺货需求量最高的 ${stockoutRows.length} 个商品` : '当前统计周期暂无缺货商品');
+
+  const thirdSpaceRows = (data.stockouts?.third_space || []).slice(0, 8).reverse();
+  setOperationMeta('third-space', period, data.stockouts?.unit || '商品基础单位');
+  renderOperationBar('operations-third-space-chart', thirdSpaceRows, 'store_name', 'quantity', '缺货需求量', '#4a8f6c');
+  setOperationState('third-space', thirdSpaceRows.length ? `汇总 ${thirdSpaceRows.length} 个第三空间的未满足需求` : '当前统计周期暂无第三空间缺货需求');
+
+  const inventoryRows = (data.inventory?.changes || []).slice(0, 8).reverse();
+  setOperationMeta('inventory', period, data.inventory?.unit || '商品基础单位');
+  renderOperationBar('operations-inventory-chart', inventoryRows, 'product_name', 'quantity_delta', '库存变化量', '#287d5a');
+  setOperationState('inventory', inventoryRows.length ? `展示 ${inventoryRows.length} 个商品的库存净变化` : '当前统计周期暂无库存流水');
+
+  const timestamps = document.getElementById('operations-timestamps');
+  if (timestamps) timestamps.textContent = `响应生成时间：${operationTime(data.generated_at)}　业务数据截止：${operationTime(data.data_cutoff)}`;
+}
+
+async function loadOperationsSummary() {
+  ['receipt', 'stockout', 'third-space', 'inventory'].forEach((kind) => setOperationState(kind, '正在读取经营数据投影'));
+  const result = await getAPI().getOperationsSummary();
+  if (!result.ok) {
+    const message = errorOf(result);
+    ['receipt', 'stockout', 'third-space', 'inventory'].forEach((kind) => setOperationState(kind, message, true));
+    return;
+  }
+  renderOperationsSummary(dataOf(result) || {});
 }
 
 async function loadResource(section) {
@@ -794,6 +991,7 @@ async function loadResource(section) {
   document.getElementById(`${section}-prev`).disabled = page <= 1;
   document.getElementById(`${section}-next`).disabled = page * Number(data.page_size || 20) >= recordTotal;
   if (section === 'inventory') {
+    await loadOperationsSummary();
     const enterpriseResult = await getAPI().list('enterprises');
     const enterpriseItems = enterpriseResult.ok ? (dataOf(enterpriseResult) || {}).items || [] : [];
     const enterpriseNames = Object.fromEntries(enterpriseItems.map((item) => [item.enterprise_id, item.enterprise_name]));
@@ -803,10 +1001,12 @@ async function loadResource(section) {
     const rows = data.items || [];
     const monitored = rows.filter((item) => item.latest_telemetry);
     const openAlerts = rows.filter((item) => item.status === 'OPEN');
-    document.getElementById('transport-monitoring').textContent = resource === 'alerts'
-      ? `服务器当前返回 ${openAlerts.length} 条待处理报警；报警时间、类型和对象版本均来自 B02 投影。`
+    document.getElementById('transport-monitoring').textContent = resource === 'telemetry-issues'
+      ? `服务器当前返回 ${rows.length} 条遥测异常或状态不一致记录，可按任务、车辆、司机和发生时间核查。`
+      : resource === 'alerts'
+      ? `服务器当前返回 ${openAlerts.length} 条待处理报警；报警时间、类型和对象版本均来自 B02 移动履约与设备服务投影。`
       : monitored.length
-        ? `当前有 ${monitored.length} 条运输任务带最新温湿度采样，异常路线在 E02 以红色显示。`
+        ? `当前有 ${monitored.length} 条运输任务带最新温湿度采样，异常路线在 E02 公开产销协同大屏以红色显示。`
         : '当前任务投影暂无温湿度采样，页面不会生成模拟异常提示。';
   }
 }
@@ -817,10 +1017,12 @@ async function loadCalculation() {
   resultEl.textContent = '计算中…';
   const body = ['carpool-preview', 'warehouse-preview'].includes(kind)
     ? { scenario_code: document.getElementById('calc-scenario').value }
-    : kind === 'procurement'
-      ? { product_id: document.getElementById('calc-product').value, required_quantity: document.getElementById('calc-quantity').value }
-      : { enterprise_id: document.getElementById('calc-enterprise').value, product_id: document.getElementById('calc-product').value };
-  const result = await getAPI().calculate(kind, body);
+    : { enterprise_id: document.getElementById('calc-enterprise').value, product_id: document.getElementById('calc-product').value };
+  const result = kind === 'procurement'
+    ? await getAPI().generateProcurementAggregation(null, newIdempotencyKey('procurement-generate'))
+    : kind === 'forecast'
+      ? await getAPI().generateNextWeekForecast(newIdempotencyKey('forecast-generate'))
+      : await getAPI().calculate(kind, body);
   if (!result.ok) {
     requireAuth(result);
     resultEl.textContent = errorOf(result);
@@ -830,8 +1032,96 @@ async function loadCalculation() {
   const data = dataOf(result);
   renderStructuredResult('calculation-result', data);
   state.lastMatchRunId = kind === 'carpool-preview' ? data?.match_run_id : null;
+  state.lastWarehouseRunId = kind === 'warehouse-preview' ? data?.match_run_id : null;
+  state.lastWarehouseCandidate = kind === 'warehouse-preview' ? (data?.candidates || [])[0] || null : null;
+  state.warehousePlan = null;
+  state.procurementAggregation = kind === 'procurement' ? (data?.items || [])[0] || null : null;
+  state.forecastBatch = kind === 'forecast' ? data?.batch || null : null;
   document.getElementById('confirm-carpool').hidden = !state.lastMatchRunId || !(data?.candidates || []).length;
+  document.getElementById('confirm-warehouse').hidden = !state.lastWarehouseRunId
+    || !state.lastWarehouseCandidate?.candidate_warehouses?.some((item) => item.eligible);
+  updateWarehouseActionButtons();
+  if (kind === 'procurement') renderProcurementAggregationBoard(data);
+  else document.getElementById('procurement-aggregation-board').hidden = true;
+  if (kind === 'forecast') renderForecastAggregationBoard(data);
+  else document.getElementById('forecast-aggregation-board').hidden = true;
+  const canConfirmProcurement = getAPI().getSession().user?.role === 'park_admin';
+  document.getElementById('confirm-procurement').hidden = !canConfirmProcurement
+    || state.procurementAggregation?.status !== 'DRAFT';
+  if (state.procurementAggregation) {
+    document.getElementById('calc-quantity').value = state.procurementAggregation.automatic_quantity;
+  }
   setMessage('计算已返回规则版本、候选方案及不匹配原因。', 'success');
+}
+
+function renderForecastAggregationBoard(data) {
+  const board = document.getElementById('forecast-aggregation-board');
+  const rows = data?.aggregates || [];
+  board.hidden = false;
+  if (!rows.length) {
+    board.textContent = '下周预测批次暂无可汇总商品。';
+    return;
+  }
+  const methodRows = data?.items || [];
+  board.innerHTML = rows.map((row) => {
+    const values = [
+      ['历史用量', Number(row.historical_usage || 0)],
+      ['生产计划', Number(row.production_plan_quantity || 0)],
+      ['预测结果', Number(row.forecast_quantity || 0)],
+    ];
+    const maximum = Math.max(...values.map((item) => item[1]), 1);
+    const bars = values.map(([label, value]) => `<div class="forecast-compare-row"><span>${label}</span><i style="--forecast-value:${(value / maximum * 100).toFixed(1)}%"></i><strong>${value.toFixed(2)}</strong></div>`).join('');
+    const related = methodRows.filter((item) => item.product_id === row.product_id);
+    const maeValues = related.map((item) => item.mae).filter((value) => value !== null);
+    const smapeValues = related.map((item) => item.smape).filter((value) => value !== null);
+    const mae = maeValues.length ? (maeValues.reduce((sum, value) => sum + value, 0) / maeValues.length).toFixed(2) : '数据不足';
+    const smape = smapeValues.length ? `${(smapeValues.reduce((sum, value) => sum + value, 0) / smapeValues.length).toFixed(2)}%` : '数据不足';
+    return `<article class="forecast-aggregation-item"><header><strong>${escapeHtml(row.product_name || row.product_id)}</strong><span>建议采购 ${Number(row.suggested_purchase_quantity || 0).toFixed(2)} ${escapeHtml(row.unit)}</span></header><p>${escapeHtml(data.period?.start || '—')} 至 ${escapeHtml(data.period?.end || '—')} · 区间 ${Number(row.lower_bound || 0).toFixed(2)}—${Number(row.upper_bound || 0).toFixed(2)}</p><div class="forecast-compare-bars" aria-label="历史用量、生产计划和预测结果条形对比图">${bars}</div><small>平均 MAE：${mae} · 平均 sMAPE：${smape} · 数据截止：${escapeHtml(data.data_cutoff || '暂无')}</small><small>方法：季节性平滑 / 加权移动平均 / 生产计划降级；数据不足 ${Number(row.data_insufficient_count || 0)} 家</small></article>`;
+  }).join('');
+}
+
+function renderProcurementAggregationBoard(data) {
+  const board = document.getElementById('procurement-aggregation-board');
+  const items = data?.items || [];
+  board.hidden = false;
+  if (!items.length) {
+    board.textContent = '当前采购周期暂无可汇总商品。';
+    return;
+  }
+  board.innerHTML = items.map((item) => {
+    const suppliers = (item.candidates || []).slice(0, 3);
+    const maximum = Math.max(...suppliers.map((supplier) => Number(supplier.composite_score || 0)), 1);
+    const bars = suppliers.length
+      ? suppliers.map((supplier) => `<div class="supplier-compare-row"><span>${escapeHtml(supplier.supplier_name)}</span><i style="--supplier-score:${(Number(supplier.composite_score || 0) / maximum * 100).toFixed(1)}%"></i><strong>${Number(supplier.composite_score || 0).toFixed(1)} 分</strong></div>`).join('')
+      : '<p class="empty-state">没有满足报价、起订量、档位和供货能力的供应商。</p>';
+    const warning = (item.unit_conversion_warnings || []).length
+      ? `<small class="warning-text">${item.unit_conversion_warnings.length} 条单位无法换算，已排除自动推荐</small>`
+      : '<small>单位换算完整</small>';
+    return `<article class="procurement-aggregation-item"><header><strong>${escapeHtml(item.product_name || item.product_id)}</strong><span>${Number(item.automatic_quantity || 0).toFixed(2)} ${escapeHtml(item.base_unit)}</span></header><p>${escapeHtml(item.cycle_start)} 至 ${escapeHtml(item.cycle_end)} · ${escapeHtml(item.status)}</p>${warning}<div class="supplier-compare-bars" aria-label="供应商方案综合评分条形图">${bars}</div></article>`;
+  }).join('');
+}
+
+async function confirmProcurementAggregation() {
+  const item = state.procurementAggregation;
+  if (!item) return;
+  const input = document.getElementById('calc-quantity');
+  const entered = input.value === '' ? null : Number(input.value);
+  const adjusted = entered !== null && entered !== Number(item.automatic_quantity) ? entered : null;
+  const result = await getAPI().confirmProcurementAggregation(
+    item.id,
+    item.object_version,
+    adjusted,
+    adjusted === null ? null : '网页授权用户调整采购汇总数量',
+    newIdempotencyKey('procurement-confirm'),
+  );
+  if (!result.ok) {
+    document.getElementById('calculation-result').textContent = errorOf(result);
+    return;
+  }
+  state.procurementAggregation = { ...item, status: 'CONFIRMED', object_version: dataOf(result).object_version };
+  document.getElementById('confirm-procurement').hidden = true;
+  renderStructuredResult('calculation-result', dataOf(result));
+  setMessage('采购汇总已保存输入快照、供应商方案和人工确认状态。', 'success');
 }
 
 async function confirmCarpool() {
@@ -846,13 +1136,85 @@ async function confirmCarpool() {
   setMessage('首选拼车方案已确认，服务器正在创建执行任务。', 'success');
 }
 
+function updateWarehouseActionButtons() {
+  const plan = state.warehousePlan;
+  document.getElementById('refresh-warehouse-plan').hidden = !plan;
+  document.getElementById('occupy-warehouse').hidden = plan?.status !== 'RESERVED';
+  document.getElementById('cancel-warehouse').hidden = !['RESERVATION_REQUESTED', 'RESERVED'].includes(plan?.status);
+  document.getElementById('release-warehouse').hidden = plan?.status !== 'OCCUPIED';
+}
+
+async function confirmWarehousePool() {
+  const candidate = state.lastWarehouseCandidate;
+  const warehouse = candidate?.candidate_warehouses?.find((item) => item.eligible);
+  if (!state.lastWarehouseRunId || !candidate || !warehouse) return;
+  const result = await getAPI().confirmWarehousePool(
+    state.lastWarehouseRunId,
+    0,
+    warehouse.warehouse_id,
+    warehouse.warehouse_object_version,
+    newIdempotencyKey('warehouse-confirm'),
+  );
+  if (!result.ok) {
+    document.getElementById('calculation-result').textContent = errorOf(result);
+    return;
+  }
+  state.warehousePlan = dataOf(result)?.plan || null;
+  document.getElementById('confirm-warehouse').hidden = true;
+  updateWarehouseActionButtons();
+  renderStructuredResult('calculation-result', dataOf(result));
+  setMessage('拼仓方案已确认，服务器正在原子预占库容。', 'success');
+}
+
+async function refreshWarehousePlan() {
+  if (!state.warehousePlan?.id) return;
+  const result = await getAPI().getWarehousePoolPlan(state.warehousePlan.id);
+  if (!result.ok) {
+    document.getElementById('calculation-result').textContent = errorOf(result);
+    return;
+  }
+  state.warehousePlan = dataOf(result)?.plan || null;
+  updateWarehouseActionButtons();
+  renderStructuredResult('calculation-result', dataOf(result));
+}
+
+async function requestWarehouseAction(action) {
+  const plan = state.warehousePlan;
+  if (!plan) return;
+  const result = await getAPI().requestWarehousePoolAction(
+    plan.id,
+    action,
+    plan.object_version,
+    newIdempotencyKey(`warehouse-${action}`),
+    action === 'cancel' ? '网页端取消拼仓计划' : null,
+  );
+  if (!result.ok) {
+    document.getElementById('calculation-result').textContent = errorOf(result);
+    return;
+  }
+  state.warehousePlan = { ...plan, ...dataOf(result) };
+  updateWarehouseActionButtons();
+  renderStructuredResult('calculation-result', dataOf(result));
+  setMessage('拼仓操作已受理，请刷新查看 Worker 处理结果。', 'success');
+}
+
 function updateCalculationFields() {
   const kind = document.getElementById('calc-kind').value;
   document.getElementById('scenario-fields').hidden = !['carpool-preview', 'warehouse-preview'].includes(kind);
-  document.getElementById('enterprise-fields').hidden = kind !== 'forecast';
-  document.getElementById('product-fields').hidden = !['procurement', 'forecast'].includes(kind);
+  document.getElementById('enterprise-fields').hidden = true;
+  document.getElementById('product-fields').hidden = true;
   document.getElementById('quantity-fields').hidden = kind !== 'procurement';
   document.getElementById('confirm-carpool').hidden = true;
+  document.getElementById('confirm-warehouse').hidden = true;
+  state.lastWarehouseRunId = null;
+  state.lastWarehouseCandidate = null;
+  state.warehousePlan = null;
+  updateWarehouseActionButtons();
+  state.procurementAggregation = null;
+  state.forecastBatch = null;
+  document.getElementById('confirm-procurement').hidden = true;
+  document.getElementById('procurement-aggregation-board').hidden = true;
+  document.getElementById('forecast-aggregation-board').hidden = true;
   state.lastMatchRunId = null;
 }
 
@@ -917,7 +1279,10 @@ function setupResourceSelects() {
       state.resourcePage[section] = 1;
       await loadResource(section);
     });
-    document.getElementById(`${section}-refresh`).addEventListener('click', () => loadResource(section));
+    document.getElementById(`${section}-refresh`).addEventListener('click', async () => {
+      await loadResource(section);
+      await window.DashboardV2?.refreshE01(section);
+    });
     const search = document.getElementById(`${section}-search`);
     search.addEventListener('input', () => {
       state.resourceSearch[section] = search.value.trim();
@@ -941,7 +1306,7 @@ function showSection(section) {
   document.body.classList.toggle('screen-mode', isPublic);
   document.querySelectorAll('.page-section').forEach((item) => item.classList.toggle('active', item.id === section));
   document.querySelectorAll('.sidebar button[data-section]').forEach((item) => item.classList.toggle('active', item.dataset.section === section));
-  const titles = { overview: 'E01 管理总览', enterprise: '主数据与企业', production: '运输订单与拼车计划', inventory: '库存、销售与冻库', transport: '运输任务与资源', import: 'B01 批量导入', analytics: 'B01 计算与建议', public: 'E02 公开大屏' };
+  const titles = { overview: 'E01 园区管理台 · 管理总览', enterprise: 'E01 园区管理台 · 主数据与企业', production: 'B01 网页管理与经营服务 · 运输订单与拼车计划', inventory: 'B01 网页管理与经营服务 · 库存、销售与冻库', transport: 'B01 网页管理与经营服务 · 运输任务与资源', import: 'B01 网页管理与经营服务 · 批量导入', analytics: 'B01 网页管理与经营服务 · 计算与建议', public: 'E02 公开产销协同大屏' };
   document.getElementById('page-title').textContent = titles[section] || '黑土闭环';
   if (section === 'overview') loadOverview();
   if (RESOURCE_GROUPS[section]) loadResource(section);
@@ -973,7 +1338,7 @@ async function handleLogin(event) {
   renderAuthState(dataOf(me) || { username, role: 'E01' });
   document.getElementById('auth-panel').hidden = true;
   await loadCalculationOptions();
-  setMessage('E01 登录成功。', 'success');
+  setMessage('E01 园区管理台登录成功。', 'success');
   showSection(state.activeSection);
 }
 
@@ -981,11 +1346,12 @@ async function handleLogout() {
   await getAPI().logout();
   renderAuthState(null);
   document.getElementById('auth-panel').hidden = false;
-  setMessage('已退出 E01 会话；E02 公开大屏仍可访问。', 'info');
+  setMessage('已退出 E01 园区管理台会话；E02 公开产销协同大屏仍可访问。', 'info');
 }
 
 async function initPage() {
   applyPublicTheme(readStoredPublicTheme());
+  await loadServerDictionaries();
   document.querySelectorAll('.sidebar button[data-section]').forEach((button) => button.addEventListener('click', () => showSection(button.dataset.section)));
   document.getElementById('open-login').addEventListener('click', () => { document.getElementById('auth-panel').hidden = false; });
   document.getElementById('close-login').addEventListener('click', () => { document.getElementById('auth-panel').hidden = true; });
@@ -994,6 +1360,12 @@ async function initPage() {
   document.getElementById('calc-kind').addEventListener('change', updateCalculationFields);
   document.getElementById('run-calculation').addEventListener('click', loadCalculation);
   document.getElementById('confirm-carpool').addEventListener('click', confirmCarpool);
+  document.getElementById('confirm-warehouse').addEventListener('click', confirmWarehousePool);
+  document.getElementById('refresh-warehouse-plan').addEventListener('click', refreshWarehousePlan);
+  document.getElementById('occupy-warehouse').addEventListener('click', () => requestWarehouseAction('occupy'));
+  document.getElementById('cancel-warehouse').addEventListener('click', () => requestWarehouseAction('cancel'));
+  document.getElementById('release-warehouse').addEventListener('click', () => requestWarehouseAction('release'));
+  document.getElementById('confirm-procurement').addEventListener('click', confirmProcurementAggregation);
   document.getElementById('public-refresh')?.addEventListener('click', () => window.DashboardV2?.refresh());
   document.getElementById('public-fullscreen')?.addEventListener('click', togglePublicFullscreen);
   document.getElementById('public-theme-toggle')?.addEventListener('click', togglePublicTheme);
@@ -1010,6 +1382,12 @@ async function initPage() {
     document.getElementById('public-news').hidden = !showNews;
   }));
   window.addEventListener('resize', applyPublicScreenScale);
+  window.addEventListener('blacksoil:e01-realtime-refresh', (event) => {
+    const targets = event.detail?.targets || [];
+    if (!targets.includes(state.activeSection) || state.activeSection === 'public') return;
+    if (state.activeSection === 'overview') loadOverview();
+    else if (RESOURCE_GROUPS[state.activeSection]) loadResource(state.activeSection);
+  });
   document.addEventListener('fullscreenchange', () => {
     const button = document.getElementById('public-fullscreen');
     if (button) {

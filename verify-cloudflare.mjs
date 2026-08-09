@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -5,6 +6,11 @@ import { fileURLToPath } from 'node:url';
 const projectRoot = dirname(fileURLToPath(import.meta.url));
 const mockDir = join(projectRoot, 'frontend-mocks-v0.1');
 const baseUrl = new URL(process.argv[2] || 'http://127.0.0.1:8787/');
+const brandAssets = Object.freeze({
+  '/assets/brand/jipin-screen-light-d0308f92.jpg': 'D0308F92B54FCFCB783886704A7A1E85B1853B724784FB89BC0E9A79425211F8',
+  '/assets/brand/jipin-web-green-e90c36ef.jpg': 'E90C36EF7F198C1C1E4EE2FCDD517C09B71842D11CD1AF2764F27AED1EB131FE',
+  '/assets/brand/jipin-screen-dark-e041ecf5.jpg': 'E041ECF5C6ADD12F257F3CC07F862BE9B8DA9797477362C6C22EAA53709B069F',
+});
 
 if (!['http:', 'https:'].includes(baseUrl.protocol)) {
   throw new Error('The verification URL must use http or https.');
@@ -30,10 +36,25 @@ const html = await (await requireOk('/')).text();
 for (const marker of ['id="public-screen-canvas"', 'id="public-theme-toggle"', 'id="dv2-brand-logo"', 'id="dv2-order-donut"', 'id="dv2-sales-donut"', 'id="dv2-mic-button"']) {
   if (!html.includes(marker)) throw new Error(`The deployed page is missing ${marker}.`);
 }
+for (const marker of ['id="toggle-mock"', 'jipin-logo.jpg']) {
+  if (html.includes(marker)) throw new Error(`The deployed page contains retired marker: ${marker}.`);
+}
 
-for (const path of ['/styles.css', '/dashboard.css', '/api.js', '/scripts.js', '/dashboard-v2.js', '/assets/brand/jipin-screen-light-d0308f92.jpg', '/assets/brand/jipin-web-green-e90c36ef.jpg', '/assets/brand/jipin-screen-dark-e041ecf5.jpg', '/vendor/echarts/echarts.min.js', '/assets/maps/northeast-china-admin1.geojson', '/assets/backgrounds/northeast-winter-corn-v1.webp']) {
+for (const path of ['/styles.css', '/dashboard.css', '/api.js', '/scripts.js', '/dashboard-v2.js', '/vendor/echarts/echarts.min.js', '/assets/maps/northeast-china-admin1.geojson', '/assets/backgrounds/northeast-winter-corn-v1.webp']) {
   const content = await (await requireOk(path)).text();
   if (content.length < 100) throw new Error(`${path} is unexpectedly empty.`);
+}
+
+for (const [path, expectedHash] of Object.entries(brandAssets)) {
+  const bytes = new Uint8Array(await (await requireOk(path)).arrayBuffer());
+  if (bytes.byteLength < 100) throw new Error(`${path} is unexpectedly empty.`);
+  const actualHash = createHash('sha256').update(bytes).digest('hex').toUpperCase();
+  if (actualHash !== expectedHash) throw new Error(`${path} failed SHA-256 verification.`);
+}
+
+const retiredLogo = await request('/jipin-logo.jpg');
+if (retiredLogo.status !== 404) {
+  throw new Error(`The retired Logo should return 404, received ${retiredLogo.status}.`);
 }
 
 const productionSource = await Promise.all(['/index.html', '/api.js', '/scripts.js', '/dashboard-v2.js', '/dashboard.css'].map(async (path) => (await requireOk(path)).text()));

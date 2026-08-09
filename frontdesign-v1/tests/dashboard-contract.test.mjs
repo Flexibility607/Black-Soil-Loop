@@ -2,8 +2,30 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { access, readFile, stat } from 'node:fs/promises';
+import { runInNewContext } from 'node:vm';
 
 const projectRoot = new URL('../../', import.meta.url);
+
+const BRAND_ASSETS = Object.freeze({
+  'jipin-screen-light-d0308f92.jpg': 'D0308F92B54FCFCB783886704A7A1E85B1853B724784FB89BC0E9A79425211F8',
+  'jipin-web-green-e90c36ef.jpg': 'E90C36EF7F198C1C1E4EE2FCDD517C09B71842D11CD1AF2764F27AED1EB131FE',
+  'jipin-screen-dark-e041ecf5.jpg': 'E041ECF5C6ADD12F257F3CC07F862BE9B8DA9797477362C6C22EAA53709B069F',
+});
+
+function extractNamedFunction(source, name) {
+  const start = source.indexOf(`function ${name}(`);
+  assert.notEqual(start, -1, `missing function ${name}`);
+  const openBrace = source.indexOf('{', start);
+  let depth = 0;
+  for (let index = openBrace; index < source.length; index += 1) {
+    if (source[index] === '{') depth += 1;
+    if (source[index] === '}') {
+      depth -= 1;
+      if (depth === 0) return source.slice(start, index + 1);
+    }
+  }
+  assert.fail(`unterminated function ${name}`);
+}
 
 test('演示快照的顶部总量等于两个渠道并按单位核对', async () => {
   const payload = JSON.parse(await readFile(new URL('frontend-mocks-v0.1/e02-dashboard-snapshot.json', projectRoot), 'utf8'));
@@ -16,7 +38,7 @@ test('演示快照的顶部总量等于两个渠道并按单位核对', async ()
   }
 });
 
-test('E02 只有麦克风入口和两个经营占比环图', async () => {
+test('E02 保留语音入口和两个经营占比环图', async () => {
   const html = await readFile(new URL('frontdesign-v1/index.html', projectRoot), 'utf8');
   assert.match(html, /id="public-theme-toggle"/);
   assert.match(html, /id="dv2-brand-logo"/);
@@ -31,31 +53,87 @@ test('E02 只有麦克风入口和两个经营占比环图', async () => {
 });
 
 test('三张吉品 Logo 在源码和构建产物中保持原始字节', async () => {
-  const assets = {
-    'jipin-screen-light-d0308f92.jpg': 'D0308F92B54FCFCB783886704A7A1E85B1853B724784FB89BC0E9A79425211F8',
-    'jipin-web-green-e90c36ef.jpg': 'E90C36EF7F198C1C1E4EE2FCDD517C09B71842D11CD1AF2764F27AED1EB131FE',
-    'jipin-screen-dark-e041ecf5.jpg': 'E041ECF5C6ADD12F257F3CC07F862BE9B8DA9797477362C6C22EAA53709B069F',
-  };
-  for (const [name, expected] of Object.entries(assets)) {
+  for (const [name, expectedHash] of Object.entries(BRAND_ASSETS)) {
     for (const prefix of ['frontdesign-v1/assets/brand', 'dist/assets/brand']) {
       const bytes = await readFile(new URL(`${prefix}/${name}`, projectRoot));
-      assert.equal(createHash('sha256').update(bytes).digest('hex').toUpperCase(), expected);
+      const actualHash = createHash('sha256').update(bytes).digest('hex').toUpperCase();
+      assert.equal(actualHash, expectedHash, `${prefix}/${name}`);
     }
   }
+  await assert.rejects(access(new URL('frontdesign-v1/jipin-logo.jpg', projectRoot)));
+  await assert.rejects(access(new URL('dist/jipin-logo.jpg', projectRoot)));
 });
 
-test('大屏主题恢复、Logo 切换和图表重绘不触发数据刷新', async () => {
+test('大屏主题恢复、非法值回退、Logo、ARIA 和客户端事件保持一致', async () => {
   const scripts = await readFile(new URL('frontdesign-v1/scripts.js', projectRoot), 'utf8');
+  const functionSource = ['normalizePublicTheme', 'readStoredPublicTheme', 'storePublicTheme', 'applyPublicTheme']
+    .map((name) => extractNamedFunction(scripts, name))
+    .join('\n');
+  const elements = {
+    'dv2-brand-logo': {
+      dataset: { daySrc: 'day-logo.jpg', nightSrc: 'night-logo.jpg' },
+      source: 'night-logo.jpg',
+      getAttribute(name) { return name === 'src' ? this.source : null; },
+      setAttribute(name, value) { if (name === 'src') this.source = value; },
+    },
+    'public-theme-toggle': {
+      attributes: {},
+      setAttribute(name, value) { this.attributes[name] = value; },
+    },
+  };
+  const appliedClasses = new Map();
+  const events = [];
+  const context = {
+    localStorage: {
+      value: 'invalid',
+      getItem() { return this.value; },
+      setItem(_key, value) { this.value = value; },
+    },
+    document: {
+      body: { classList: { toggle(name, enabled) { appliedClasses.set(name, enabled); } } },
+      getElementById(id) { return elements[id] || null; },
+    },
+    window: { dispatchEvent(event) { events.push(event); } },
+    CustomEvent: class CustomEvent {
+      constructor(type, options) { this.type = type; this.detail = options?.detail; }
+    },
+  };
+  const themeApi = runInNewContext(`${functionSource}; ({ normalizePublicTheme, readStoredPublicTheme, storePublicTheme, applyPublicTheme })`, context);
+
+  assert.equal(themeApi.readStoredPublicTheme(), 'night');
+  context.localStorage.getItem = () => { throw new Error('storage blocked'); };
+  assert.equal(themeApi.readStoredPublicTheme(), 'night');
+  context.localStorage.getItem = function getItem() { return this.value; };
+
+  assert.equal(themeApi.applyPublicTheme('day'), 'day');
+  assert.equal(appliedClasses.get('screen-day'), true);
+  assert.equal(elements['dv2-brand-logo'].source, 'day-logo.jpg');
+  assert.equal(elements['public-theme-toggle'].textContent, '夜间模式');
+  assert.equal(elements['public-theme-toggle'].attributes['aria-pressed'], 'true');
+  assert.equal(events.at(-1).type, 'app:public-theme-change');
+  assert.equal(events.at(-1).detail.theme, 'day');
+
+  assert.equal(themeApi.applyPublicTheme('unexpected'), 'night');
+  assert.equal(appliedClasses.get('screen-day'), false);
+  assert.equal(elements['dv2-brand-logo'].source, 'night-logo.jpg');
+  assert.equal(elements['public-theme-toggle'].textContent, '日间模式');
+  assert.equal(elements['public-theme-toggle'].attributes['aria-pressed'], 'false');
+  assert.match(scripts, /applyPublicTheme\(readStoredPublicTheme\(\)\)/);
+});
+
+test('大屏主题切换只用当前快照重绘且保留图表实例', async () => {
   const dashboard = await readFile(new URL('frontdesign-v1/dashboard-v2.js', projectRoot), 'utf8');
-  const css = await readFile(new URL('frontdesign-v1/dashboard.css', projectRoot), 'utf8');
-  assert.match(scripts, /readStoredPublicTheme\(\)/);
-  assert.match(scripts, /theme === 'day' \? 'day' : 'night'/);
-  assert.match(scripts, /app:public-theme-change/);
-  assert.match(scripts, /dataset\.daySrc/);
-  assert.match(css, /body\.screen-mode\.screen-day \.dashboard-v2/);
+  const setTheme = extractNamedFunction(dashboard, 'setTheme');
   assert.match(dashboard, /window\.addEventListener\('app:public-theme-change'/);
-  const themeBlock = dashboard.slice(dashboard.indexOf('function setTheme('), dashboard.indexOf('\nconst voiceLabels'));
-  assert.doesNotMatch(themeBlock, /\brefresh\s*\(|\bAPI\./);
+  assert.match(
+    dashboard,
+    /bindEvents\(\);\s*setTheme\(document\.body\.classList\.contains\('screen-day'\) \? 'day' : 'night'\);/,
+  );
+  assert.match(setTheme, /state\.snapshot/);
+  for (const renderer of ['renderDemandChart', 'renderMix', 'renderMap', 'renderStoredDialog']) {
+    assert.match(setTheme, new RegExp(`\\b${renderer}\\s*\\(`));
+  }
+  assert.doesNotMatch(setTheme, /\b(?:API\.|fetch\s*\(|refresh\s*\(|dispose\s*\()/);
 });
 
 test('生产构建包含本地地图、背景和 ECharts 且不含外部依赖地址', async () => {

@@ -29,6 +29,9 @@ export const SCREEN_PALETTES = Object.freeze({
     mapEffect: '#d9fbff',
     mapTextBorder: '#071a2d',
     mapReference: '#799dad',
+    vehicle: '#f4c96b',
+    vehicleBorder: '#fff3c7',
+    vehicleLabel: '#f8dda0',
   }),
   day: Object.freeze({
     traditional: '#1677b8',
@@ -51,6 +54,9 @@ export const SCREEN_PALETTES = Object.freeze({
     mapEffect: '#eefaff',
     mapTextBorder: '#f6fbfe',
     mapReference: '#55788d',
+    vehicle: '#a56a08',
+    vehicleBorder: '#fff7df',
+    vehicleLabel: '#7a520b',
   }),
 });
 
@@ -67,8 +73,8 @@ export function formatNumber(value, digits = 0) {
 export function formatCurrency(value, compact = true) {
   const number = Number(value);
   if (!Number.isFinite(number)) return '—';
-  if (compact && Math.abs(number) >= 10000) return `¥${(number / 10000).toFixed(2)}万`;
-  return new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY', maximumFractionDigits: 0 }).format(number);
+  if (compact && Math.abs(number) >= 10000) return `人民币 ${(number / 10000).toFixed(2)} 万`;
+  return `人民币 ${new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 }).format(number)}`;
 }
 
 export function formatPercent(value) {
@@ -82,19 +88,33 @@ export function formatDate(value) {
   return new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit' }).format(date).replaceAll('/', '-');
 }
 
+export function formatUnit(value) {
+  const unit = String(value || '').trim();
+  return {
+    kg: '公斤', kilogram: '公斤', kilograms: '公斤',
+    m3: '立方米', cny: '人民币', rmb: '人民币',
+    celsius: '摄氏度', pct: '百分比', percent: '百分比',
+  }[unit.toLowerCase()] || unit || '未注明单位';
+}
+
 export function sortDemandTotals(items = []) {
-  return [...items]
-    .filter((item) => item && item.unit)
-    .sort((a, b) => String(a.unit).localeCompare(String(b.unit), 'zh-CN'));
+  const totals = new Map();
+  for (const item of items) {
+    if (!item?.unit) continue;
+    const unit = formatUnit(item.unit);
+    totals.set(unit, (totals.get(unit) || 0) + Number(item.quantity || 0));
+  }
+  return [...totals].map(([unit, quantity]) => ({ unit, quantity }))
+    .sort((a, b) => a.unit.localeCompare(b.unit, 'zh-CN'));
 }
 
 export function demandSeries(dailyTrend = []) {
   const dates = [...new Set(dailyTrend.map((item) => String(item.date)))].sort();
-  const units = [...new Set(dailyTrend.flatMap((item) => (item.demand_totals || []).map((total) => total.unit)))].sort((a, b) => a.localeCompare(b, 'zh-CN'));
+  const units = [...new Set(dailyTrend.flatMap((item) => (item.demand_totals || []).map((total) => formatUnit(total.unit))))].sort((a, b) => a.localeCompare(b, 'zh-CN'));
   const values = new Map();
   for (const row of dailyTrend) {
     for (const item of row.demand_totals || []) {
-      const key = `${row.date}\u0000${item.unit}`;
+      const key = `${row.date}\u0000${formatUnit(item.unit)}`;
       values.set(key, (values.get(key) || 0) + Number(item.quantity || 0));
     }
   }

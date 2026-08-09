@@ -15,6 +15,16 @@ const TRANSPORT_NAMES = {
   DELIVERED: '已送达', STORE_SIGNED: '门店已签收', COMPLETED: '已完成', CANCELLED: '已取消',
 };
 
+export function applyDashboardDictionaries(dictionaries) {
+  if (!dictionaries || typeof dictionaries !== 'object') return;
+  Object.assign(CHANNEL_NAMES, dictionaries.channel || {});
+  Object.assign(TRANSPORT_NAMES, dictionaries.transport_status || {});
+}
+
+function unknownLabel(value) {
+  return `未知类型（${value || '空值'}）`;
+}
+
 function channelType(value) {
   return CHANNEL_TYPES[value] || value || 'UNKNOWN';
 }
@@ -71,7 +81,7 @@ export function adaptDashboardSnapshot(source) {
   const preorders = new Map((charts.preorders_by_channel || []).map((row) => [channelType(row.channel), number(row.count)]));
   const channels = (charts.channel_mix || []).map((row) => ({
     channel_type: channelType(row.channel),
-    display_name: CHANNEL_NAMES[channelType(row.channel)] || row.channel,
+    display_name: CHANNEL_NAMES[channelType(row.channel)] || unknownLabel(row.channel),
     preorder_count: preorders.get(channelType(row.channel)) || 0,
     demand_totals: demandTotals(demandRows.filter((item) => channelType(item.channel) === channelType(row.channel))),
     operation_order_count: number(row.order_count),
@@ -95,6 +105,11 @@ export function adaptDashboardSnapshot(source) {
   }
   for (const route of source.map?.routes || []) {
     const originId = `origin-${route.task_id}`;
+    const environmentalAlerts = (source.alerts || []).filter((alert) => (
+      alert.task_id === route.task_id
+      && alert.status !== 'RESOLVED'
+      && /TEMPERATURE|HUMIDITY/.test(alert.alert_type || '')
+    ));
     pushNode({
       node_id: originId,
       node_type: 'PARK',
@@ -122,9 +137,11 @@ export function adaptDashboardSnapshot(source) {
         status: route.status,
         channel_type: channelType(store.channel),
         route_label: route.route_label || '经纬度估算路线',
+        plate_no: route.plate_no,
         latest_telemetry: route.latest_telemetry,
         latest_location: route.latest_location,
-        abnormal: Boolean(route.latest_telemetry?.anomaly_code),
+        environmental_alerts: environmentalAlerts,
+        abnormal: environmentalAlerts.length > 0 || Boolean(route.latest_telemetry?.anomaly_code),
       });
     }
   }
@@ -143,7 +160,9 @@ export function adaptDashboardSnapshot(source) {
   const reportingCount = number(quality.reporting_store_count);
   return {
     park_name: '黑土循环产业协同园区',
-    data_cutoff: source.data_cutoff || source.generated_at,
+    period: source.period || '30d',
+    data_cutoff: source.data_cutoff ?? null,
+    data_cutoff_note: source.data_cutoff_note || null,
     generated_at: source.generated_at,
     headline: {
       preorder_count: number(summary.preorder_count),
@@ -173,10 +192,10 @@ export function adaptDashboardSnapshot(source) {
     map_edges: mapEdges,
     alerts: source.alerts || [],
     internal: {
-      capacity: (charts.demand_by_enterprise || []).map((row) => ({ label: row.name, value: row.quantity_kg, unit: 'kg' })),
+      capacity: (charts.demand_by_enterprise || []).map((row) => ({ label: row.name, value: row.quantity_kg, unit: '公斤' })),
       inventory_alerts: (charts.inventory_by_product || []).map((row) => ({ label: row.product_name, value: row.quantity, unit: '库存' })),
       freezer: (charts.warehouse_capacity || []).map((row) => ({ label: row.warehouse_name, value: row.utilization_pct, unit: '%' })),
-      transport: (charts.transport_status || []).map((row) => ({ label: TRANSPORT_NAMES[row.status] || '其他状态', value: row.count, unit: '项' })),
+      transport: (charts.transport_status || []).map((row) => ({ label: TRANSPORT_NAMES[row.status] || unknownLabel(row.status), value: row.count, unit: '项' })),
     },
   };
 }
