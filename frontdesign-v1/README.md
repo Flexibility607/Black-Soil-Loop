@@ -30,7 +30,13 @@
 
 ## 语音助手
 
-E02 没有文字输入框。点击麦克风开始，再次点击结束；前端限制 30 秒和 5 MiB，按浏览器能力选择 WebM/Ogg/MP4。服务端还支持 WAV 与 MP3，并负责语音转写、白名单工具问答和受控图表指令。
+E02 同时提供自由文字、预设问题和匿名语音入口。点击麦克风开始，再次点击结束，满 30 秒自动停止；浏览器优先通过 AudioWorklet 采集 PCM，不支持时使用 ScriptProcessor 兼容路径，并在 Worker 中重采样、编码为 16 kHz、单声道、16 位 WAV。前端限制为 30 秒和 2 MiB。
+
+匿名访客调用 `/public/assistant/transcriptions`，登录用户调用 `/web/assistant/transcriptions`。每轮录音使用同一 UUID 作为 `Idempotency-Key` 和 `client_request_id`。转写文字会写入可编辑输入框并自动执行只读业务查询；取消、页面隐藏或离开 E02 会中止请求并释放麦克风。语音不可用时仍可使用文字和预设问题，页面不提供 TTS 或自动播放。
+
+录音只在浏览器内存中处理并上传本站服务器，网页端不写入本地存储、IndexedDB 或构建目录。本站不保存原始录音；服务器可将转写文字短期保留最长约 10 分钟，仅用于幂等重放并避免相同录音重复计费。生产启用阿里云语音服务所需的 AccessKey、Secret 与 AppKey 只能配置在 FastAPI 服务端。
+
+`npm run build:demo` 使用同源 `/api/v1` 作为占位地址，API 适配层会阻止所有服务器请求。E02 快照和确定性助手只读取构建内的演示 JSON，匿名语音返回受控 `VOICE_DISABLED`，不会上传录音。
 
 ## 本地验证
 
@@ -44,4 +50,4 @@ npm run cf:check
 
 本地连接 FastAPI 时复制 `.dev.vars.example` 为 `.dev.vars`，设置 `BACKEND_API_BASE_URL`、`ALLOW_INSECURE_BACKEND=true` 和与后端一致的 `DASHBOARD_SERVICE_TOKEN`，然后执行 `npm run cf:dev`。
 
-服务器上线后只修改 Cloudflare 环境变量。OpenAI 密钥只放在 FastAPI 服务端，不能写入 Worker、前端源码或浏览器存储。
+服务器上线后只修改 Cloudflare 环境变量。阿里云及其他供应商凭据只放在 FastAPI 服务端，不能写入 Worker、前端源码或浏览器存储。

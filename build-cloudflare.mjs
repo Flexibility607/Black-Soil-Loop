@@ -7,6 +7,7 @@ const outputDir = join(projectRoot, 'dist');
 const frontendDir = join(projectRoot, 'frontdesign-v1');
 const mockDir = join(projectRoot, 'frontend-mocks-v0.1');
 const includeDemoFixtures = process.argv.includes('--demo');
+const runtimeApiBase = includeDemoFixtures ? '/api/v1' : 'https://api.flexibility607.cn/api/v1';
 
 const mockFiles = includeDemoFixtures ? (await readdir(mockDir, { withFileTypes: true }))
   .filter((entry) => entry.isFile() && entry.name.endsWith('.json'))
@@ -44,7 +45,7 @@ if (includeDemoFixtures) {
 }
 await writeFile(
   join(outputDir, 'runtime-config.js'),
-  `window.BLACKSOIL_CONFIG = Object.freeze({ apiBase: 'https://api.flexibility607.cn/api/v1', demo: ${includeDemoFixtures} });\n`,
+  `window.BLACKSOIL_CONFIG = Object.freeze({ apiBase: '${runtimeApiBase}', demo: ${includeDemoFixtures} });\n`,
   'utf8',
 );
 
@@ -64,4 +65,4 @@ for (const font of fonts) {
   await cp(join(source, 'files'), join(target, 'files'), { recursive: true });
 }
 
-console.log(`Cloudflare assets ready: production API, local ECharts, ${fonts.length} local fonts, demo fixtures: ${includeDemoFixtures ? mockFiles.length : 0}.`);
+console.log(`Cloudflare assets ready: ${includeDemoFixtures ? 'same-origin demo' : 'production API'}, local ECharts, ${fonts.length} local fonts, demo fixtures: ${includeDemoFixtures ? mockFiles.length : 0}.`);

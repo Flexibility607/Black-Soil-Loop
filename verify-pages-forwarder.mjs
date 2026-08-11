@@ -32,6 +32,13 @@ assert.equal(
 assert.equal(response.headers.get('x-black-soil-loop-proxy'), 'pages-service-binding');
 assert.equal(await response.text(), 'forwarded');
 
+await worker.fetch(
+  new Request('https://black-soil-loop-f607.pages.dev/dashboard-audio-worklet.js?v=20260811-anonymous-voice-1'),
+  env,
+);
+assert.equal(new URL(forwardedRequest.url).pathname, '/dashboard-audio-worklet.js');
+assert.equal(new URL(forwardedRequest.url).search, '?v=20260811-anonymous-voice-1');
+
 const unavailable = await worker.fetch(new Request('https://black-soil-loop-f607.pages.dev/'), {});
 assert.equal(unavailable.status, 503);
 

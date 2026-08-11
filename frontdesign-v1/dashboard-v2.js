@@ -20,7 +20,7 @@ import {
   harbinIsNorthOfChangchun,
   localGeoJsonIsNortheast,
 } from './dashboard-map.js?v=20260809-jipin-theme-2';
-import { VOICE_STATES, VoiceQuestionController } from './dashboard-voice.js';
+import { VOICE_STATES, VoiceQuestionController } from './dashboard-voice.js?v=20260811-anonymous-voice-1';
 import { adaptDashboardSnapshot, applyDashboardDictionaries } from './dashboard-adapter.js';
 import { eventTargets, RealtimeCoordinator } from './dashboard-realtime.js';
 
@@ -403,10 +403,14 @@ const voice = new VoiceQuestionController({
     const mic = byId('dv2-mic-button');
     mic.classList.toggle('recording', next === VOICE_STATES.RECORDING);
     mic.querySelector('span').textContent = next === VOICE_STATES.RECORDING ? '结束录音' : '开始提问';
+    mic.setAttribute('aria-label', next === VOICE_STATES.RECORDING ? '结束语音录音' : '开始语音提问');
+    mic.setAttribute('aria-pressed', String(next === VOICE_STATES.RECORDING));
+    mic.disabled = [VOICE_STATES.REQUESTING, VOICE_STATES.UPLOADING, VOICE_STATES.TRANSCRIBING, VOICE_STATES.ANALYZING].includes(next);
     byId('dv2-voice-cancel').hidden = ![VOICE_STATES.REQUESTING, VOICE_STATES.RECORDING, VOICE_STATES.UPLOADING, VOICE_STATES.TRANSCRIBING, VOICE_STATES.ANALYZING].includes(next);
     byId('dv2-voice-retry').hidden = next !== VOICE_STATES.ERROR && next !== VOICE_STATES.CANCELLED;
   },
   onTranscript(question) {
+    byId('dv2-assistant-input').value = question;
     const element = byId('dv2-transcript');
     element.hidden = false;
     element.textContent = `识别问题：${question}`;
@@ -414,6 +418,9 @@ const voice = new VoiceQuestionController({
   onAnswer(result) {
     byId('dv2-answer').textContent = result?.answer || '已完成分析。';
     if (result?.chart) renderAssistantChart(result.chart);
+  },
+  onFallback() {
+    byId('dv2-assistant-input')?.focus();
   },
 });
 
@@ -504,6 +511,7 @@ function activate() {
 
 function deactivate() {
   state.active = false;
+  if (voice.busy) voice.cancel('已离开 E02 大屏，本次语音提问已停止');
 }
 
 function flushRealtimeRefresh() {
@@ -541,22 +549,31 @@ function startRealtimeEvents() {
 async function submitAssistantQuestion(question, sourceLabel = '文字问题') {
   const normalized = String(question || '').trim();
   if (normalized.length < 2) return;
+  if (voice.busy) voice.cancel('已切换为文字提问');
   byId('dv2-voice-state').textContent = '正在分析';
   byId('dv2-voice-hint').textContent = `${sourceLabel}：${normalized}`;
-  const result = await API.queryDashboardAssistant(normalized, state.period, state.snapshot?.park_id);
-  const payload = safeEnvelopeData(result);
-  if (!payload) {
+  try {
+    const result = await API.queryDashboardAssistant(normalized, state.period, state.snapshot?.park_id);
+    const payload = safeEnvelopeData(result);
+    if (!payload) {
+      byId('dv2-voice-state').textContent = '提问失败';
+      byId('dv2-answer').textContent = responseError(result);
+      return;
+    }
+    byId('dv2-voice-state').textContent = '回答完成';
+    byId('dv2-answer').textContent = payload.answer || '已完成分析。';
+    if (payload.chart) renderAssistantChart(payload.chart);
+  } catch {
     byId('dv2-voice-state').textContent = '提问失败';
-    byId('dv2-answer').textContent = responseError(result);
-    return;
+    byId('dv2-answer').textContent = '网络连接失败，请检查网络后重试。';
   }
-  byId('dv2-voice-state').textContent = '回答完成';
-  byId('dv2-answer').textContent = payload.answer || '已完成分析。';
-  if (payload.chart) renderAssistantChart(payload.chart);
 }
 
 function bindEvents() {
   document.querySelectorAll('.dv2-periods button').forEach((button) => button.addEventListener('click', () => {
+    if (button.dataset.period !== state.period && voice.busy) {
+      voice.cancel('统计周期已切换，请按新周期重新录音');
+    }
     state.period = button.dataset.period;
     document.querySelectorAll('.dv2-periods button').forEach((item) => item.classList.toggle('active', item === button));
     state.snapshot = null;
@@ -587,7 +604,10 @@ function bindEvents() {
   window.addEventListener('resize', () => chartInstances.forEach((chart) => chart.resize()));
   window.addEventListener('app:public-theme-change', (event) => setTheme(event.detail?.theme));
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) return;
+    if (document.hidden) {
+      if (voice.busy) voice.cancel('页面已隐藏，本次语音提问已停止');
+      return;
+    }
     queueRealtimeRefresh(['overview', 'enterprise', 'production', 'inventory', 'transport']);
     startRealtimeEvents();
   });

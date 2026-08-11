@@ -1071,6 +1071,11 @@ body.screen-mode.screen-day .dv2-brand-mark img {
   animation: dv2-recording-pulse 1.3s ease-out infinite;
 }
 
+.dv2-mic:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
 @keyframes dv2-recording-pulse {
   50% { box-shadow: 0 0 0 18px var(--dv2-recording-ring-wide), 0 0 42px var(--dv2-recording-glow-wide); }
 }
@@ -1084,6 +1089,13 @@ body.screen-mode.screen-day .dv2-brand-mark img {
   background: var(--dv2-answer-surface);
   font-size: 11px;
   line-height: 1.55;
+}
+
+.dv2-voice-panel > .dv2-voice-privacy {
+  margin: -1px 16px 8px;
+  color: var(--dv2-muted);
+  font-size: 9px;
+  line-height: 1.45;
 }
 
 .dv2-answer {

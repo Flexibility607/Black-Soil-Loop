@@ -1,10 +1,10 @@
 (function () {
   const runtime = window.BLACKSOIL_CONFIG || {};
   const productionHost = /(^|\.)flexibility607\.cn$/i.test(window.location.hostname);
-  const baseUrl = productionHost
-    ? 'https://api.flexibility607.cn/api/v1'
-    : (runtime.apiBase || '/api/v1');
   const demoMode = runtime.demo === true;
+  const baseUrl = demoMode
+    ? (runtime.apiBase || '/api/v1')
+    : productionHost ? 'https://api.flexibility607.cn/api/v1' : (runtime.apiBase || '/api/v1');
   const demoSnapshotUrl = './frontend-mocks-v0.1/e02-dashboard-snapshot.json';
   const authListeners = new Set();
   const channel = typeof BroadcastChannel === 'function' ? new BroadcastChannel('blacksoil-auth-v1') : null;
@@ -114,6 +114,12 @@
   }
 
   async function rawRequest(path, options = {}, retryOn401 = true) {
+    if (demoMode) {
+      return response(false, 503, {
+        code: 'DEMO_API_DISABLED',
+        message: '本地演示不会访问服务器 API。',
+      });
+    }
     const headers = new Headers(options.headers || {});
     const hasFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
     if (options.body && !hasFormData && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
@@ -239,18 +245,130 @@
     return withData(result, result.json?.dictionaries);
   }
 
-  async function transcribeDashboardAudio(blob, durationSeconds, filename = 'question.webm') {
+  async function demoAssistantAnswer(question, period) {
+    try {
+      const result = await fetch(demoSnapshotUrl, { cache: 'no-store' });
+      const envelope = await readJson(result);
+      const snapshot = envelope?.data;
+      if (!result.ok || !snapshot) throw new Error('fixture unavailable');
+      const normalized = String(question || '').trim();
+      const common = {
+        mode: 'demo_deterministic',
+        period,
+        period_start: snapshot.range_start || null,
+        period_end: snapshot.range_end || null,
+        data_cutoff: snapshot.data_cutoff || envelope.data_cutoff || null,
+        generated_at: new Date().toISOString(),
+        allowed_chart_types: ['bar', 'line', 'donut', 'route'],
+        chart_fallback_reason: null,
+      };
+      const channelMix = Array.isArray(snapshot.channel_mix) ? snapshot.channel_mix : [];
+      const thirdSpace = channelMix.find((item) => item.channel_type === 'THIRD_SPACE');
+      if (/第三空间/.test(normalized) && /(占比|营业额)/.test(normalized)) {
+        return response(true, 200, { data: {
+          ...common,
+          intent: 'CHANNEL',
+          unit: '人民币',
+          answer: `演示数据中，第三空间营业额为 ${Number(thirdSpace?.sales_amount || 0).toLocaleString('zh-CN')} 元，占园区营业额 ${Number(thirdSpace?.sales_share || 0).toFixed(2)}%。`,
+          chart: {
+            kind: 'donut',
+            title: '演示渠道营业额构成',
+            unit: '人民币',
+            categories: channelMix.map((item) => item.display_name),
+            series: [{ name: '营业额', data: channelMix.map((item) => Number(item.sales_amount || 0)) }],
+          },
+        } });
+      }
+      if (/排行/.test(normalized)) {
+        const stores = [...(snapshot.third_spaces || [])].sort((left, right) => Number(right.sales_amount || 0) - Number(left.sales_amount || 0));
+        return response(true, 200, { data: {
+          ...common,
+          intent: 'OPERATIONS',
+          unit: '人民币',
+          answer: `演示数据中，第三空间营业额最高的是 ${stores[0]?.store_name || '暂无门店'}。`,
+          chart: {
+            kind: 'bar',
+            title: '演示第三空间营业额排行',
+            unit: '人民币',
+            categories: stores.map((item) => item.store_name),
+            series: [{ name: '营业额', data: stores.map((item) => Number(item.sales_amount || 0)) }],
+          },
+        } });
+      }
+      if (/需求|趋势/.test(normalized)) {
+        const totals = new Map();
+        for (const row of snapshot.daily_trend || []) {
+          const kg = row.demand_totals?.find((item) => item.unit === 'kg')?.quantity || 0;
+          totals.set(row.date, Number(totals.get(row.date) || 0) + Number(kg));
+        }
+        const dates = [...totals.keys()].sort();
+        return response(true, 200, { data: {
+          ...common,
+          intent: 'OVERVIEW',
+          unit: '公斤',
+          answer: `演示数据包含 ${dates.length} 个自然日的需求趋势，请查看折线图。`,
+          chart: {
+            kind: 'line',
+            title: '演示每日需求趋势',
+            unit: '公斤',
+            categories: dates,
+            series: [{ name: '需求量', data: dates.map((date) => Number(totals.get(date) || 0)) }],
+          },
+        } });
+      }
+      const demandTotals = snapshot.headline?.demand_totals || [];
+      return response(true, 200, { data: {
+        ...common,
+        intent: 'OVERVIEW',
+        unit: '按商品单位拆分',
+        answer: `当前为本地演示数据：预订单 ${Number(snapshot.headline?.preorder_count || 0)} 笔，经营订单 ${Number(snapshot.headline?.operation_order_count || 0)} 笔。`,
+        chart: {
+          kind: 'bar',
+          title: '演示园区需求概览',
+          unit: '原始单位',
+          categories: demandTotals.map((item) => item.unit),
+          series: [{ name: '需求量', data: demandTotals.map((item) => Number(item.quantity || 0)) }],
+        },
+      } });
+    } catch {
+      return response(false, 503, {
+        code: 'DEMO_ASSISTANT_UNAVAILABLE',
+        message: '本地演示助手数据暂不可用，请刷新页面后重试。',
+      });
+    }
+  }
+
+  async function transcribeDashboardAudio(blob, durationSeconds, filename = 'question.wav', options = {}) {
+    if (demoMode) {
+      return response(false, 503, {
+        code: 'VOICE_DISABLED',
+        message: '本地演示不上传录音，请使用文字或预设问题。',
+      });
+    }
+    const requestId = options.requestId || globalThis.crypto?.randomUUID?.();
+    if (!requestId) throw new Error('无法生成语音请求编号，请刷新页面后重试。');
     const form = new FormData();
     form.append('audio', blob, filename);
     form.append('duration_seconds', String(durationSeconds));
-    const result = await rawRequest('/web/assistant/transcriptions', { method: 'POST', body: form }, false);
+    form.append('client_request_id', requestId);
+    const route = accessToken ? '/web/assistant/transcriptions' : '/public/assistant/transcriptions';
+    const result = await rawRequest(route, {
+      method: 'POST',
+      headers: { 'Idempotency-Key': requestId, 'X-Trace-Id': requestId },
+      body: form,
+      signal: options.signal,
+    }, Boolean(accessToken));
     return withData(result, result.json ? { ...result.json, text: result.json.transcript } : null);
   }
 
-  async function queryDashboardAssistant(question, _period = '30d', _parkId = null, preferredChart = null) {
+  async function queryDashboardAssistant(question, period = '30d', _parkId = null, preferredChart = null, options = {}) {
+    if (demoMode) return demoAssistantAnswer(question, period);
+    const headers = options.requestId ? { 'X-Trace-Id': options.requestId } : undefined;
     const result = await rawRequest(accessToken ? '/web/assistant/query' : '/public/assistant/query', {
       method: 'POST',
-      body: JSON.stringify({ question, preferred_chart: preferredChart || 'auto' }),
+      headers,
+      body: JSON.stringify({ question, preferred_chart: preferredChart || 'auto', period }),
+      signal: options.signal,
     });
     return withData(result, result.json);
   }

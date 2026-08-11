@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="vendor/fonts/noto-sans-sc/index.css" />
   <link rel="stylesheet" href="vendor/fonts/zcool-qingke-huangyou/400.css" />
   <link rel="stylesheet" href="vendor/fonts/jetbrains-mono/index.css" />
-  <link rel="stylesheet" href="dashboard.css?v=20260809-jipin-theme-2" />
+  <link rel="stylesheet" href="dashboard.css?v=20260811-anonymous-voice-1" />
 </head>
 <body>
   <div class="app-shell">
@@ -158,7 +158,8 @@
                   <div><input id="dv2-assistant-input" maxlength="500" minlength="2" placeholder="例如：当前有多少条未处理运输报警？" required /><button type="submit">发送</button></div>
                 </form>
                 <div class="dv2-examples"><span>可问</span><button type="button" data-example="第三空间营业额占比是多少？">第三空间营业额占比</button><button type="button" data-example="最近的需求趋势如何？">最近需求趋势</button><button type="button" data-example="第三空间销售排行">第三空间排行</button></div>
-                <div class="dv2-mic-zone"><button id="dv2-mic-button" class="dv2-mic" type="button" aria-label="开始语音提问"><i></i><span>开始提问</span></button><button id="dv2-voice-cancel" class="dv2-voice-secondary" type="button" hidden>取消</button><button id="dv2-voice-retry" class="dv2-voice-secondary" type="button" hidden>重试</button></div>
+                <div class="dv2-mic-zone"><button id="dv2-mic-button" class="dv2-mic" type="button" aria-label="开始语音提问" aria-pressed="false"><i></i><span>开始提问</span></button><button id="dv2-voice-cancel" class="dv2-voice-secondary" type="button" hidden>取消</button><button id="dv2-voice-retry" class="dv2-voice-secondary" type="button" hidden>重试</button></div>
+                <p class="dv2-voice-privacy">录音会发送至本站服务器并交由阿里云智能语音交互处理，本站不保存原始录音；转写文字最长约保留 10 分钟，用于幂等重放并避免重复计费。语音只用于只读业务查询。</p>
                 <div id="dv2-transcript" class="dv2-transcript" hidden></div><div id="dv2-answer" class="dv2-answer" aria-live="polite">助手仅使用受控业务查询，并可打开条形图、折线图、环图或路线摘要。</div>
               </section>
             </div>
@@ -172,9 +173,9 @@
     </main>
   </div>
   <script src="runtime-config.js"></script>
-  <script src="api.js?v=20260806-real-api-1"></script>
+  <script src="api.js?v=20260811-anonymous-voice-1"></script>
   <script src="scripts.js?v=20260809-jipin-theme-2"></script>
   <script src="vendor/echarts/echarts.min.js"></script>
-  <script type="module" src="dashboard-v2.js?v=20260809-jipin-theme-2"></script>
+  <script type="module" src="dashboard-v2.js?v=20260811-anonymous-voice-1"></script>
 </body>
 </html>

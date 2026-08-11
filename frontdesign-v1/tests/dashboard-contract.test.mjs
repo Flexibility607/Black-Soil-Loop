@@ -49,7 +49,23 @@ test('E02 保留语音入口和两个经营占比环图', async () => {
   assert.match(html, /id="dv2-order-donut"/);
   assert.match(html, /id="dv2-sales-donut"/);
   assert.match(html, /id="dv2-mic-button"/);
+  assert.match(html, /本站不保存原始录音；转写文字最长约保留 10 分钟/);
+  assert.match(html, /dashboard-v2\.js\?v=20260811-anonymous-voice-1/);
+  assert.match(html, /api\.js\?v=20260811-anonymous-voice-1/);
   assert.doesNotMatch(html, /id="public-assistant-input"/);
+});
+
+test('同源录音 Worklet 与 WAV Worker 完整进入生产构建', async () => {
+  for (const name of ['dashboard-audio-worklet.js', 'dashboard-wav-worker.js', 'dashboard-voice.js']) {
+    const source = await readFile(new URL(`frontdesign-v1/${name}`, projectRoot));
+    const output = await readFile(new URL(`dist/${name}`, projectRoot));
+    assert.ok(source.byteLength > 100, name);
+    assert.equal(createHash('sha256').update(output).digest('hex'), createHash('sha256').update(source).digest('hex'));
+  }
+  const voice = await readFile(new URL('frontdesign-v1/dashboard-voice.js', projectRoot), 'utf8');
+  assert.match(voice, /new URL\('\.\/dashboard-audio-worklet\.js\?v=20260811-anonymous-voice-1'/);
+  assert.match(voice, /new URL\('\.\/dashboard-wav-worker\.js\?v=20260811-anonymous-voice-1'/);
+  assert.doesNotMatch(voice, /https?:\/\//);
 });
 
 test('三张吉品 Logo 在源码和构建产物中保持原始字节', async () => {
@@ -159,4 +175,12 @@ test('生产构建强制真实 API 且不携带 Mock 数据', async () => {
   const html = await readFile(new URL('dist/index.html', projectRoot), 'utf8');
   assert.doesNotMatch(html, /id="toggle-mock"/);
   for (const label of ['DEMAND BY UNIT', 'CHANNEL MIX', 'VOICE DATA AGENT']) assert.equal(html.includes(label), false);
+});
+
+test('构建脚本将演示 API 固定为同源且生产模式仍使用正式地址', async () => {
+  const build = await readFile(new URL('build-cloudflare.mjs', projectRoot), 'utf8');
+  assert.match(build, /includeDemoFixtures \? '\/api\/v1' : 'https:\/\/api\.flexibility607\.cn\/api\/v1'/);
+  const api = await readFile(new URL('frontdesign-v1/api.js', projectRoot), 'utf8');
+  assert.match(api, /if \(demoMode\) \{\s*return response\(false, 503, \{\s*code: 'DEMO_API_DISABLED'/);
+  assert.match(api, /if \(demoMode\) return demoAssistantAnswer\(question, period\)/);
 });
