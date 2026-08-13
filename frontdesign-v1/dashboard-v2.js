@@ -14,22 +14,25 @@ import {
   responseError,
   safeEnvelopeData,
   sortDemandTotals,
-} from './dashboard-format.js?v=20260809-jipin-theme-2';
+} from './dashboard-format.js?v=20260813-dashboard-presentation-2';
 import {
   applyDashboardMapDictionaries,
   buildChangchunMapOption,
   buildNortheastMapOption,
+  localGeoJsonIsChangchunRoadBasemap,
   localGeoJsonIsChangchunServiceArea,
   localGeoJsonIsNortheast,
-} from './dashboard-map.js?v=20260809-jipin-theme-2';
-import { VOICE_STATES, VoiceQuestionController } from './dashboard-voice.js?v=20260811-anonymous-voice-1';
-import { adaptDashboardSnapshot, applyDashboardDictionaries } from './dashboard-adapter.js';
-import { eventTargets, RealtimeCoordinator } from './dashboard-realtime.js';
+} from './dashboard-map.js?v=20260813-dashboard-presentation-2';
+import { createSeamlessLoop } from './dashboard-loop.js?v=20260813-dashboard-presentation-2';
+import { VOICE_STATES, VoiceQuestionController } from './dashboard-voice.js?v=20260813-dashboard-presentation-2';
+import { adaptDashboardSnapshot, applyDashboardDictionaries } from './dashboard-adapter.js?v=20260813-dashboard-presentation-2';
+import { eventTargets, RealtimeCoordinator } from './dashboard-realtime.js?v=20260813-dashboard-presentation-2';
 
 const echarts = window.echarts;
 const API = window.API;
 const DEMO_FIXTURE = './frontend-mocks-v0.1/e02-dashboard-snapshot.json';
 const CHANGCHUN_MAP_FIXTURE = './assets/maps/changchun-service-area.geojson';
+const CHANGCHUN_ROAD_BASEMAP = './assets/maps/changchun-road-basemap.v1.geojson';
 const LEGACY_MAP_FIXTURE = './assets/maps/northeast-china-admin1.geojson';
 const chartInstances = new Map();
 const state = {
@@ -41,12 +44,17 @@ const state = {
   lastSuccessfulAt: null,
   mapReady: false,
   mapMode: null,
+  mapBasemap: null,
+  mapBasemapFallback: false,
   refreshGeneration: 0,
   information: null,
   informationEtag: null,
   informationKind: 'NEWS',
+  informationSignature: null,
   informationTimer: null,
-  informationScrollTimer: null,
+  rankingLoop: null,
+  informationLoop: null,
+  rankingSignature: null,
   showcasePanel: 'CARPOOL',
   showcaseCase: {},
   showcasePauseUntil: 0,
@@ -189,6 +197,17 @@ async function ensureMap(mode = 'changchun') {
   if (mode === 'changchun') {
     if (!localGeoJsonIsChangchunServiceArea(geojson)) throw new Error('长春服务范围地图坐标校验失败');
     echarts.registerMap('changchun-service-area', geojson);
+    try {
+      const basemapResponse = await fetch(CHANGCHUN_ROAD_BASEMAP, { cache: 'force-cache' });
+      if (!basemapResponse.ok) throw new Error(`HTTP ${basemapResponse.status}`);
+      const basemap = await basemapResponse.json();
+      if (!localGeoJsonIsChangchunRoadBasemap(basemap)) throw new Error('结构校验失败');
+      state.mapBasemap = basemap;
+      state.mapBasemapFallback = false;
+    } catch {
+      state.mapBasemap = null;
+      state.mapBasemapFallback = true;
+    }
   } else {
     if (!localGeoJsonIsNortheast(geojson)) throw new Error('东北三省地图坐标校验失败');
     echarts.registerMap('northeast-admin1', geojson);
@@ -247,14 +266,19 @@ function renderDemandChart(snapshot, target = 'dv2-demand-chart', palette = scre
   }, true);
 }
 
-function donutOption(values, centerLabel, palette = COLORS, valueFormatter = formatNumber) {
+function donutOption(values, centerLabel, palette = COLORS, valueFormatter = formatNumber, displayOptions = {}) {
   const total = values.reduce((sum, item) => sum + Number(item.value || 0), 0);
+  const expanded = displayOptions.profile === 'e02-expanded';
+  const primary = displayOptions.centerPrimary ?? (total ? valueFormatter(total) : valueFormatter(0));
+  const unit = displayOptions.centerUnit ?? centerLabel;
+  const primaryLength = String(primary).length;
+  const primaryFontSize = expanded ? (primaryLength >= 8 ? 12 : primaryLength >= 6 ? 14 : 16) : 18;
   return {
     animationDuration: 350,
     tooltip: { trigger: 'item', formatter: (params) => `${htmlEscape(params.name)}<br/>${htmlEscape(valueFormatter(params.value, true))} · ${htmlEscape(formatPercent(params.percent))}`, backgroundColor: palette.tooltipBackground || 'rgba(8, 31, 55, .96)', borderColor: palette.tooltipBorder || palette.traditional, textStyle: { color: palette.text } },
-    title: { text: total ? valueFormatter(total) : valueFormatter(0), subtext: centerLabel, left: 'center', top: '37%', textStyle: { color: palette.text, fontFamily: 'JetBrains Mono Variable', fontSize: 18 }, subtextStyle: { color: palette.muted, fontSize: 10 } },
+    title: { text: primary, subtext: unit, left: 'center', top: expanded ? '32%' : '37%', textStyle: { color: palette.text, fontFamily: 'JetBrains Mono Variable', fontSize: primaryFontSize, width: expanded ? 64 : undefined, overflow: 'truncate', align: 'center' }, subtextStyle: { color: palette.muted, fontSize: expanded ? 9 : 10, width: expanded ? 64 : undefined, overflow: 'truncate', align: 'center' } },
     series: [{
-      type: 'pie', radius: ['57%', '77%'], center: ['50%', '48%'], startAngle: 90,
+      type: 'pie', radius: expanded ? ['63%', '88%'] : ['57%', '77%'], center: ['50%', expanded ? '49%' : '48%'], startAngle: 90,
       label: { show: false }, emphasis: { scale: true, scaleSize: 5 },
       itemStyle: { borderColor: palette.pieBorder || '#0b263e', borderWidth: 2 },
       data: values,
@@ -264,26 +288,62 @@ function donutOption(values, centerLabel, palette = COLORS, valueFormatter = for
 
 function renderMix(snapshot) {
   const palette = screenPalette();
-  initChart('dv2-order-donut')?.setOption(donutOption(channelValues(snapshot.channel_mix, 'operation_order_count', palette), '订单', palette), true);
+  const orderTotal = snapshot.channel_mix.reduce((sum, item) => sum + Number(item.operation_order_count || 0), 0);
+  initChart('dv2-order-donut')?.setOption(donutOption(
+    channelValues(snapshot.channel_mix, 'operation_order_count', palette), '订单', palette, formatNumber,
+    { profile: 'e02-expanded', centerPrimary: formatNumber(orderTotal), centerUnit: '笔' },
+  ), true);
   const salesFormatter = (value, full = false) => snapshot.currency === 'CNY'
     ? formatCnyAmount(value, { compact: !full, fullPrecision: full })
     : `币种不支持（${snapshot.currency || '空值'}）`;
-  initChart('dv2-sales-donut')?.setOption(donutOption(channelValues(snapshot.channel_mix, 'sales_amount', palette), '营业额', palette, salesFormatter), true);
+  const salesTotal = snapshot.channel_mix.reduce((sum, item) => sum + Number(item.sales_amount || 0), 0);
+  const salesPrimary = snapshot.currency === 'CNY'
+    ? formatCnyAmount(salesTotal).replace(/\s*(亿元|万元|元)$/, '')
+    : '—';
+  const salesUnit = snapshot.currency === 'CNY'
+    ? (salesTotal >= 100000000 ? '亿元' : salesTotal >= 10000 ? '万元' : '元')
+    : '';
+  initChart('dv2-sales-donut')?.setOption(donutOption(
+    channelValues(snapshot.channel_mix, 'sales_amount', palette), '营业额', palette, salesFormatter,
+    { profile: 'e02-expanded', centerPrimary: salesPrimary, centerUnit: salesUnit },
+  ), true);
   byId('dv2-mix-legend').innerHTML = snapshot.channel_mix.map((item) => {
     const color = item.channel_type === 'THIRD_SPACE' ? palette.thirdSpace : palette.traditional;
     return `<div style="--legend-color:${color}"><strong>${htmlEscape(item.display_name)}</strong><small>订单 ${htmlEscape(formatPercent(item.operation_order_share))} · 营业额 ${htmlEscape(formatPercent(item.sales_share))}</small></div>`;
   }).join('');
 }
 
+function rankItemMarkup(item, index, max, snapshot) {
+  return `<div class="dv2-rank-item">
+    <b>${index + 1}</b>
+    <div><strong>${htmlEscape(item.store_name)}</strong><small>${htmlEscape(item.city || '城市待补充')} · 最近上报 ${htmlEscape(item.last_report_date || '缺报')}</small><div class="dv2-rank-bar"><i style="width:${Math.max(4, Number(item.sales_amount || 0) / max * 100).toFixed(1)}%"></i></div></div>
+    <span class="dv2-rank-value"><b>${htmlEscape(snapshot.currency === 'CNY' ? formatCnyAmount(item.sales_amount) : `币种不支持（${snapshot.currency || '空值'}）`)}</b><small>${htmlEscape(formatNumber(item.operation_order_count))} 笔</small></span>
+  </div>`;
+}
+
 function renderRanking(snapshot) {
   const rows = [...snapshot.third_spaces].sort((a, b) => Number(b.sales_amount) - Number(a.sales_amount));
   const max = Math.max(...rows.map((item) => Number(item.sales_amount || 0)), 1);
-  byId('dv2-third-space-list').innerHTML = rows.length ? rows.slice(0, 4).map((item, index) => `
-    <div class="dv2-rank-item">
-      <b>${index + 1}</b>
-      <div><strong>${htmlEscape(item.store_name)}</strong><small>${htmlEscape(item.city || '城市待补充')} · 最近上报 ${htmlEscape(item.last_report_date || '缺报')}</small><div class="dv2-rank-bar"><i style="width:${Math.max(4, Number(item.sales_amount || 0) / max * 100).toFixed(1)}%"></i></div></div>
-      <span class="dv2-rank-value"><b>${htmlEscape(snapshot.currency === 'CNY' ? formatCnyAmount(item.sales_amount) : `币种不支持（${snapshot.currency || '空值'}）`)}</b><small>${htmlEscape(formatNumber(item.operation_order_count))} 笔</small></span>
-    </div>`).join('') : '<div class="dv2-empty">暂无第三空间经营数据</div>';
+  const viewport = byId('dv2-third-space-list');
+  const signature = JSON.stringify(rows.map((item) => [item.store_name, item.sales_amount, item.operation_order_count, item.last_report_date]));
+  if (state.rankingSignature === signature && viewport.querySelector('.dv2-loop-track')) {
+    state.rankingLoop?.refresh();
+    return;
+  }
+  state.rankingLoop?.destroy();
+  state.rankingLoop = null;
+  state.rankingSignature = signature;
+  viewport.innerHTML = rows.length ? `<div class="dv2-loop-track">${rows.map((item, index) => rankItemMarkup(item, index, max, snapshot)).join('')}</div>` : '<div class="dv2-empty">暂无第三空间经营数据</div>';
+  if (!rows.length) {
+    byId('dv2-ranking-loop-toggle').hidden = true;
+    return;
+  }
+  state.rankingLoop = createSeamlessLoop({
+    viewport, track: viewport.firstElementChild, pauseButton: byId('dv2-ranking-loop-toggle'),
+    signature, speedPxPerSecond: 15, itemCount: rows.length,
+    active: () => state.active && !document.hidden,
+    blocked: () => Boolean(document.querySelector('.dv2-chart-dialog[open]')),
+  });
 }
 
 function renderQuality(snapshot) {
@@ -302,42 +362,66 @@ function renderMap(snapshot) {
   const chart = initChart('dv2-map-chart');
   if (!chart) return;
   const option = snapshot.public_map?.schema_version === '2.0'
-    ? buildChangchunMapOption(snapshot, screenPalette())
+    ? buildChangchunMapOption(snapshot, screenPalette(), state.mapBasemap)
     : buildNortheastMapOption(snapshot, screenPalette());
   chart.setOption(option, true);
   const excluded = snapshot.public_map?.excluded_route_summary?.count || 0;
   const alerts = (snapshot.public_map?.active_routes || []).reduce((sum, route) => sum + Number(route.alert_count || 0), 0);
-  if (byId('dv2-map-summary')) byId('dv2-map-summary').textContent = `未解决报警 ${alerts} 条 · 范围外或无下一站 ${excluded} 项`;
+  if (byId('dv2-map-summary')) byId('dv2-map-summary').textContent = state.mapBasemapFallback
+    ? `道路底图暂不可用，当前显示长春服务范围图 · 报警 ${alerts} 条 · 排除 ${excluded} 项`
+    : `未解决报警 ${alerts} 条 · 范围外或无下一站 ${excluded} 项`;
 }
 
 function showcaseAllocationSummary(allocation) {
   if (allocation.type === 'CARPOOL') {
     return {
       title: `${allocation.vehicle_label} → ${(allocation.store_names || []).join('、') || '门店待补充'}`,
-      metrics: `${allocation.order_count} 单 / ${allocation.enterprise_count} 企业 · 利用率 ${formatPercent(allocation.capacity_utilization_pct)} · 估算节省 ${formatNumber(allocation.mileage_benefit_estimated_km, 1)} km`,
-      detail: `${allocation.temperature_zone_label} · ${allocation.total_weight_kg} kg · ${allocation.total_volume_m3} m³ · ${allocation.decision_state_label}`,
+      statusLabel: allocation.decision_state_label,
+      primaryMetrics: `${allocation.order_count} 单 · ${allocation.enterprise_count} 家企业 · ${allocation.temperature_zone_label}`,
+      secondaryMetrics: `${formatNumber(allocation.total_weight_kg, 1)} kg · ${formatNumber(allocation.total_volume_m3, 1)} m³ · 利用率 ${formatPercent(allocation.capacity_utilization_pct)}`,
+      detail: `估算节省 ${formatNumber(allocation.mileage_benefit_estimated_km, 1)} km`,
     };
   }
   if (allocation.type === 'WAREHOUSE') {
     return {
-      title: `${allocation.warehouse_name} · ${allocation.decision_state_label}`,
-      metrics: `${allocation.order_count} 单 / ${allocation.enterprise_count} 企业 · 需要 ${formatNumber(allocation.required_volume_m3, 1)} m³ · 剩余 ${formatNumber(allocation.remaining_volume_m3, 1)} m³`,
-      detail: `${allocation.temperature_zone_label} · 最远估算 ${formatNumber(allocation.estimated_distance_km, 1)} km · ${(allocation.reasons || []).join('；')}`,
+      title: allocation.warehouse_name,
+      statusLabel: allocation.decision_state_label,
+      primaryMetrics: `${allocation.order_count} 单 · ${allocation.enterprise_count} 家企业 · ${allocation.temperature_zone_label}`,
+      secondaryMetrics: `需要 ${formatNumber(allocation.required_volume_m3, 1)} m³ · 可用 ${formatNumber(allocation.available_volume_m3, 1)} m³ · 剩余 ${formatNumber(allocation.remaining_volume_m3, 1)} m³`,
+      detail: `最远估算 ${formatNumber(allocation.estimated_distance_km, 1)} km · ${(allocation.reasons || []).join('；')}`,
     };
   }
   if (allocation.type === 'PROCUREMENT') {
     const supplier = (allocation.supplier_options || [])[0];
     return {
-      title: `${allocation.product_name} · ${allocation.confirmation_state_label}`,
-      metrics: `采用 ${formatNumber(allocation.effective_quantity, 2)} ${allocation.base_unit} · ${supplier ? `推荐 ${supplier.supplier_name}` : '暂无合格供应商'}`,
-      detail: supplier ? `单价 ${formatCnyAmount(supplier.unit_price, { compact: false })} · 总额 ${formatCnyAmount(supplier.total_amount)} · 综合评分 ${formatNumber(supplier.composite_score, 1)}` : '等待补充报价和供货能力',
+      title: allocation.product_name,
+      statusLabel: allocation.confirmation_state_label,
+      primaryMetrics: `采用 ${formatNumber(allocation.effective_quantity, 2)} ${allocation.base_unit} · ${allocation.quantity_source_label}`,
+      secondaryMetrics: supplier ? `首选 ${supplier.supplier_name} · 单价 ${formatCnyAmount(supplier.unit_price, { compact: false })}` : '暂无合格供应商',
+      detail: supplier ? `总额 ${formatCnyAmount(supplier.total_amount)} · 综合评分 ${formatNumber(supplier.composite_score, 1)}` : '等待补充报价和供货能力',
     };
   }
   return {
     title: `${allocation.product_name} · ${allocation.unit}`,
-    metrics: `预测 ${allocation.forecast_quantity ?? '数据不足'} · 建议采购 ${formatNumber(allocation.suggested_purchase_quantity, 2)} · ${allocation.enterprise_count} 家企业`,
-    detail: `区间 ${allocation.lower_bound ?? '数据不足'}—${allocation.upper_bound ?? '数据不足'} · ${(allocation.method_labels || []).join('、') || '方法待补充'}`,
+    statusLabel: allocation.data_insufficient_count ? '部分数据不足' : '预测已生成',
+    primaryMetrics: `预测 ${allocation.forecast_quantity ?? '数据不足'} · 建议采购 ${allocation.suggested_purchase_quantity ?? '数据不足'}`,
+    secondaryMetrics: `区间 ${allocation.lower_bound ?? '数据不足'}—${allocation.upper_bound ?? '数据不足'} · ${allocation.enterprise_count} 家企业`,
+    detail: `MAE ${allocation.mae_average ?? '数据不足'} · sMAPE ${allocation.smape_average ?? '数据不足'} · ${(allocation.method_labels || []).join('、') || '方法待补充'}`,
   };
+}
+
+function showcaseSummary(selected) {
+  const summary = selected.result_summary || {};
+  return [
+    `${summary.allocation_count || 0} 个结果`,
+    summary.allocated_order_count === null || summary.allocated_order_count === undefined ? null : `${summary.allocated_order_count} 单已分配`,
+    summary.unmatched_count ? `${summary.unmatched_count} 项待调整` : null,
+    summary.warning_count ? `${summary.warning_count} 项提示` : null,
+  ].filter(Boolean).join(' · ');
+}
+
+function showcaseCardMarkup(card) {
+  return `<article><header><b>${htmlEscape(card.title)}</b><i>${htmlEscape(card.statusLabel || '')}</i></header><span>${htmlEscape(card.primaryMetrics)}</span><small>${htmlEscape(card.secondaryMetrics)}</small><em>${htmlEscape(card.detail)}</em></article>`;
 }
 
 function selectedShowcaseCase(showcase) {
@@ -361,6 +445,7 @@ function renderShowcase(showcase) {
   byId('dv2-showcase-cases').innerHTML = cases.length > 1 ? cases.map((item) => `<button type="button" data-case="${htmlEscape(item.key)}" class="${item === selected ? 'active' : ''}">${htmlEscape(item.title)}</button>`).join('') : (selected?.input_summary?.period_start ? `<span>${htmlEscape(selected.input_summary.period_start)}—${htmlEscape(selected.input_summary.period_end)}</span>` : '');
   if (!selected) {
     byId('dv2-showcase-content').innerHTML = '<div class="dv2-empty">等待生成分配方案</div>';
+    byId('dv2-showcase-summary').textContent = '';
     byId('dv2-showcase-more').hidden = true;
     return;
   }
@@ -372,8 +457,12 @@ function renderShowcase(showcase) {
     ...(input.temperature_zones || []),
   ].filter(Boolean);
   const cards = (selected.allocations || []).slice(0, 2).map(showcaseAllocationSummary);
-  byId('dv2-showcase-content').innerHTML = `<div class="dv2-showcase-copy"><strong>${htmlEscape(selected.title)}</strong><span>${htmlEscape(selected.status_label)} · ${htmlEscape(formatSnapshotTime(selected.calculated_at, '尚未计算'))}</span><p>${htmlEscape(selected.description)}</p><div>${chips.map((chip) => `<i>${htmlEscape(chip)}</i>`).join('')}</div></div><div class="dv2-showcase-cards">${cards.length ? cards.map((card) => `<article><b>${htmlEscape(card.title)}</b><span>${htmlEscape(card.metrics)}</span><small>${htmlEscape(card.detail)}</small></article>`).join('') : `<div class="dv2-empty"><b>${htmlEscape(selected.headline)}</b><span>${htmlEscape(selected.unmatched_reasons?.[0]?.reason || selected.data_cutoff_note || '')}</span></div>`}</div>`;
-  byId('dv2-showcase-more').hidden = !(selected.allocations || []).length;
+  byId('dv2-showcase-content').innerHTML = `<div class="dv2-showcase-copy"><div><strong>${htmlEscape(selected.title)}</strong><span>${htmlEscape(selected.status_label)} · ${htmlEscape(formatSnapshotTime(selected.calculated_at, '尚未计算'))}</span><p>${htmlEscape(selected.description)}</p></div><div class="dv2-showcase-chips">${chips.map((chip) => `<i>${htmlEscape(chip)}</i>`).join('')}</div></div><div class="dv2-showcase-cards">${cards.length ? cards.map(showcaseCardMarkup).join('') : `<div class="dv2-empty"><b>${htmlEscape(selected.headline)}</b><span>${htmlEscape(selected.unmatched_reasons?.[0]?.reason || selected.data_cutoff_note || '')}</span></div>`}</div>`;
+  const reason = selected.unmatched_reasons?.[0]?.reason || '';
+  byId('dv2-showcase-summary').innerHTML = `<b>${htmlEscape(showcaseSummary(selected))}</b>${reason ? `<span>首要原因：${htmlEscape(reason)}</span>` : ''}`;
+  const resultCount = (selected.allocations || []).length;
+  byId('dv2-showcase-more').textContent = resultCount > 2 ? `查看全部 ${resultCount} 个结果` : reason && !resultCount ? '查看不匹配原因' : '查看方案详情';
+  byId('dv2-showcase-more').hidden = !(resultCount || selected.headline || reason);
 }
 
 function openShowcaseDialog() {
@@ -381,8 +470,10 @@ function openShowcaseDialog() {
   if (!selected) return;
   byId('dv2-algorithm-dialog-title').textContent = selected.title;
   const cards = (selected.allocations || []).slice(0, 24).map(showcaseAllocationSummary);
-  byId('dv2-algorithm-dialog-content').innerHTML = `<div class="dv2-algorithm-dialog-summary"><strong>${htmlEscape(selected.headline)}</strong><p>${htmlEscape(selected.description)}</p></div>${cards.map((card) => `<article><h4>${htmlEscape(card.title)}</h4><p>${htmlEscape(card.metrics)}</p><small>${htmlEscape(card.detail)}</small></article>`).join('')}${(selected.unmatched_reasons || []).length ? `<section><h4>待调整原因</h4>${selected.unmatched_reasons.map((item) => `<p>${htmlEscape(item.reason)} · ${item.count} 项</p>`).join('')}</section>` : ''}`;
+  byId('dv2-algorithm-dialog-content').innerHTML = `<div class="dv2-algorithm-dialog-summary"><strong>${htmlEscape(selected.headline)}</strong><p>${htmlEscape(selected.description)}</p></div>${cards.map((card) => `<article><h4>${htmlEscape(card.title)} · ${htmlEscape(card.statusLabel || '')}</h4><p>${htmlEscape(card.primaryMetrics)}</p><p>${htmlEscape(card.secondaryMetrics)}</p><small>${htmlEscape(card.detail)}</small></article>`).join('')}${(selected.unmatched_reasons || []).length ? `<section><h4>待调整原因</h4>${selected.unmatched_reasons.map((item) => `<p>${htmlEscape(item.reason)} · ${item.count} 项</p>`).join('')}</section>` : ''}`;
   byId('dv2-algorithm-dialog').showModal();
+  state.rankingLoop?.refresh();
+  state.informationLoop?.refresh();
 }
 
 function informationCacheKey() {
@@ -406,18 +497,37 @@ function saveInformationCache(payload, etag) {
   }
 }
 
-function renderInformation(message = null) {
+function renderInformation(message = null, { animate = true } = {}) {
   const items = (state.information?.items || []).filter((item) => item.kind === state.informationKind);
   const list = byId('dv2-information-list');
+  const signature = `${state.informationKind}:${state.information?.catalog_version || ''}:${items.map((item) => item.slug).join('|')}`;
+  if (animate && !message && state.informationSignature === signature && list.querySelector('.dv2-loop-track')) {
+    state.informationLoop?.refresh();
+    return;
+  }
+  state.informationLoop?.destroy();
+  state.informationLoop = null;
+  state.informationSignature = signature;
   if (!items.length) {
     list.innerHTML = `<div class="dv2-empty">${htmlEscape(message || (state.informationKind === 'NEWS' ? '暂无园区动态' : '暂无政策资讯'))}</div>`;
+    byId('dv2-information-loop-toggle').hidden = true;
     return;
   }
   byId('dv2-information-retry').hidden = true;
-  list.innerHTML = items.map((item) => {
+  list.innerHTML = `<div class="dv2-loop-track">${items.map((item) => {
     const content = `<small>${htmlEscape(item.category)} · ${htmlEscape(formatSnapshotTime(item.published_at, '时间待补充'))}</small><strong>${htmlEscape(item.title)}</strong><span>${htmlEscape(item.summary)}</span><em>${htmlEscape(item.source_name)}</em>`;
     return item.source_url ? `<a class="tone-${item.tone.toLowerCase()}" href="${htmlEscape(item.source_url)}" target="_blank" rel="noopener noreferrer">${content}</a>` : `<article class="tone-${item.tone.toLowerCase()}">${content}</article>`;
-  }).join('');
+  }).join('')}</div>`;
+  if (!animate) {
+    byId('dv2-information-loop-toggle').hidden = true;
+    return;
+  }
+  state.informationLoop = createSeamlessLoop({
+    viewport: list, track: list.firstElementChild, pauseButton: byId('dv2-information-loop-toggle'),
+    signature, speedPxPerSecond: 8, itemCount: items.length,
+    active: () => state.active && !document.hidden,
+    blocked: () => Boolean(document.querySelector('.dv2-chart-dialog[open]')),
+  });
 }
 
 async function refreshInformation() {
@@ -443,7 +553,7 @@ async function refreshInformation() {
     if (!state.information && cached?.payload) state.information = cached.payload;
     if (state.information) {
       byId('dv2-information-state').textContent = '更新失败，显示上次内容';
-      renderInformation();
+      renderInformation(null, { animate: false });
     } else {
       byId('dv2-information-state').textContent = error.status === 404 ? '功能正在更新' : '资讯暂不可用';
       renderInformation(error.status === 404 ? '园区资讯功能正在更新' : '园区资讯暂不可用');
@@ -454,15 +564,7 @@ async function refreshInformation() {
 
 function startInformationTimer() {
   window.clearInterval(state.informationTimer);
-  window.clearInterval(state.informationScrollTimer);
   state.informationTimer = window.setInterval(() => { if (state.active && !document.hidden) refreshInformation(); }, 300000);
-  state.informationScrollTimer = window.setInterval(() => {
-    const list = byId('dv2-information-list');
-    if (!state.active || document.hidden || !list || list.matches(':hover, :focus-within')) return;
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
-    const next = list.scrollTop + Math.max(42, Math.floor(list.clientHeight * 0.72));
-    list.scrollTo({ top: next >= list.scrollHeight - list.clientHeight ? 0 : next, behavior: 'smooth' });
-  }, 4000);
 }
 
 function startShowcaseRotation() {
@@ -728,8 +830,8 @@ function deactivate() {
   state.active = false;
   window.clearInterval(state.informationTimer);
   state.informationTimer = null;
-  window.clearInterval(state.informationScrollTimer);
-  state.informationScrollTimer = null;
+  state.rankingLoop?.refresh();
+  state.informationLoop?.refresh();
   window.clearInterval(state.showcaseTimer);
   state.showcaseTimer = null;
   if (voice.busy) voice.cancel('已离开 E02 大屏，本次语音提问已停止');
@@ -829,7 +931,7 @@ function bindEvents() {
     requestAnimationFrame(() => renderDemandChart(state.snapshot, 'dv2-dialog-chart'));
   });
   byId('dv2-dialog-close')?.addEventListener('click', () => byId('dv2-chart-dialog').close());
-  byId('dv2-chart-dialog')?.addEventListener('close', () => { state.dialogContent = null; });
+  byId('dv2-chart-dialog')?.addEventListener('close', () => { state.dialogContent = null; state.rankingLoop?.refresh(); state.informationLoop?.refresh(); });
   byId('dv2-chart-dialog')?.addEventListener('click', (event) => { if (event.target === byId('dv2-chart-dialog')) event.target.close(); });
   document.querySelectorAll('#dv2-showcase-tabs [data-kind]').forEach((button) => button.addEventListener('click', () => {
     state.showcasePanel = button.dataset.kind;
@@ -845,9 +947,11 @@ function bindEvents() {
   });
   byId('dv2-showcase-more')?.addEventListener('click', openShowcaseDialog);
   byId('dv2-algorithm-dialog-close')?.addEventListener('click', () => byId('dv2-algorithm-dialog').close());
+  byId('dv2-algorithm-dialog')?.addEventListener('close', () => { state.rankingLoop?.refresh(); state.informationLoop?.refresh(); });
   byId('dv2-algorithm-dialog')?.addEventListener('click', (event) => { if (event.target === byId('dv2-algorithm-dialog')) event.target.close(); });
   document.querySelectorAll('.dv2-information-tabs [data-kind]').forEach((button) => button.addEventListener('click', () => {
     state.informationKind = button.dataset.kind;
+    state.informationSignature = null;
     document.querySelectorAll('.dv2-information-tabs [data-kind]').forEach((item) => item.setAttribute('aria-selected', String(item === button)));
     renderInformation();
   }));
@@ -858,6 +962,8 @@ function bindEvents() {
   window.addEventListener('resize', () => chartInstances.forEach((chart) => chart.resize()));
   window.addEventListener('app:public-theme-change', (event) => setTheme(event.detail?.theme));
   document.addEventListener('visibilitychange', () => {
+    state.rankingLoop?.refresh();
+    state.informationLoop?.refresh();
     if (document.hidden) {
       if (voice.busy) voice.cancel('页面已隐藏，本次语音提问已停止');
       return;

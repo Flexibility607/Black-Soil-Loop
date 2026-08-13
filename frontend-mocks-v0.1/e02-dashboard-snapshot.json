@@ -1157,6 +1157,36 @@
         "last_report_date": "2026-08-04",
         "last_report_status": "INCOMPLETE",
         "is_demo": true
+      },
+      {
+        "store_id": "STORE-DEMO-THIRD-004",
+        "store_name": "净月潭游客服务中心【演示】",
+        "city": "长春市",
+        "operation_order_count": 842,
+        "sales_amount": 21865.4,
+        "last_report_date": "2026-08-04",
+        "last_report_status": "COMPLETE",
+        "is_demo": true
+      },
+      {
+        "store_id": "STORE-DEMO-THIRD-005",
+        "store_name": "国信南山温泉体验区【演示】",
+        "city": "长春市",
+        "operation_order_count": 695,
+        "sales_amount": 18742.6,
+        "last_report_date": "2026-08-04",
+        "last_report_status": "COMPLETE",
+        "is_demo": true
+      },
+      {
+        "store_id": "STORE-DEMO-THIRD-006",
+        "store_name": "长春世界雕塑园服务点【演示】",
+        "city": "长春市",
+        "operation_order_count": 521,
+        "sales_amount": 14980.25,
+        "last_report_date": "2026-08-04",
+        "last_report_status": "COMPLETE",
+        "is_demo": true
       }
     ],
     "map_nodes": [

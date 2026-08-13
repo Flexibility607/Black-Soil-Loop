@@ -1,4 +1,4 @@
-import { SCREEN_PALETTES } from './dashboard-format.js?v=20260809-jipin-theme-2';
+import { SCREEN_PALETTES } from './dashboard-format.js?v=20260813-dashboard-presentation-2';
 
 export const REFERENCE_CITIES = [
   { name: '哈尔滨市', value: [126.642, 45.757] },
@@ -23,6 +23,19 @@ export function localGeoJsonIsChangchunServiceArea(geojson) {
   return features.every((feature) => {
     const type = feature?.geometry?.type;
     return type === 'Polygon' || type === 'MultiPolygon';
+  });
+}
+
+export function localGeoJsonIsChangchunRoadBasemap(geojson) {
+  const features = Array.isArray(geojson?.features) ? geojson.features : [];
+  const layers = new Set(features.map((feature) => feature?.properties?.layer));
+  if (geojson?.metadata?.crs !== 'EPSG:4326' || geojson?.metadata?.license !== 'ODbL 1.0') return false;
+  if (!['motorway', 'primary', 'secondary', 'railway', 'waterway', 'place_label'].every((layer) => layers.has(layer))) return false;
+  return features.every((feature) => {
+    const geometry = feature?.geometry;
+    if (geometry?.type === 'Point') return geometry.coordinates?.length === 2 && geometry.coordinates.every(Number.isFinite);
+    return geometry?.type === 'LineString' && geometry.coordinates?.length > 1
+      && geometry.coordinates.every((point) => point.length === 2 && point.every(Number.isFinite));
   });
 }
 
@@ -220,7 +233,47 @@ function publicRouteTooltip(route) {
   return `${route.vehicle_label || '配送车辆'} → ${route.to?.display_name || '运输目标点'}<br/>${route.status_label || statusLabel(route.status)} · ${route.route_label || '经纬度估算路线'}${locationText}${telemetryText}${alertText}`;
 }
 
-export function buildChangchunMapOption(snapshot, palette = SCREEN_PALETTES.night) {
+function basemapSeries(basemap, colors) {
+  if (!Array.isArray(basemap?.features)) return [];
+  const layerStyles = {
+    motorway: { color: colors.mapRoadMotorway, width: 1.8 },
+    trunk: { color: colors.mapRoadTrunk, width: 1.45 },
+    primary: { color: colors.mapRoadPrimary, width: 1.05 },
+    secondary: { color: colors.mapRoadSecondary, width: 0.75 },
+    tertiary: { color: colors.mapRoadSecondary, width: 0.55, opacity: 0.72 },
+    railway: { color: colors.mapRailway, width: 0.65, type: 'dashed' },
+    waterway: { color: colors.mapWaterway, width: 0.85 },
+    district_boundary: { color: colors.mapDistrict, width: 0.7, type: 'dashed' },
+  };
+  const groups = new Map();
+  const labels = [];
+  for (const feature of basemap.features) {
+    const layer = feature?.properties?.layer;
+    const geometry = feature?.geometry;
+    if (layer === 'place_label' && geometry?.type === 'Point') {
+      labels.push({ name: feature.properties.name, value: geometry.coordinates });
+      continue;
+    }
+    if (geometry?.type !== 'LineString' || !layerStyles[layer]) continue;
+    if (!groups.has(layer)) groups.set(layer, []);
+    groups.get(layer).push({ name: feature.properties.name || '', coords: geometry.coordinates });
+  }
+  const names = { motorway: '高速与快速路', trunk: '国省干线', primary: '城市主干路', secondary: '城市次干路', tertiary: '连接道路', railway: '铁路', waterway: '主要水系', district_boundary: '片区边界' };
+  const result = [...groups].map(([layer, data], index) => ({
+    name: names[layer], type: 'lines', coordinateSystem: 'geo', zlevel: 0, silent: true,
+    progressive: 800, large: data.length > 1000, largeThreshold: 800,
+    lineStyle: { opacity: 1, curveness: 0, ...layerStyles[layer] }, data,
+  }));
+  if (labels.length) result.push({
+    name: '长春片区标签', type: 'scatter', coordinateSystem: 'geo', zlevel: 1, silent: true,
+    symbolSize: 2, itemStyle: { color: 'transparent' },
+    label: { show: true, formatter: '{b}', position: 'top', color: colors.mapPlaceLabel, fontSize: 9, textBorderColor: colors.mapTextBorder, textBorderWidth: 2 },
+    data: labels,
+  });
+  return result.map((series, index) => ({ ...series, z: index + 1 }));
+}
+
+export function buildChangchunMapOption(snapshot, palette = SCREEN_PALETTES.night, basemap = null) {
   const colors = { ...SCREEN_PALETTES.night, ...palette };
   const publicMap = snapshot.public_map || snapshot.map || {};
   const points = (publicMap.points || []).map((point) => ({
@@ -271,7 +324,7 @@ export function buildChangchunMapOption(snapshot, palette = SCREEN_PALETTES.nigh
     },
     geo: {
       map: 'changchun-service-area',
-      roam: true,
+      roam: false,
       layoutCenter: ['50%', '51%'],
       layoutSize: '97%',
       label: { show: false },
@@ -279,6 +332,7 @@ export function buildChangchunMapOption(snapshot, palette = SCREEN_PALETTES.nigh
       emphasis: { itemStyle: { areaColor: colors.mapEmphasis } },
     },
     series: [
+      ...basemapSeries(basemap, colors),
       {
         name: '有效运输路线', type: 'lines', coordinateSystem: 'geo', zlevel: 2,
         effect: { show: true, period: 7, trailLength: 0.18, symbolSize: 3, color: colors.mapEffect },

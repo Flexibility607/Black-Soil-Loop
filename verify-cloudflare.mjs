@@ -52,7 +52,7 @@ for (const marker of ['id="toggle-mock"', 'jipin-logo.jpg']) {
   if (html.includes(marker)) throw new Error(`The deployed page contains retired marker: ${marker}.`);
 }
 
-for (const path of ['/styles.css', '/dashboard.css', '/api.js', '/scripts.js', '/dashboard-v2.js', ...moduleAssets, '/vendor/echarts/echarts.min.js', '/assets/maps/northeast-china-admin1.geojson', '/assets/maps/changchun-service-area.geojson', '/assets/backgrounds/northeast-winter-corn-v1.webp']) {
+for (const path of ['/styles.css', '/dashboard.css', '/api.js', '/scripts.js', '/dashboard-v2.js', '/dashboard-loop.js', ...moduleAssets, '/vendor/echarts/echarts.min.js', '/assets/maps/northeast-china-admin1.geojson', '/assets/maps/changchun-service-area.geojson', '/assets/maps/changchun-road-basemap.v1.geojson', '/assets/backgrounds/northeast-winter-corn-v1.webp']) {
   const content = await (await requireOk(path)).text();
   if (content.length < 100) throw new Error(`${path} is unexpectedly empty.`);
 }
@@ -85,6 +85,13 @@ for (const marker of ['localhost', 'fonts.googleapis', 'cdnjs', 'unpkg.com', 'js
 const changchunMap = await (await requireOk('/assets/maps/changchun-service-area.geojson')).json();
 if (changchunMap?.metadata?.crs !== 'EPSG:4326' || changchunMap?.metadata?.license !== 'ODbL 1.0') {
   throw new Error('The local Changchun map is missing WGS84 or ODbL metadata.');
+}
+
+const roadBasemap = await (await requireOk('/assets/maps/changchun-road-basemap.v1.geojson')).json();
+const roadLayers = new Set((roadBasemap.features || []).map((feature) => feature.properties?.layer));
+if (roadBasemap?.metadata?.crs !== 'EPSG:4326' || roadBasemap?.metadata?.license !== 'ODbL 1.0'
+  || !['motorway', 'primary', 'secondary', 'railway', 'waterway', 'place_label'].every((layer) => roadLayers.has(layer))) {
+  throw new Error('The local Changchun road basemap failed its layer or license contract.');
 }
 
 for (const name of mockFiles) {
