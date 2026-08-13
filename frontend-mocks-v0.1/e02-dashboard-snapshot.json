@@ -7,6 +7,9 @@
     "range_start": "2026-07-06T00:00:00+08:00",
     "range_end": "2026-08-05T00:00:00+08:00",
     "period": "30d",
+    "currency": "CNY",
+    "sales_amount_unit": "yuan",
+    "order_count_unit": "单",
     "headline": {
       "preorder_count": 450,
       "demand_totals": [
@@ -1233,6 +1236,54 @@
         "channel_type": "THIRD_SPACE"
       }
     ],
+    "public_map": {
+      "schema_version": "2.0",
+      "catalog_version": "2026-08-13.1-demo",
+      "crs": "EPSG:4326",
+      "coordinate_order": "longitude,latitude",
+      "scope": {
+        "name": "长春市及近郊",
+        "map_name": "changchun-service-area",
+        "asset": "/assets/maps/changchun-service-area.geojson",
+        "bounds": [125.15, 43.6, 125.6, 44.02],
+        "route_method": "HAVERSINE_STRAIGHT_LINE",
+        "disclaimer": "经纬度估算路线，不代表道路导航"
+      },
+      "points": [
+        {"point_code":"CC-THIRD-ZHEYOUSEAN","display_name":"这有山","point_type":"THIRD_SPACE","brand_name":"这有山","address":"长春市朝阳区红旗街959号","longitude":125.28612,"latitude":43.86884,"coordinate_accuracy":"ENTRANCE","featured":true,"display_order":10,"is_demo":false},
+        {"point_code":"CC-THIRD-GUOXIN-NANSHAN","display_name":"国信南山温泉","point_type":"THIRD_SPACE","brand_name":"国信南山温泉","address":"长春市双阳区长清公路16公里处","longitude":125.5217,"latitude":43.68356,"coordinate_accuracy":"ENTRANCE","featured":true,"display_order":20,"is_demo":false},
+        {"point_code":"CC-THIRD-JINGYUETAN","display_name":"净月潭","point_type":"THIRD_SPACE","brand_name":"净月潭","address":"长春市南关区净月大街5840号","longitude":125.44888,"latitude":43.79942,"coordinate_accuracy":"ENTRANCE","featured":true,"display_order":30,"is_demo":false},
+        {"point_code":"CC-STORE-BAIJI-LINHE","display_name":"柏记水饺临河街店","point_type":"TRADITIONAL_STORE","brand_name":"柏记水饺","address":"长春市南关区临河街宏达花园36号楼101车库","longitude":125.3692,"latitude":43.8469,"coordinate_accuracy":"ADDRESS","featured":true,"display_order":110,"is_demo":false},
+        {"point_code":"CC-STORE-BAIJI-GUANTANG","display_name":"柏记水饺新星宇观塘店","point_type":"TRADITIONAL_STORE","brand_name":"柏记水饺","address":"长春市南关区新星宇观塘A12幢105号","longitude":125.3862,"latitude":43.8012,"coordinate_accuracy":"ADDRESS","featured":true,"display_order":120,"is_demo":false},
+        {"point_code":"CC-STORE-HEJI-FUJIN","display_name":"鹤记生煎富锦路店","point_type":"TRADITIONAL_STORE","brand_name":"鹤记生煎","address":"长春市朝阳区富锦路476号","longitude":125.3037,"latitude":43.8662,"coordinate_accuracy":"ADDRESS","featured":true,"display_order":130,"is_demo":false},
+        {"point_code":"CC-STORE-HEJI-WANHAO","display_name":"鹤记生煎欧亚万豪店","point_type":"TRADITIONAL_STORE","brand_name":"鹤记生煎","address":"长春市二道区欧亚万豪购物中心一楼","longitude":125.4318,"latitude":43.8736,"coordinate_accuracy":"ADDRESS","featured":true,"display_order":140,"is_demo":false},
+        {"point_code":"CC-STORE-DASHIWEI-DEMO","display_name":"大食味（演示门店）","point_type":"TRADITIONAL_STORE","brand_name":"大食味","address":"长春市区演示坐标，仅用于大屏场景展示","longitude":125.35,"latitude":43.845,"coordinate_accuracy":"DEMO_APPROXIMATE","featured":true,"display_order":150,"is_demo":true,"coordinate_note":"长春市区演示坐标，仅用于大屏场景展示，不提供导航。"}
+      ],
+      "active_routes": [],
+      "excluded_route_summary": {"count": 0, "reasons": {}}
+    },
+    "algorithm_showcase": {
+      "schema_version": "1.0",
+      "status": "PARTIAL",
+      "status_label": "方案已生成",
+      "data_cutoff": null,
+      "data_cutoff_note": "预设场景测算不代表实时业务订单",
+      "panels": [
+        {
+          "kind": "CARPOOL", "title": "拼车联配", "status": "PARTIAL", "status_label": "形成部分方案", "headline": "形成 2 个配送组，12 单已分配，3 单待调整", "calculated_at": "2026-08-13T09:40:00+08:00", "data_cutoff": null, "data_cutoff_note": "预设场景参数，无实时业务数据截止时间",
+          "cases": [
+            {"key":"city-morning-delivery","title":"长春市区门店晨间联合配送","description":"多企业、多品类订单在晨间集中发车，按温区和运力形成联合配送组。","source_mode":"PRESET_SIMULATION","status":"PARTIAL","status_label":"形成部分方案","headline":"形成 2 个配送组，12 单已分配，3 单待调整","calculated_at":"2026-08-13T09:40:00+08:00","data_cutoff":null,"data_cutoff_note":"预设场景参数，无实时业务数据截止时间","input_summary":{"service_area":"长春市及近郊","enterprise_count":3,"order_count":15,"product_count":5,"temperature_zones":["常温","冷藏"],"period_start":null,"period_end":null,"window_start":"2026-08-13T07:00:00+08:00","window_end":"2026-08-13T07:45:00+08:00"},"result_summary":{"allocation_count":2,"allocated_order_count":12,"unmatched_count":3,"warning_count":1},"allocations":[{"type":"CARPOOL","vehicle_label":"冷藏配送车（7 吨级）","temperature_zone_label":"冷藏","enterprise_count":3,"order_count":7,"product_count":5,"store_names":["这有山","净月潭"],"total_weight_kg":4380,"total_volume_m3":16.2,"capacity_utilization_pct":78.4,"mileage_benefit_estimated_km":27.5,"decision_state_label":"推荐方案"},{"type":"CARPOOL","vehicle_label":"常温配送车（5 吨级）","temperature_zone_label":"常温","enterprise_count":2,"order_count":5,"product_count":3,"store_names":["柏记水饺临河街店","鹤记生煎富锦路店"],"total_weight_kg":2860,"total_volume_m3":11.4,"capacity_utilization_pct":70.6,"mileage_benefit_estimated_km":18.3,"decision_state_label":"备选方案"}],"unmatched_reasons":[{"reason":"发车时间窗与其他订单不重叠","count":3}]},
+            {"key":"jingyue-cold-chain","title":"净月片区冷链错峰补货","description":"冷链订单按温区和时窗错峰合单。","source_mode":"PRESET_SIMULATION","status":"READY","status_label":"已形成可执行方案","headline":"形成 2 个配送组","calculated_at":"2026-08-13T09:40:00+08:00","data_cutoff":null,"data_cutoff_note":"预设场景参数","input_summary":{"service_area":"长春市及近郊","enterprise_count":3,"order_count":15,"product_count":5,"temperature_zones":["冷藏","冷冻"],"window_start":"2026-08-13T08:00:00+08:00","window_end":"2026-08-13T08:45:00+08:00"},"result_summary":{"allocation_count":2,"allocated_order_count":15,"unmatched_count":0,"warning_count":0},"allocations":[],"unmatched_reasons":[]},
+            {"key":"suburban-third-space","title":"长春市郊第三空间集中补货","description":"市郊第三空间订单按站点和运力集中配送。","source_mode":"PRESET_SIMULATION","status":"WAITING","status_label":"等待生成分配方案","headline":"等待生成分配方案","calculated_at":null,"data_cutoff":null,"data_cutoff_note":"预设场景参数","input_summary":{"service_area":"长春市及近郊","enterprise_count":3,"order_count":15,"product_count":5,"temperature_zones":["常温","冷藏"],"window_start":"2026-08-13T09:00:00+08:00","window_end":"2026-08-13T09:45:00+08:00"},"result_summary":{"allocation_count":0,"allocated_order_count":0,"unmatched_count":0,"warning_count":0},"allocations":[],"unmatched_reasons":[]}
+          ]
+        },
+        {
+          "kind":"WAREHOUSE","title":"共享仓匹配","status":"READY","status_label":"已形成可执行方案","headline":"推荐 2 个共享仓方案","calculated_at":"2026-08-13T09:42:00+08:00","data_cutoff":null,"data_cutoff_note":"预设场景测算",
+          "cases":[{"key":"city-morning-delivery","title":"长春市区门店晨间联合配送","description":"核验入仓、出仓时间窗和库容约束。","source_mode":"PRESET_SIMULATION","status":"READY","status_label":"已形成可执行方案","headline":"推荐 2 个共享仓方案","calculated_at":"2026-08-13T09:42:00+08:00","data_cutoff":null,"data_cutoff_note":"预设场景参数","input_summary":{"service_area":"长春市及近郊","enterprise_count":3,"order_count":15,"product_count":5,"temperature_zones":["常温","冷藏"]},"result_summary":{"allocation_count":2,"allocated_order_count":15,"unmatched_count":0,"warning_count":0},"allocations":[{"type":"WAREHOUSE","warehouse_name":"净月冷链共享仓","decision_state_label":"推荐方案","order_count":8,"enterprise_count":3,"required_volume_m3":18.6,"remaining_volume_m3":73.8,"temperature_zone_label":"冷藏","estimated_distance_km":12.7,"reasons":["时间窗、温区和库容均满足"]},{"type":"WAREHOUSE","warehouse_name":"南关常温协同仓","decision_state_label":"备选方案","order_count":7,"enterprise_count":2,"required_volume_m3":14.2,"remaining_volume_m3":55.8,"temperature_zone_label":"常温","estimated_distance_km":16.4,"reasons":["服务距离和库容满足"]}],"unmatched_reasons":[]},{"key":"jingyue-cold-chain","title":"净月片区冷链错峰补货","description":"核验冷藏与冷冻库容。","source_mode":"PRESET_SIMULATION","status":"WAITING","status_label":"等待生成分配方案","headline":"等待生成分配方案","calculated_at":null,"data_cutoff":null,"data_cutoff_note":"预设场景参数","input_summary":{"enterprise_count":3,"order_count":15,"product_count":5,"temperature_zones":["冷藏","冷冻"]},"result_summary":{"allocation_count":0,"allocated_order_count":0,"unmatched_count":0,"warning_count":0},"allocations":[],"unmatched_reasons":[]},{"key":"suburban-third-space","title":"长春市郊第三空间集中补货","description":"核验市郊配送距离和共享仓容量。","source_mode":"PRESET_SIMULATION","status":"WAITING","status_label":"等待生成分配方案","headline":"等待生成分配方案","calculated_at":null,"data_cutoff":null,"data_cutoff_note":"预设场景参数","input_summary":{"enterprise_count":3,"order_count":15,"product_count":5,"temperature_zones":["常温","冷藏"]},"result_summary":{"allocation_count":0,"allocated_order_count":0,"unmatched_count":0,"warning_count":0},"allocations":[],"unmatched_reasons":[]}]},
+        {"kind":"PROCUREMENT","title":"集中采购","status":"WAITING","status_label":"等待本周采购汇总","headline":"等待本周采购汇总","calculated_at":null,"data_cutoff":null,"data_cutoff_note":"仅展示真实聚合投影","cases":[]},
+        {"kind":"FORECAST","title":"下周预测","status":"WAITING","status_label":"等待下周预测批次","headline":"等待下周预测批次","calculated_at":null,"data_cutoff":null,"data_cutoff_note":"仅展示真实预测投影","cases":[]}
+      ]
+    },
     "data_quality": {
       "store_count": 5,
       "reporting_store_count": 5,

@@ -5,6 +5,7 @@ import {
   dashboardPalette,
   demandSeries,
   formatCurrency,
+  formatCnyAmount,
   formatUnit,
   SCREEN_PALETTES,
 } from '../dashboard-format.js';
@@ -21,7 +22,18 @@ test('需求趋势保持单位拆分，不把公斤与件相加', () => {
 test('大屏统一中文单位与人民币格式', () => {
   assert.equal(formatUnit('kg'), '公斤');
   assert.equal(formatUnit('m3'), '立方米');
-  assert.equal(formatCurrency(12345), '人民币 1.23 万');
+  assert.equal(formatCurrency(12345), '1.23 万元');
+  assert.equal(formatCnyAmount(null), '—');
+  assert.equal(formatCnyAmount(''), '—');
+  assert.equal(formatCnyAmount(Number.NaN), '—');
+  assert.equal(formatCnyAmount(Number.POSITIVE_INFINITY), '—');
+  assert.equal(formatCnyAmount(-1), '—');
+  assert.equal(formatCnyAmount(-0), '0 元');
+  assert.equal(formatCnyAmount(0), '0 元');
+  assert.equal(formatCnyAmount(9999.99), '9,999.99 元');
+  assert.equal(formatCnyAmount(10000), '1 万元');
+  assert.equal(formatCnyAmount(100000000), '1 亿元');
+  assert.equal(formatCnyAmount(283744.6, { compact: false, fullPrecision: true }), '283,744.60 元');
 });
 
 test('零分母的渠道环图保持两个渠道和零值', () => {

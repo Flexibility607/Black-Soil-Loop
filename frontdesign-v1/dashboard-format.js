@@ -70,11 +70,24 @@ export function formatNumber(value, digits = 0) {
   return new Intl.NumberFormat('zh-CN', { maximumFractionDigits: digits }).format(number);
 }
 
-export function formatCurrency(value, compact = true) {
+export function formatCnyAmount(value, { compact = true, fullPrecision = false } = {}) {
+  if (value === null || value === undefined || value === '') return '—';
   const number = Number(value);
-  if (!Number.isFinite(number)) return '—';
-  if (compact && Math.abs(number) >= 10000) return `人民币 ${(number / 10000).toFixed(2)} 万`;
-  return `人民币 ${new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 }).format(number)}`;
+  if (!Number.isFinite(number) || number < 0) return '—';
+  const normalized = Object.is(number, -0) ? 0 : number;
+  if (!compact || normalized < 10000) {
+    return `${new Intl.NumberFormat('zh-CN', {
+      minimumFractionDigits: fullPrecision ? 2 : 0,
+      maximumFractionDigits: fullPrecision ? 2 : 2,
+    }).format(normalized)} 元`;
+  }
+  const divisor = normalized >= 100000000 ? 100000000 : 10000;
+  const suffix = divisor === 100000000 ? '亿元' : '万元';
+  return `${new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 }).format(normalized / divisor)} ${suffix}`;
+}
+
+export function formatCurrency(value, compact = true) {
+  return formatCnyAmount(value, { compact });
 }
 
 export function formatPercent(value) {

@@ -1,0 +1,45 @@
+{
+  "type": "FeatureCollection",
+  "name": "changchun-service-area",
+  "metadata": {
+    "crs": "EPSG:4326",
+    "coordinate_order": "longitude,latitude",
+    "source_url": "https://www.openstreetmap.org/relation/2763992",
+    "source_date": "2026-08-13",
+    "source_sha256": "25886485d9c97c83fcd38a870e8168d359c808444d8f0c910e9360fe75fca607",
+    "license": "ODbL 1.0",
+    "attribution": "© OpenStreetMap contributors",
+    "generation": "service-area-clip-v1",
+    "simplification_tolerance_degrees": 0.002,
+    "bounds": [125.15, 43.60, 125.60, 44.02]
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "长春市及近郊",
+        "scope": "长春主城区、净月片区和双阳南山方向服务范围",
+        "source": "OpenStreetMap relation 2763992，按大屏服务范围裁剪并保拓扑简化"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [125.15, 44.00],
+            [125.15, 43.82],
+            [125.19, 43.70],
+            [125.28, 43.62],
+            [125.42, 43.60],
+            [125.54, 43.64],
+            [125.60, 43.72],
+            [125.60, 43.87],
+            [125.56, 43.98],
+            [125.50, 44.02],
+            [125.30, 44.02],
+            [125.15, 44.00]
+          ]
+        ]
+      }
+    }
+  ]
+}

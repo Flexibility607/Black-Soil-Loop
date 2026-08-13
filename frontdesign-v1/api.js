@@ -35,8 +35,8 @@
     'procurement-aggregations': '/web/procurement/aggregations',
   };
 
-  function response(ok, status, json) {
-    return { ok, status, json };
+  function response(ok, status, json, headers = null) {
+    return { ok, status, json, headers };
   }
 
   async function readJson(res) {
@@ -120,17 +120,30 @@
         message: '本地演示不会访问服务器 API。',
       });
     }
-    const headers = new Headers(options.headers || {});
-    const hasFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
-    if (options.body && !hasFormData && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
-    if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
+    const {
+      authPolicy = 'auto',
+      credentialsPolicy = 'include',
+      ...fetchOptions
+    } = options;
+    const headers = new Headers(fetchOptions.headers || {});
+    const hasFormData = typeof FormData !== 'undefined' && fetchOptions.body instanceof FormData;
+    if (fetchOptions.body && !hasFormData && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+    if (authPolicy === 'required' && !accessToken) {
+      return response(false, 401, { code: 'NOT_AUTHENTICATED', message: '请先登录后再执行此操作' });
+    }
+    if (authPolicy !== 'omit' && accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
     if (path === '/web/auth/refresh' && csrfToken) headers.set('X-CSRF-Token', csrfToken);
-    const res = await fetch(`${baseUrl}${path}`, { ...options, headers, credentials: 'include', cache: 'no-store' });
-    const result = response(res.ok, res.status, await readJson(res));
-    if (res.status === 401 && retryOn401 && path !== '/web/auth/refresh' && await refreshAccessToken()) {
+    const res = await fetch(`${baseUrl}${path}`, {
+      ...fetchOptions,
+      headers,
+      credentials: credentialsPolicy,
+      cache: fetchOptions.cache || 'no-store',
+    });
+    const result = response(res.ok, res.status, await readJson(res), res.headers);
+    if (res.status === 401 && authPolicy !== 'omit' && retryOn401 && path !== '/web/auth/refresh' && await refreshAccessToken()) {
       return rawRequest(path, options, false);
     }
-    if (res.status === 401 && !retryOn401) clearSession('unauthorized');
+    if (res.status === 401 && authPolicy !== 'omit' && !retryOn401) clearSession('unauthorized');
     return result;
   }
 
@@ -230,7 +243,9 @@
       return response(res.ok, res.status, await readJson(res));
     }
     const route = authenticated ? '/web/dashboard/snapshot' : '/public/dashboard/snapshot';
-    const result = await rawRequest(`${route}?${new URLSearchParams({ period })}`);
+    const result = await rawRequest(`${route}?${new URLSearchParams({ period })}`, authenticated
+      ? { authPolicy: 'required' }
+      : { authPolicy: 'omit', credentialsPolicy: 'omit' });
     return withData(result, result.json);
   }
 
@@ -241,8 +256,62 @@
 
   async function getDictionaries() {
     const route = accessToken ? '/web/dictionaries' : '/public/dictionaries';
-    const result = await rawRequest(route);
+    const result = await rawRequest(route, accessToken
+      ? { authPolicy: 'required' }
+      : { authPolicy: 'omit', credentialsPolicy: 'omit' });
     return withData(result, result.json?.dictionaries);
+  }
+
+  async function getPublicDictionaries() {
+    const result = await rawRequest('/public/dictionaries', {
+      authPolicy: 'omit',
+      credentialsPolicy: 'omit',
+    });
+    return withData(result, result.json?.dictionaries);
+  }
+
+  async function getPublicInformation(limit = 8, etag = null) {
+    if (demoMode) {
+      const [newsResponse, policyResponse] = await Promise.all([
+        fetch('./frontend-mocks-v0.1/e02-public-news-changchun.json', { cache: 'no-store' }),
+        fetch('./frontend-mocks-v0.1/e02-public-policies-changchun.json', { cache: 'no-store' }),
+      ]);
+      const newsEnvelope = await readJson(newsResponse);
+      const policyEnvelope = await readJson(policyResponse);
+      if (!newsResponse.ok || !policyResponse.ok) return { ok: false, status: 503, data: null, etag: null };
+      const toneMap = { blue: 'INFO', green: 'SUCCESS', amber: 'WARNING', red: 'ALERT' };
+      const now = '2026-08-13T10:20:00+08:00';
+      const news = (newsEnvelope?.data || []).slice(0, 4).map((item, index) => ({
+        slug: `demo-news-${index + 1}`, kind: 'NEWS', kind_label: '园区动态', category: item.category,
+        title: item.title,
+        summary: String(item.summary || '').replaceAll('current_qty', '当前库存'),
+        published_at: now,
+        source_type: 'INTERNAL_RELEASE',
+        source_name: '吉品食品产业协同园区', source_url: null, source_verified_at: now,
+        service_scope: '长春市及市郊', tone: toneMap[item.tone] || 'INFO',
+      }));
+      const policies = (policyEnvelope?.data || []).slice(0, 4).map((item, index) => ({
+        slug: `demo-policy-${index + 1}`, kind: 'POLICY', kind_label: '政策资讯', category: item.category,
+        title: item.title, summary: item.summary, published_at: item.published_at || now,
+        source_type: 'GOVERNMENT_POLICY', source_name: item.source_name, source_url: item.source_url,
+        source_verified_at: now, service_scope: '长春市及市郊', tone: index === 0 ? 'WARNING' : 'INFO',
+      }));
+      const data = {
+        items: [...news, ...policies], total: 8, kind: 'all', catalog_version: '2026-08-13.1-demo',
+        service_scope: '长春市及市郊', data_cutoff: now,
+      };
+      return {
+        ...response(true, 200, { status: 'PROCESSED', code: 'OK', data }),
+        etag: '"demo-public-information-20260813"',
+      };
+    }
+    const headers = etag ? { 'If-None-Match': etag } : undefined;
+    const result = await rawRequest(`/public/dashboard/information?${new URLSearchParams({ kind: 'all', limit: String(limit) })}`, {
+      headers,
+      authPolicy: 'omit',
+      credentialsPolicy: 'omit',
+    });
+    return { ...withData(result, result.json), etag: result.headers?.get?.('etag') || null };
   }
 
   async function demoAssistantAnswer(question, period) {
@@ -364,11 +433,14 @@
   async function queryDashboardAssistant(question, period = '30d', _parkId = null, preferredChart = null, options = {}) {
     if (demoMode) return demoAssistantAnswer(question, period);
     const headers = options.requestId ? { 'X-Trace-Id': options.requestId } : undefined;
-    const result = await rawRequest(accessToken ? '/web/assistant/query' : '/public/assistant/query', {
+    const authenticated = Boolean(accessToken);
+    const result = await rawRequest(authenticated ? '/web/assistant/query' : '/public/assistant/query', {
       method: 'POST',
       headers,
       body: JSON.stringify({ question, preferred_chart: preferredChart || 'auto', period }),
       signal: options.signal,
+      authPolicy: authenticated ? 'required' : 'omit',
+      credentialsPolicy: authenticated ? 'include' : 'omit',
     });
     return withData(result, result.json);
   }
@@ -390,10 +462,15 @@
     return withData(result, result.json);
   }
 
-  async function confirmCarpool(matchRunId, objectVersion = 1, candidateIndex = 0) {
+  async function confirmCarpool(matchRunId, objectVersion = 1, candidateIndex = 0, orderVersions = null) {
     const result = await rawRequest(`/web/algorithms/carpool/runs/${encodeURIComponent(matchRunId)}/confirm`, {
       method: 'POST',
-      body: JSON.stringify({ match_run_id: matchRunId, candidate_index: candidateIndex, object_version: objectVersion }),
+      body: JSON.stringify({
+        match_run_id: matchRunId,
+        candidate_index: candidateIndex,
+        object_version: objectVersion,
+        order_versions: orderVersions || {},
+      }),
     });
     return withData(result, result.json);
   }
@@ -485,10 +562,9 @@
     let cursor = Number(sessionStorage.getItem('blacksoil.dashboard.cursor') || '0');
     const result = await fetch(`${baseUrl}/dashboard/events?cursor=${encodeURIComponent(cursor)}`, {
       headers: {
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
         ...(cursor > 0 ? { 'Last-Event-ID': String(cursor) } : {}),
       },
-      credentials: 'include',
+      credentials: 'omit',
       cache: 'no-store',
       signal,
     });
@@ -532,10 +608,13 @@
     getCurrentUser,
     getDashboard,
     getDictionaries,
+    getPublicDictionaries,
+    getPublicInformation,
     getDashboardSnapshot,
     generateProcurementAggregation,
     generateNextWeekForecast,
     getOperationsSummary,
+    getBaseUrl: () => baseUrl,
     getNextWeekForecast,
     getWarehousePoolPlan,
     getLiveBase: () => baseUrl,

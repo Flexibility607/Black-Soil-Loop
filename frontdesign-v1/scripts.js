@@ -51,6 +51,7 @@ const state = {
   warehousePlan: null,
   procurementAggregation: null,
   forecastBatch: null,
+  calculationContext: null,
 };
 
 function newIdempotencyKey(prefix) {
@@ -270,7 +271,12 @@ function renderStructuredResult(target, data) {
     el.textContent = formatValue(data);
     return;
   }
-  const hiddenMetadata = new Set(['trace_id', 'schema_version', 'generated_at']);
+  const hiddenMetadata = new Set([
+    'trace_id', 'schema_version', 'generated_at', 'id', 'object_version', 'rules_version',
+    'run_id', 'match_run_id', 'algorithm_run_id', 'plan_id', 'task_id', 'order_id',
+    'warehouse_id', 'vehicle_id', 'driver_id', 'product_id', 'enterprise_id', 'supplier_id',
+    'input_snapshot', 'output_snapshot', 'scenario_code', 'confirmed_by',
+  ]);
   const primitiveEntries = Object.entries(data).filter(([key, value]) => !hiddenMetadata.has(key) && (value === null || ['string', 'number', 'boolean'].includes(typeof value)));
   const listEntries = Object.entries(data).filter(([, value]) => Array.isArray(value));
   const objectEntries = Object.entries(data).filter(([, value]) => value && typeof value === 'object' && !Array.isArray(value));
@@ -290,6 +296,36 @@ function renderStructuredResult(target, data) {
     return `<section><h4>${escapeHtml(displayField(key))}</h4><p>${value.map((item) => displayCell(item, key)).map(escapeHtml).join('、')}</p></section>`;
   }).join('');
   el.innerHTML = `${cards}${objects}${lists}`;
+}
+
+function renderAlgorithmPresentation(presentation) {
+  const target = document.getElementById('calculation-result');
+  if (!presentation || typeof presentation !== 'object') {
+    target.textContent = '本次计算没有可展示的业务结论。';
+    return;
+  }
+  const input = presentation.input_summary || {};
+  const chips = [
+    input.enterprise_count ? `${input.enterprise_count} 家企业` : null,
+    input.order_count ? `${input.order_count} 单` : null,
+    input.product_count ? `${input.product_count} 个商品` : null,
+    ...(input.temperature_zones || []),
+  ].filter(Boolean);
+  const allocations = presentation.allocations || [];
+  target.innerHTML = `<section class="algorithm-presentation"><header><div><small>${escapeHtml(presentation.status_label)}</small><h4>${escapeHtml(presentation.title)}</h4></div><strong>${escapeHtml(presentation.headline)}</strong></header><div class="algorithm-input-chips">${chips.map((chip) => `<span>${escapeHtml(chip)}</span>`).join('')}</div><div class="algorithm-allocation-cards">${allocations.map((item, index) => {
+    const isCarpool = Boolean(item.vehicle_label);
+    const title = isCarpool ? `${item.vehicle_label} → ${(item.store_names || []).join('、') || '门店待补充'}` : `${item.warehouse_name || '名称待补充'} · ${item.recommendation_label || ''}`;
+    const metrics = isCarpool
+      ? `${item.order_count} 单 / ${item.enterprise_count} 企业 · 综合利用率 ${formatNumber(item.capacity_utilization_pct, 1)}% · 估算节省 ${formatNumber(item.mileage_benefit_estimated_km, 1)} 千米`
+      : `${item.order_count} 单 / ${item.enterprise_count} 企业 · 需要 ${formatNumber(item.required_volume_m3, 1)} 立方米 · 剩余 ${formatNumber(item.remaining_volume_m3, 1)} 立方米`;
+    const detail = isCarpool ? `${item.temperature_zone_label} · ${item.recommendation_label} · ${item.explanation}` : `${item.temperature_zone_label} · ${formatNumber(item.estimated_distance_km, 1)} 千米 · ${(item.reasons || []).join('；')}`;
+    return `<button type="button" class="algorithm-allocation-card${index === Number(state.calculationContext?.candidateIndex || 0) ? ' selected' : ''}"><b>${escapeHtml(title)}</b><span>${escapeHtml(metrics)}</span><small>${escapeHtml(detail)}</small></button>`;
+  }).join('') || '<div class="empty-state">等待生成分配方案</div>'}</div>${(presentation.unmatched_reasons || []).length ? `<div class="algorithm-unmatched"><b>待调整原因</b>${presentation.unmatched_reasons.map((item) => `<span>${escapeHtml(item.reason)} · ${item.count} 项</span>`).join('')}</div>` : ''}</section>`;
+  [...target.querySelectorAll('.algorithm-allocation-card')].forEach((button, index) => button.addEventListener('click', () => {
+    if (!state.calculationContext) return;
+    state.calculationContext.candidateIndex = index;
+    [...target.querySelectorAll('.algorithm-allocation-card')].forEach((item, itemIndex) => item.classList.toggle('selected', itemIndex === index));
+  }));
 }
 
 function formatNumber(value, maximumFractionDigits = 0) {
@@ -782,6 +818,7 @@ function renderAuthState(user) {
 
 function requireAuth(result) {
   if (result && result.status === 401 && !getAPI().isMock()) {
+    updateCalculationFields();
     document.getElementById('auth-panel').hidden = false;
     setMessage('E01 园区管理台接口需要登录，请先输入后端账号。', 'warning');
     return true;
@@ -1030,13 +1067,40 @@ async function loadCalculation() {
     return;
   }
   const data = dataOf(result);
-  renderStructuredResult('calculation-result', data);
+  if (data?.presentation) renderAlgorithmPresentation(data.presentation);
+  else if (!['procurement', 'forecast'].includes(kind)) renderStructuredResult('calculation-result', data);
   state.lastMatchRunId = kind === 'carpool-preview' ? data?.match_run_id : null;
   state.lastWarehouseRunId = kind === 'warehouse-preview' ? data?.match_run_id : null;
   state.lastWarehouseCandidate = kind === 'warehouse-preview' ? (data?.candidates || [])[0] || null : null;
   state.warehousePlan = null;
   state.procurementAggregation = kind === 'procurement' ? (data?.items || [])[0] || null : null;
   state.forecastBatch = kind === 'forecast' ? data?.batch || null : null;
+  state.calculationContext = {
+    kind,
+    runId: kind === 'carpool-preview' ? data?.match_run_id : kind === 'warehouse-preview' ? data?.match_run_id : null,
+    candidateIndex: 0,
+    choices: kind === 'carpool-preview'
+      ? (data?.candidates || []).map((candidate, candidateIndex) => ({
+          candidateIndex,
+          orderVersions: candidate.order_versions || null,
+        }))
+      : kind === 'warehouse-preview'
+        ? (data?.candidates || []).flatMap((candidate, candidateIndex) => (
+            (candidate.candidate_warehouses || []).map((warehouse) => ({
+              candidateIndex,
+              warehouseId: warehouse.warehouse_id,
+              warehouseObjectVersion: warehouse.warehouse_object_version,
+              eligible: warehouse.eligible,
+            }))
+          ))
+        : [],
+    aggregationId: state.procurementAggregation?.id || null,
+    objectVersion: state.procurementAggregation?.object_version || null,
+  };
+  if (kind === 'warehouse-preview') {
+    const firstEligible = state.calculationContext.choices.findIndex((item) => item.eligible);
+    state.calculationContext.candidateIndex = firstEligible >= 0 ? firstEligible : 0;
+  }
   document.getElementById('confirm-carpool').hidden = !state.lastMatchRunId || !(data?.candidates || []).length;
   document.getElementById('confirm-warehouse').hidden = !state.lastWarehouseRunId
     || !state.lastWarehouseCandidate?.candidate_warehouses?.some((item) => item.eligible);
@@ -1051,7 +1115,7 @@ async function loadCalculation() {
   if (state.procurementAggregation) {
     document.getElementById('calc-quantity').value = state.procurementAggregation.automatic_quantity;
   }
-  setMessage('计算已返回规则版本、候选方案及不匹配原因。', 'success');
+  setMessage('计算已返回场景条件、业务分配结论及待调整原因。', 'success');
 }
 
 function renderForecastAggregationBoard(data) {
@@ -1076,7 +1140,7 @@ function renderForecastAggregationBoard(data) {
     const smapeValues = related.map((item) => item.smape).filter((value) => value !== null);
     const mae = maeValues.length ? (maeValues.reduce((sum, value) => sum + value, 0) / maeValues.length).toFixed(2) : '数据不足';
     const smape = smapeValues.length ? `${(smapeValues.reduce((sum, value) => sum + value, 0) / smapeValues.length).toFixed(2)}%` : '数据不足';
-    return `<article class="forecast-aggregation-item"><header><strong>${escapeHtml(row.product_name || row.product_id)}</strong><span>建议采购 ${Number(row.suggested_purchase_quantity || 0).toFixed(2)} ${escapeHtml(row.unit)}</span></header><p>${escapeHtml(data.period?.start || '—')} 至 ${escapeHtml(data.period?.end || '—')} · 区间 ${Number(row.lower_bound || 0).toFixed(2)}—${Number(row.upper_bound || 0).toFixed(2)}</p><div class="forecast-compare-bars" aria-label="历史用量、生产计划和预测结果条形对比图">${bars}</div><small>平均 MAE：${mae} · 平均 sMAPE：${smape} · 数据截止：${escapeHtml(data.data_cutoff || '暂无')}</small><small>方法：季节性平滑 / 加权移动平均 / 生产计划降级；数据不足 ${Number(row.data_insufficient_count || 0)} 家</small></article>`;
+    return `<article class="forecast-aggregation-item"><header><strong>${escapeHtml(row.product_name || '名称待补充')}</strong><span>建议采购 ${Number(row.suggested_purchase_quantity || 0).toFixed(2)} ${escapeHtml(row.unit)}</span></header><p>${escapeHtml(data.period?.start || '—')} 至 ${escapeHtml(data.period?.end || '—')} · 区间 ${row.lower_bound ?? '数据不足'}—${row.upper_bound ?? '数据不足'}</p><div class="forecast-compare-bars" aria-label="历史用量、生产计划和预测结果条形对比图">${bars}</div><small>平均 MAE：${mae} · 平均 sMAPE：${smape} · 数据截止：${escapeHtml(data.data_cutoff || '暂无')}</small><small>方法：季节性平滑 / 加权移动平均 / 生产计划降级；数据不足 ${Number(row.data_insufficient_count || 0)} 家</small></article>`;
   }).join('');
 }
 
@@ -1097,7 +1161,7 @@ function renderProcurementAggregationBoard(data) {
     const warning = (item.unit_conversion_warnings || []).length
       ? `<small class="warning-text">${item.unit_conversion_warnings.length} 条单位无法换算，已排除自动推荐</small>`
       : '<small>单位换算完整</small>';
-    return `<article class="procurement-aggregation-item"><header><strong>${escapeHtml(item.product_name || item.product_id)}</strong><span>${Number(item.automatic_quantity || 0).toFixed(2)} ${escapeHtml(item.base_unit)}</span></header><p>${escapeHtml(item.cycle_start)} 至 ${escapeHtml(item.cycle_end)} · ${escapeHtml(item.status)}</p>${warning}<div class="supplier-compare-bars" aria-label="供应商方案综合评分条形图">${bars}</div></article>`;
+    return `<article class="procurement-aggregation-item"><header><strong>${escapeHtml(item.product_name || '名称待补充')}</strong><span>${Number(item.automatic_quantity || 0).toFixed(2)} ${escapeHtml(item.base_unit)}</span></header><p>${escapeHtml(item.cycle_start)} 至 ${escapeHtml(item.cycle_end)} · ${escapeHtml(item.status)}</p>${warning}<div class="supplier-compare-bars" aria-label="供应商方案综合评分条形图">${bars}</div></article>`;
   }).join('');
 }
 
@@ -1120,19 +1184,27 @@ async function confirmProcurementAggregation() {
   }
   state.procurementAggregation = { ...item, status: 'CONFIRMED', object_version: dataOf(result).object_version };
   document.getElementById('confirm-procurement').hidden = true;
-  renderStructuredResult('calculation-result', dataOf(result));
+  document.getElementById('calculation-result').innerHTML = '<div class="operation-note">采购建议已确认，采用数量、供应商推荐和业务状态已同步保存。</div>';
+  renderProcurementAggregationBoard({ items: [state.procurementAggregation] });
   setMessage('采购汇总已保存输入快照、供应商方案和人工确认状态。', 'success');
 }
 
 async function confirmCarpool() {
   if (!state.lastMatchRunId) return;
-  const result = await getAPI().confirmCarpool(state.lastMatchRunId, 1, 0);
+  const context = state.calculationContext || {};
+  const choice = context.choices?.[context.candidateIndex] || {};
+  const result = await getAPI().confirmCarpool(
+    state.lastMatchRunId,
+    1,
+    Number(choice.candidateIndex || 0),
+    choice.orderVersions,
+  );
   if (!result.ok) {
     document.getElementById('calculation-result').textContent = errorOf(result);
     return;
   }
   document.getElementById('confirm-carpool').hidden = true;
-  renderStructuredResult('calculation-result', dataOf(result));
+  document.getElementById('calculation-result').innerHTML = '<div class="operation-note">拼车方案已确认，服务器正在创建执行任务。</div>';
   setMessage('首选拼车方案已确认，服务器正在创建执行任务。', 'success');
 }
 
@@ -1145,14 +1217,14 @@ function updateWarehouseActionButtons() {
 }
 
 async function confirmWarehousePool() {
-  const candidate = state.lastWarehouseCandidate;
-  const warehouse = candidate?.candidate_warehouses?.find((item) => item.eligible);
-  if (!state.lastWarehouseRunId || !candidate || !warehouse) return;
+  const context = state.calculationContext || {};
+  const choice = context.choices?.[context.candidateIndex] || context.choices?.find((item) => item.eligible);
+  if (!state.lastWarehouseRunId || !choice?.eligible) return;
   const result = await getAPI().confirmWarehousePool(
     state.lastWarehouseRunId,
-    0,
-    warehouse.warehouse_id,
-    warehouse.warehouse_object_version,
+    choice.candidateIndex,
+    choice.warehouseId,
+    choice.warehouseObjectVersion,
     newIdempotencyKey('warehouse-confirm'),
   );
   if (!result.ok) {
@@ -1162,7 +1234,7 @@ async function confirmWarehousePool() {
   state.warehousePlan = dataOf(result)?.plan || null;
   document.getElementById('confirm-warehouse').hidden = true;
   updateWarehouseActionButtons();
-  renderStructuredResult('calculation-result', dataOf(result));
+  document.getElementById('calculation-result').innerHTML = '<div class="operation-note">共享仓方案已确认，服务器正在原子预占库容。</div>';
   setMessage('拼仓方案已确认，服务器正在原子预占库容。', 'success');
 }
 
@@ -1175,7 +1247,7 @@ async function refreshWarehousePlan() {
   }
   state.warehousePlan = dataOf(result)?.plan || null;
   updateWarehouseActionButtons();
-  renderStructuredResult('calculation-result', dataOf(result));
+  document.getElementById('calculation-result').innerHTML = `<div class="operation-note">共享仓当前状态：${escapeHtml(state.warehousePlan?.status_label || state.warehousePlan?.status || '处理中')}</div>`;
 }
 
 async function requestWarehouseAction(action) {
@@ -1194,7 +1266,7 @@ async function requestWarehouseAction(action) {
   }
   state.warehousePlan = { ...plan, ...dataOf(result) };
   updateWarehouseActionButtons();
-  renderStructuredResult('calculation-result', dataOf(result));
+  document.getElementById('calculation-result').innerHTML = `<div class="operation-note">拼仓操作已受理，当前状态：${escapeHtml(state.warehousePlan?.status_label || state.warehousePlan?.status || '处理中')}</div>`;
   setMessage('拼仓操作已受理，请刷新查看 Worker 处理结果。', 'success');
 }
 
@@ -1216,6 +1288,7 @@ function updateCalculationFields() {
   document.getElementById('procurement-aggregation-board').hidden = true;
   document.getElementById('forecast-aggregation-board').hidden = true;
   state.lastMatchRunId = null;
+  state.calculationContext = null;
 }
 
 async function loadCalculationOptions() {
@@ -1313,11 +1386,11 @@ function showSection(section) {
   if (isPublic) {
     updatePublicClock();
     requestAnimationFrame(applyPublicScreenScale);
-    window.DashboardV2?.activate();
   } else {
     window.scrollTo({ top: 0, left: 0 });
   }
   window.dispatchEvent(new CustomEvent('app:section-change', { detail: { section } }));
+  if (window.location.hash !== `#${section}`) history.replaceState(null, '', `#${section}`);
 }
 
 async function exitPublicScreen() {
@@ -1344,6 +1417,7 @@ async function handleLogin(event) {
 
 async function handleLogout() {
   await getAPI().logout();
+  updateCalculationFields();
   renderAuthState(null);
   document.getElementById('auth-panel').hidden = false;
   setMessage('已退出 E01 园区管理台会话；E02 公开产销协同大屏仍可访问。', 'info');
@@ -1358,6 +1432,7 @@ async function initPage() {
   document.getElementById('logout-button').addEventListener('click', handleLogout);
   document.getElementById('login-form').addEventListener('submit', handleLogin);
   document.getElementById('calc-kind').addEventListener('change', updateCalculationFields);
+  document.getElementById('calc-scenario').addEventListener('change', updateCalculationFields);
   document.getElementById('run-calculation').addEventListener('click', loadCalculation);
   document.getElementById('confirm-carpool').addEventListener('click', confirmCarpool);
   document.getElementById('confirm-warehouse').addEventListener('click', confirmWarehousePool);
@@ -1366,7 +1441,7 @@ async function initPage() {
   document.getElementById('cancel-warehouse').addEventListener('click', () => requestWarehouseAction('cancel'));
   document.getElementById('release-warehouse').addEventListener('click', () => requestWarehouseAction('release'));
   document.getElementById('confirm-procurement').addEventListener('click', confirmProcurementAggregation);
-  document.getElementById('public-refresh')?.addEventListener('click', () => window.DashboardV2?.refresh());
+  document.getElementById('public-refresh')?.addEventListener('click', () => window.DashboardV2?.refreshAll?.());
   document.getElementById('public-fullscreen')?.addEventListener('click', togglePublicFullscreen);
   document.getElementById('public-theme-toggle')?.addEventListener('click', togglePublicTheme);
   document.getElementById('public-exit')?.addEventListener('click', exitPublicScreen);
@@ -1414,7 +1489,8 @@ async function initPage() {
   document.getElementById('auth-panel').hidden = Boolean(user);
   if (user) await loadCalculationOptions();
   updateCalculationFields();
-  showSection('overview');
+  const requestedSection = window.location.hash.slice(1);
+  showSection(document.getElementById(requestedSection)?.classList.contains('page-section') ? requestedSection : 'overview');
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initPage);

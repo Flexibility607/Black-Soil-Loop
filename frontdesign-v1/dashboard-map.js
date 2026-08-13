@@ -17,6 +17,15 @@ export function localGeoJsonIsNortheast(geojson) {
   return ['黑龙江省', '吉林省', '辽宁省'].every((name) => names.has(name));
 }
 
+export function localGeoJsonIsChangchunServiceArea(geojson) {
+  const features = Array.isArray(geojson?.features) ? geojson.features : [];
+  if (!features.length) return false;
+  return features.every((feature) => {
+    const type = feature?.geometry?.type;
+    return type === 'Polygon' || type === 'MultiPolygon';
+  });
+}
+
 function nodeColor(type, palette) {
   if (type === 'PARK') return palette.demand;
   if (type === 'THIRD_SPACE') return palette.thirdSpace;
@@ -184,6 +193,112 @@ export function buildNortheastMapOption(snapshot, palette = SCREEN_PALETTES.nigh
         itemStyle: { color: colors.mapReference },
         label: { show: true, formatter: '{b}', position: 'top', color: colors.mapReference, fontSize: 10 },
         data: REFERENCE_CITIES,
+      },
+    ],
+  };
+}
+
+function publicPointTooltip(point) {
+  const type = point.point_type === 'THIRD_SPACE' ? '第三空间' : '普通销售门店';
+  const note = point.coordinate_note ? `<br/>${point.coordinate_note}` : '';
+  return `${point.display_name}<br/>${type}<br/>${point.address || '地址待补充'}${note}`;
+}
+
+function publicRouteTooltip(route) {
+  const location = route.latest_location;
+  const telemetry = route.latest_telemetry;
+  const locationText = location
+    ? `<br/>位置采样：${location.recorded_at || '—'}<br/>速度：${location.speed_mps ?? '—'} 米/秒 · 定位精度：${location.accuracy_m ?? '—'} 米 · ${location.freshness || '未知时效'}`
+    : '<br/>暂无有效车辆位置，使用任务起点估算';
+  const telemetryText = telemetry
+    ? `<br/>温度 ${telemetry.temperature_c ?? '—'} ℃ · 湿度 ${telemetry.humidity_pct ?? '—'}% · 采样 ${telemetry.sampled_at || '—'}${telemetry.anomaly_code ? `<br/>遥测异常提示：${telemetry.anomaly_code}` : ''}`
+    : '<br/>暂无温湿度采样';
+  const alerts = Array.isArray(route.alerts) ? route.alerts : [];
+  const alertText = alerts.length
+    ? `<br/>独立报警：${alerts.map((item) => item.message || item.alert_type_label || item.alert_type).join('；')}${Number(route.alert_count || 0) > alerts.length ? ` 等 ${route.alert_count} 条` : ''}`
+    : '<br/>独立报警：无';
+  return `${route.vehicle_label || '配送车辆'} → ${route.to?.display_name || '运输目标点'}<br/>${route.status_label || statusLabel(route.status)} · ${route.route_label || '经纬度估算路线'}${locationText}${telemetryText}${alertText}`;
+}
+
+export function buildChangchunMapOption(snapshot, palette = SCREEN_PALETTES.night) {
+  const colors = { ...SCREEN_PALETTES.night, ...palette };
+  const publicMap = snapshot.public_map || snapshot.map || {};
+  const points = (publicMap.points || []).map((point) => ({
+    name: point.display_name,
+    value: [Number(point.longitude), Number(point.latitude)],
+    point,
+    symbolSize: point.point_type === 'THIRD_SPACE' ? 14 : 10,
+    itemStyle: { color: point.point_type === 'THIRD_SPACE' ? colors.thirdSpace : colors.traditional },
+  })).filter((point) => point.value.every(Number.isFinite));
+  const routes = (publicMap.active_routes || []).map((route) => {
+    const from = route.from;
+    const target = route.to;
+    const coords = [[Number(from?.longitude), Number(from?.latitude)], [Number(target?.longitude), Number(target?.latitude)]];
+    if (!coords.flat().every(Number.isFinite)) return null;
+    return {
+      name: `${route.vehicle_label || '配送车辆'} → ${target?.display_name || '运输目标点'}`,
+      coords,
+      route,
+      lineStyle: {
+        color: target?.channel === 'THIRD_SPACE' ? colors.thirdSpace : colors.traditional,
+        type: route.latest_location?.freshness === 'DELAYED' || route.fallback ? 'dashed' : 'solid',
+        opacity: route.latest_location?.freshness === 'DELAYED' ? 0.5 : 0.78,
+      },
+    };
+  }).filter(Boolean);
+  const vehicles = routes.filter((item) => item.route.from?.kind === 'VEHICLE').map((item) => ({
+    name: item.route.vehicle_label || '配送车辆',
+    value: item.coords[0],
+    route: item.route,
+  }));
+  const alerts = routes.filter((item) => Number(item.route.alert_count || item.route.alerts?.length || 0) > 0).map((item) => ({
+    name: `${item.route.to?.display_name || '运输目标点'}报警`,
+    value: item.coords[1],
+    route: item.route,
+  }));
+  return {
+    animation: false,
+    tooltip: {
+      trigger: 'item',
+      backgroundColor: colors.tooltipBackground,
+      borderColor: colors.tooltipBorder,
+      textStyle: { color: colors.text },
+      formatter(params) {
+        if (params.seriesName === '精选点位') return publicPointTooltip(params.data.point);
+        if (['有效运输路线', '车辆当前位置', '独立温湿度报警'].includes(params.seriesName)) return publicRouteTooltip(params.data.route);
+        return params.name || '';
+      },
+    },
+    geo: {
+      map: 'changchun-service-area',
+      roam: true,
+      layoutCenter: ['50%', '51%'],
+      layoutSize: '97%',
+      label: { show: false },
+      itemStyle: { areaColor: colors.mapArea, borderColor: colors.mapBorder, borderWidth: 1.2, shadowColor: colors.mapShadow, shadowBlur: 16 },
+      emphasis: { itemStyle: { areaColor: colors.mapEmphasis } },
+    },
+    series: [
+      {
+        name: '有效运输路线', type: 'lines', coordinateSystem: 'geo', zlevel: 2,
+        effect: { show: true, period: 7, trailLength: 0.18, symbolSize: 3, color: colors.mapEffect },
+        lineStyle: { width: 1.6, curveness: 0.08 }, data: routes,
+      },
+      {
+        name: '精选点位', type: 'effectScatter', coordinateSystem: 'geo', zlevel: 3,
+        rippleEffect: { scale: 2.4, brushType: 'stroke' },
+        label: { show: true, formatter: '{b}', position: 'right', distance: 6, color: colors.text, fontSize: 10, textBorderColor: colors.mapTextBorder, textBorderWidth: 3 },
+        data: points,
+      },
+      {
+        name: '车辆当前位置', type: 'effectScatter', coordinateSystem: 'geo', zlevel: 5,
+        symbol: 'diamond', symbolSize: 14, rippleEffect: { scale: 3, brushType: 'stroke' },
+        itemStyle: { color: colors.vehicle, borderColor: colors.vehicleBorder, borderWidth: 1 }, data: vehicles,
+      },
+      {
+        name: '独立温湿度报警', type: 'effectScatter', coordinateSystem: 'geo', zlevel: 6,
+        symbolSize: 19, rippleEffect: { scale: 3.5, brushType: 'stroke' },
+        itemStyle: { color: colors.danger }, data: alerts,
       },
     ],
   };

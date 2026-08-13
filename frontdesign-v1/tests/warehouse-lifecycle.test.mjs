@@ -30,5 +30,6 @@ test('拼仓页面显示完整生命周期操作并保存服务器对象版本',
   ]) assert.match(html, new RegExp(`id="${id}"`));
   assert.match(scripts, /warehouse_object_version/);
   assert.match(scripts, /plan\.object_version/);
-  assert.match(scripts, /candidate_warehouses\?\.find\(\(item\) => item\.eligible\)/);
+  assert.match(scripts, /context\.choices\?\.\[context\.candidateIndex\]/);
+  assert.match(scripts, /warehouseObjectVersion/);
 });

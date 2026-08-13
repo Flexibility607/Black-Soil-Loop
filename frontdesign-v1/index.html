@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="vendor/fonts/noto-sans-sc/index.css" />
   <link rel="stylesheet" href="vendor/fonts/zcool-qingke-huangyou/400.css" />
   <link rel="stylesheet" href="vendor/fonts/jetbrains-mono/index.css" />
-  <link rel="stylesheet" href="dashboard.css?v=20260811-anonymous-voice-1" />
+  <link rel="stylesheet" href="dashboard.css?v=20260813-dashboard-presentation-1" />
 </head>
 <body>
   <div class="app-shell">
@@ -116,8 +116,8 @@
       </section>
 
       <section id="analytics" class="page-section">
-        <div class="section-heading"><div><p class="eyebrow">B01 网页管理与经营服务 · 智能计算</p><h2>拼车、拼仓、采购与预测</h2></div><span class="data-count">保留输入、规则版本、候选方案和解释</span></div>
-        <div class="toolbar analytics-toolbar"><label>计算<select id="calc-kind"><option value="carpool-preview">拼车匹配</option><option value="warehouse-preview">拼仓匹配</option><option value="procurement">采购自动汇总</option><option value="forecast">需求预测</option></select></label><label id="scenario-fields">演示场景<select id="calc-scenario"><option value="SCENARIO_1">复杂场景一</option><option value="SCENARIO_2">复杂场景二</option><option value="SCENARIO_3">复杂场景三</option></select></label><label id="enterprise-fields" hidden>企业<select id="calc-enterprise"></select></label><label id="product-fields" hidden>商品<select id="calc-product"></select></label><label id="quantity-fields" hidden>授权调整首项数量<input id="calc-quantity" type="number" min="0" placeholder="自动汇总" /></label><button id="run-calculation" class="button primary" type="button">运行计算</button><button id="confirm-carpool" class="button secondary" type="button" hidden>确认首选拼车方案</button><button id="confirm-warehouse" class="button secondary" type="button" hidden>确认首选拼仓方案</button><button id="refresh-warehouse-plan" class="button secondary" type="button" hidden>刷新拼仓状态</button><button id="occupy-warehouse" class="button secondary" type="button" hidden>确认入仓占用</button><button id="cancel-warehouse" class="button secondary" type="button" hidden>取消拼仓</button><button id="release-warehouse" class="button secondary" type="button" hidden>释放库容</button><button id="confirm-procurement" class="button secondary" type="button" hidden>确认首项采购汇总</button></div>
+        <div class="section-heading"><div><p class="eyebrow">B01 网页管理与经营服务 · 智能计算</p><h2>拼车、拼仓、采购与预测</h2></div><span class="data-count">展示业务条件、方案分配和可核对结论</span></div>
+        <div class="toolbar analytics-toolbar"><label>计算<select id="calc-kind"><option value="carpool-preview">拼车匹配</option><option value="warehouse-preview">拼仓匹配</option><option value="procurement">采购自动汇总</option><option value="forecast">需求预测</option></select></label><label id="scenario-fields">预设场景<select id="calc-scenario"><option value="SCENARIO_1">长春市区门店晨间联合配送</option><option value="SCENARIO_2">净月片区冷链错峰补货</option><option value="SCENARIO_3">长春市郊第三空间集中补货</option></select></label><label id="enterprise-fields" hidden>企业<select id="calc-enterprise"></select></label><label id="product-fields" hidden>商品<select id="calc-product"></select></label><label id="quantity-fields" hidden>授权调整首项数量<input id="calc-quantity" type="number" min="0" placeholder="自动汇总" /></label><button id="run-calculation" class="button primary" type="button">运行计算</button><button id="confirm-carpool" class="button secondary" type="button" hidden>确认首选拼车方案</button><button id="confirm-warehouse" class="button secondary" type="button" hidden>确认首选拼仓方案</button><button id="refresh-warehouse-plan" class="button secondary" type="button" hidden>刷新拼仓状态</button><button id="occupy-warehouse" class="button secondary" type="button" hidden>确认入仓占用</button><button id="cancel-warehouse" class="button secondary" type="button" hidden>取消拼仓</button><button id="release-warehouse" class="button secondary" type="button" hidden>释放库容</button><button id="confirm-procurement" class="button secondary" type="button" hidden>确认首项采购汇总</button></div>
         <div class="result-card"><h3>计算结果</h3><div id="calculation-result" class="readable-result">选择计算类型后运行。</div><div id="procurement-aggregation-board" class="procurement-aggregation-board" hidden></div><div id="forecast-aggregation-board" class="forecast-aggregation-board" hidden></div></div>
       </section>
 
@@ -146,10 +146,14 @@
               <section class="dv2-panel dv2-quality-panel"><header><div><small>数据质量</small><h3>数据质量</h3></div><span id="dv2-coverage">—</span></header><div id="dv2-quality-list" class="dv2-quality-list"></div></section>
             </div>
 
-            <section class="dv2-panel dv2-map-panel"><header><div><small>东北供销网络</small><h3>东北三省供销网络</h3></div><div class="dv2-map-legend"><span class="park">园区</span><span class="store">传统门店</span><span class="third">第三空间</span></div></header><div id="dv2-map-chart" class="dv2-map-chart" role="img" aria-label="东北三省园区和门店供销地图"></div><div class="dv2-map-caption"><span>经纬度坐标 · 哈尔滨位于长春北侧 · 路线均为估算</span><a href="https://www.naturalearthdata.com/downloads/50m-cultural-vectors/50m-admin-1-states-provinces/" target="_blank" rel="noopener noreferrer">边界数据：自然地球省级边界</a></div></section>
+            <div class="dv2-center-stack">
+              <section class="dv2-panel dv2-map-panel"><header><div><small>长春本地服务范围</small><h3>长春市及近郊供销网络</h3></div><div class="dv2-map-legend"><span class="store">普通销售门店</span><span class="third">第三空间</span></div></header><div id="dv2-map-chart" class="dv2-map-chart" role="img" aria-label="长春市及近郊门店与有效运输任务地图"></div><div class="dv2-map-caption"><span id="dv2-map-summary">经纬度估算路线，不代表道路导航</span><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap contributors · ODbL</a></div></section>
+              <section class="dv2-panel dv2-showcase-panel" aria-labelledby="dv2-showcase-title"><header><div><small>预设场景测算与真实经营投影</small><h3 id="dv2-showcase-title">协同运算方案</h3></div><span id="dv2-showcase-state">等待生成</span></header><div id="dv2-showcase-tabs" class="dv2-showcase-tabs" role="tablist" aria-label="协同运算类别"><button type="button" role="tab" data-kind="CARPOOL" aria-selected="true">拼车联配</button><button type="button" role="tab" data-kind="WAREHOUSE" aria-selected="false">共享仓匹配</button><button type="button" role="tab" data-kind="PROCUREMENT" aria-selected="false">集中采购</button><button type="button" role="tab" data-kind="FORECAST" aria-selected="false">下周预测</button></div><div id="dv2-showcase-cases" class="dv2-showcase-cases"></div><div id="dv2-showcase-content" class="dv2-showcase-content"><div class="dv2-empty">等待生成分配方案</div></div><button id="dv2-showcase-more" class="dv2-showcase-more" type="button" hidden>查看全部方案</button></section>
+            </div>
 
             <div class="dv2-right-stack">
               <section class="dv2-panel dv2-mix-panel"><header><div><small>渠道构成</small><h3>终端经营渠道占比</h3></div><span>仅 B02 移动履约与经营日报</span></header><div class="dv2-donut-grid"><div><div id="dv2-order-donut" class="dv2-donut" role="img" aria-label="传统门店与第三空间经营订单量占比"></div><b>经营订单量占比</b></div><div><div id="dv2-sales-donut" class="dv2-donut" role="img" aria-label="传统门店与第三空间营业额占比"></div><b>营业额占比</b></div></div><div id="dv2-mix-legend" class="dv2-mix-legend"></div></section>
+              <section class="dv2-panel dv2-information-panel"><header><div><small>公开审核目录</small><h3>园区动态与政策资讯</h3></div><span id="dv2-information-state">正在读取</span></header><div class="dv2-information-tabs" role="tablist" aria-label="资讯类别"><button type="button" role="tab" data-kind="NEWS" aria-selected="true">园区动态</button><button type="button" role="tab" data-kind="POLICY" aria-selected="false">政策资讯</button></div><div id="dv2-information-list" class="dv2-information-list" aria-live="polite"></div><button id="dv2-information-retry" class="dv2-information-retry" type="button" hidden>重试</button></section>
               <section class="dv2-panel dv2-voice-panel">
                 <header><div><small>数据智能助手</small><h3>文字与语音助手</h3></div><span id="dv2-voice-state">等待提问</span></header>
                 <p id="dv2-voice-hint">输入文字、选择预设问题或使用最长 30 秒的语音提问。</p>
@@ -168,14 +172,15 @@
           <footer class="dv2-footer"><span><i></i><b id="public-sync-state">等待同步</b></span><span>业务数据截止：<b id="public-data-cutoff">—</b></span><span>响应生成：<b id="public-generated-at">—</b></span><span>SSE 实时更新 · 断线时每 30 秒轮询</span></footer>
 
           <dialog id="dv2-chart-dialog" class="dv2-chart-dialog"><header><div><small>数据详情</small><h3 id="dv2-dialog-title">数据图表</h3></div><button id="dv2-dialog-close" type="button" aria-label="关闭图表">关闭</button></header><div id="dv2-dialog-chart" class="dv2-dialog-chart"></div></dialog>
+          <dialog id="dv2-algorithm-dialog" class="dv2-chart-dialog dv2-algorithm-dialog"><header><div><small>业务化分配结论</small><h3 id="dv2-algorithm-dialog-title">协同运算方案</h3></div><button id="dv2-algorithm-dialog-close" type="button" aria-label="关闭协同运算方案">关闭</button></header><div id="dv2-algorithm-dialog-content" class="dv2-algorithm-dialog-content"></div></dialog>
         </div>
       </section>
     </main>
   </div>
   <script src="runtime-config.js"></script>
-  <script src="api.js?v=20260811-anonymous-voice-1"></script>
-  <script src="scripts.js?v=20260809-jipin-theme-2"></script>
+  <script src="api.js?v=20260813-dashboard-presentation-1"></script>
+  <script src="scripts.js?v=20260813-dashboard-presentation-1"></script>
   <script src="vendor/echarts/echarts.min.js"></script>
-  <script type="module" src="dashboard-v2.js?v=20260811-anonymous-voice-1"></script>
+  <script type="module" src="dashboard-v2.js?v=20260813-dashboard-presentation-1"></script>
 </body>
 </html>

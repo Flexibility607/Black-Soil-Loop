@@ -5,6 +5,7 @@ import {
   dashboardPalette,
   demandSeries,
   formatCurrency,
+  formatCnyAmount,
   formatDate,
   formatNumber,
   formatPercent,
@@ -16,8 +17,9 @@ import {
 } from './dashboard-format.js?v=20260809-jipin-theme-2';
 import {
   applyDashboardMapDictionaries,
+  buildChangchunMapOption,
   buildNortheastMapOption,
-  harbinIsNorthOfChangchun,
+  localGeoJsonIsChangchunServiceArea,
   localGeoJsonIsNortheast,
 } from './dashboard-map.js?v=20260809-jipin-theme-2';
 import { VOICE_STATES, VoiceQuestionController } from './dashboard-voice.js?v=20260811-anonymous-voice-1';
@@ -27,7 +29,8 @@ import { eventTargets, RealtimeCoordinator } from './dashboard-realtime.js';
 const echarts = window.echarts;
 const API = window.API;
 const DEMO_FIXTURE = './frontend-mocks-v0.1/e02-dashboard-snapshot.json';
-const MAP_FIXTURE = './assets/maps/northeast-china-admin1.geojson';
+const CHANGCHUN_MAP_FIXTURE = './assets/maps/changchun-service-area.geojson';
+const LEGACY_MAP_FIXTURE = './assets/maps/northeast-china-admin1.geojson';
 const chartInstances = new Map();
 const state = {
   active: false,
@@ -37,6 +40,17 @@ const state = {
   source: null,
   lastSuccessfulAt: null,
   mapReady: false,
+  mapMode: null,
+  refreshGeneration: 0,
+  information: null,
+  informationEtag: null,
+  informationKind: 'NEWS',
+  informationTimer: null,
+  informationScrollTimer: null,
+  showcasePanel: 'CARPOOL',
+  showcaseCase: {},
+  showcasePauseUntil: 0,
+  showcaseTimer: null,
   e01Snapshot: null,
   currentSection: 'overview',
   eventRefreshTimer: null,
@@ -166,14 +180,21 @@ async function loadDemoSnapshot() {
   return recomputeSnapshot(payload.data, state.period);
 }
 
-async function ensureMap() {
-  if (state.mapReady) return;
-  const response = await fetch(MAP_FIXTURE, { cache: 'force-cache' });
+async function ensureMap(mode = 'changchun') {
+  if (state.mapReady && state.mapMode === mode) return;
+  const asset = mode === 'changchun' ? CHANGCHUN_MAP_FIXTURE : LEGACY_MAP_FIXTURE;
+  const response = await fetch(asset, { cache: 'force-cache' });
   if (!response.ok) throw new Error(`本地地图资源加载失败（HTTP ${response.status}）`);
   const geojson = await response.json();
-  if (!localGeoJsonIsNortheast(geojson) || !harbinIsNorthOfChangchun()) throw new Error('东北三省地图坐标校验失败');
-  echarts.registerMap('northeast-admin1', geojson);
+  if (mode === 'changchun') {
+    if (!localGeoJsonIsChangchunServiceArea(geojson)) throw new Error('长春服务范围地图坐标校验失败');
+    echarts.registerMap('changchun-service-area', geojson);
+  } else {
+    if (!localGeoJsonIsNortheast(geojson)) throw new Error('东北三省地图坐标校验失败');
+    echarts.registerMap('northeast-admin1', geojson);
+  }
   state.mapReady = true;
+  state.mapMode = mode;
 }
 
 function setSource(source, message) {
@@ -190,7 +211,9 @@ function renderHeadline(snapshot) {
   byId('dv2-park-name').textContent = snapshot.park_name || '园区未选择';
   byId('dv2-preorder-count').textContent = formatNumber(snapshot.headline.preorder_count);
   byId('dv2-operation-orders').textContent = formatNumber(snapshot.headline.operation_order_count);
-  byId('dv2-sales-amount').textContent = formatCurrency(snapshot.headline.sales_amount);
+  byId('dv2-sales-amount').textContent = snapshot.currency === 'CNY'
+    ? formatCnyAmount(snapshot.headline.sales_amount)
+    : `币种不支持（${snapshot.currency || '空值'}）`;
   byId('dv2-third-space-count').textContent = formatNumber(snapshot.third_spaces.length);
   const totals = sortDemandTotals(snapshot.headline.demand_totals);
   byId('dv2-demand-totals').innerHTML = totals.length
@@ -224,12 +247,12 @@ function renderDemandChart(snapshot, target = 'dv2-demand-chart', palette = scre
   }, true);
 }
 
-function donutOption(values, centerLabel, palette = COLORS) {
+function donutOption(values, centerLabel, palette = COLORS, valueFormatter = formatNumber) {
   const total = values.reduce((sum, item) => sum + Number(item.value || 0), 0);
   return {
     animationDuration: 350,
-    tooltip: { trigger: 'item', formatter: '{b}<br/>{c} · {d}%', backgroundColor: palette.tooltipBackground || 'rgba(8, 31, 55, .96)', borderColor: palette.tooltipBorder || palette.traditional, textStyle: { color: palette.text } },
-    title: { text: total ? formatNumber(total) : '0', subtext: centerLabel, left: 'center', top: '37%', textStyle: { color: palette.text, fontFamily: 'JetBrains Mono Variable', fontSize: 18 }, subtextStyle: { color: palette.muted, fontSize: 10 } },
+    tooltip: { trigger: 'item', formatter: (params) => `${htmlEscape(params.name)}<br/>${htmlEscape(valueFormatter(params.value, true))} · ${htmlEscape(formatPercent(params.percent))}`, backgroundColor: palette.tooltipBackground || 'rgba(8, 31, 55, .96)', borderColor: palette.tooltipBorder || palette.traditional, textStyle: { color: palette.text } },
+    title: { text: total ? valueFormatter(total) : valueFormatter(0), subtext: centerLabel, left: 'center', top: '37%', textStyle: { color: palette.text, fontFamily: 'JetBrains Mono Variable', fontSize: 18 }, subtextStyle: { color: palette.muted, fontSize: 10 } },
     series: [{
       type: 'pie', radius: ['57%', '77%'], center: ['50%', '48%'], startAngle: 90,
       label: { show: false }, emphasis: { scale: true, scaleSize: 5 },
@@ -242,7 +265,10 @@ function donutOption(values, centerLabel, palette = COLORS) {
 function renderMix(snapshot) {
   const palette = screenPalette();
   initChart('dv2-order-donut')?.setOption(donutOption(channelValues(snapshot.channel_mix, 'operation_order_count', palette), '订单', palette), true);
-  initChart('dv2-sales-donut')?.setOption(donutOption(channelValues(snapshot.channel_mix, 'sales_amount', palette), '营业额', palette), true);
+  const salesFormatter = (value, full = false) => snapshot.currency === 'CNY'
+    ? formatCnyAmount(value, { compact: !full, fullPrecision: full })
+    : `币种不支持（${snapshot.currency || '空值'}）`;
+  initChart('dv2-sales-donut')?.setOption(donutOption(channelValues(snapshot.channel_mix, 'sales_amount', palette), '营业额', palette, salesFormatter), true);
   byId('dv2-mix-legend').innerHTML = snapshot.channel_mix.map((item) => {
     const color = item.channel_type === 'THIRD_SPACE' ? palette.thirdSpace : palette.traditional;
     return `<div style="--legend-color:${color}"><strong>${htmlEscape(item.display_name)}</strong><small>订单 ${htmlEscape(formatPercent(item.operation_order_share))} · 营业额 ${htmlEscape(formatPercent(item.sales_share))}</small></div>`;
@@ -256,7 +282,7 @@ function renderRanking(snapshot) {
     <div class="dv2-rank-item">
       <b>${index + 1}</b>
       <div><strong>${htmlEscape(item.store_name)}</strong><small>${htmlEscape(item.city || '城市待补充')} · 最近上报 ${htmlEscape(item.last_report_date || '缺报')}</small><div class="dv2-rank-bar"><i style="width:${Math.max(4, Number(item.sales_amount || 0) / max * 100).toFixed(1)}%"></i></div></div>
-      <span class="dv2-rank-value"><b>${htmlEscape(formatCurrency(item.sales_amount))}</b><small>${htmlEscape(formatNumber(item.operation_order_count))} 笔</small></span>
+      <span class="dv2-rank-value"><b>${htmlEscape(snapshot.currency === 'CNY' ? formatCnyAmount(item.sales_amount) : `币种不支持（${snapshot.currency || '空值'}）`)}</b><small>${htmlEscape(formatNumber(item.operation_order_count))} 笔</small></span>
     </div>`).join('') : '<div class="dv2-empty">暂无第三空间经营数据</div>';
 }
 
@@ -275,7 +301,181 @@ function renderQuality(snapshot) {
 function renderMap(snapshot) {
   const chart = initChart('dv2-map-chart');
   if (!chart) return;
-  chart.setOption(buildNortheastMapOption(snapshot, screenPalette()), true);
+  const option = snapshot.public_map?.schema_version === '2.0'
+    ? buildChangchunMapOption(snapshot, screenPalette())
+    : buildNortheastMapOption(snapshot, screenPalette());
+  chart.setOption(option, true);
+  const excluded = snapshot.public_map?.excluded_route_summary?.count || 0;
+  const alerts = (snapshot.public_map?.active_routes || []).reduce((sum, route) => sum + Number(route.alert_count || 0), 0);
+  if (byId('dv2-map-summary')) byId('dv2-map-summary').textContent = `未解决报警 ${alerts} 条 · 范围外或无下一站 ${excluded} 项`;
+}
+
+function showcaseAllocationSummary(allocation) {
+  if (allocation.type === 'CARPOOL') {
+    return {
+      title: `${allocation.vehicle_label} → ${(allocation.store_names || []).join('、') || '门店待补充'}`,
+      metrics: `${allocation.order_count} 单 / ${allocation.enterprise_count} 企业 · 利用率 ${formatPercent(allocation.capacity_utilization_pct)} · 估算节省 ${formatNumber(allocation.mileage_benefit_estimated_km, 1)} km`,
+      detail: `${allocation.temperature_zone_label} · ${allocation.total_weight_kg} kg · ${allocation.total_volume_m3} m³ · ${allocation.decision_state_label}`,
+    };
+  }
+  if (allocation.type === 'WAREHOUSE') {
+    return {
+      title: `${allocation.warehouse_name} · ${allocation.decision_state_label}`,
+      metrics: `${allocation.order_count} 单 / ${allocation.enterprise_count} 企业 · 需要 ${formatNumber(allocation.required_volume_m3, 1)} m³ · 剩余 ${formatNumber(allocation.remaining_volume_m3, 1)} m³`,
+      detail: `${allocation.temperature_zone_label} · 最远估算 ${formatNumber(allocation.estimated_distance_km, 1)} km · ${(allocation.reasons || []).join('；')}`,
+    };
+  }
+  if (allocation.type === 'PROCUREMENT') {
+    const supplier = (allocation.supplier_options || [])[0];
+    return {
+      title: `${allocation.product_name} · ${allocation.confirmation_state_label}`,
+      metrics: `采用 ${formatNumber(allocation.effective_quantity, 2)} ${allocation.base_unit} · ${supplier ? `推荐 ${supplier.supplier_name}` : '暂无合格供应商'}`,
+      detail: supplier ? `单价 ${formatCnyAmount(supplier.unit_price, { compact: false })} · 总额 ${formatCnyAmount(supplier.total_amount)} · 综合评分 ${formatNumber(supplier.composite_score, 1)}` : '等待补充报价和供货能力',
+    };
+  }
+  return {
+    title: `${allocation.product_name} · ${allocation.unit}`,
+    metrics: `预测 ${allocation.forecast_quantity ?? '数据不足'} · 建议采购 ${formatNumber(allocation.suggested_purchase_quantity, 2)} · ${allocation.enterprise_count} 家企业`,
+    detail: `区间 ${allocation.lower_bound ?? '数据不足'}—${allocation.upper_bound ?? '数据不足'} · ${(allocation.method_labels || []).join('、') || '方法待补充'}`,
+  };
+}
+
+function selectedShowcaseCase(showcase) {
+  const panel = (showcase?.panels || []).find((item) => item.kind === state.showcasePanel) || showcase?.panels?.[0];
+  if (!panel) return { panel: null, selected: null };
+  const requested = state.showcaseCase[panel.kind];
+  const selected = panel.cases?.find((item) => item.key === requested) || panel.cases?.[0] || null;
+  if (selected) state.showcaseCase[panel.kind] = selected.key;
+  return { panel, selected };
+}
+
+function renderShowcase(showcase) {
+  const { panel, selected } = selectedShowcaseCase(showcase);
+  byId('dv2-showcase-state').textContent = panel?.status_label || '等待生成';
+  document.querySelectorAll('#dv2-showcase-tabs [data-kind]').forEach((button) => {
+    const active = button.dataset.kind === (panel?.kind || state.showcasePanel);
+    button.setAttribute('aria-selected', String(active));
+    button.classList.toggle('active', active);
+  });
+  const cases = panel?.cases || [];
+  byId('dv2-showcase-cases').innerHTML = cases.length > 1 ? cases.map((item) => `<button type="button" data-case="${htmlEscape(item.key)}" class="${item === selected ? 'active' : ''}">${htmlEscape(item.title)}</button>`).join('') : (selected?.input_summary?.period_start ? `<span>${htmlEscape(selected.input_summary.period_start)}—${htmlEscape(selected.input_summary.period_end)}</span>` : '');
+  if (!selected) {
+    byId('dv2-showcase-content').innerHTML = '<div class="dv2-empty">等待生成分配方案</div>';
+    byId('dv2-showcase-more').hidden = true;
+    return;
+  }
+  const input = selected.input_summary || {};
+  const chips = [
+    input.enterprise_count ? `${input.enterprise_count} 家企业` : null,
+    input.order_count ? `${input.order_count} 单` : null,
+    input.product_count ? `${input.product_count} 个商品` : null,
+    ...(input.temperature_zones || []),
+  ].filter(Boolean);
+  const cards = (selected.allocations || []).slice(0, 2).map(showcaseAllocationSummary);
+  byId('dv2-showcase-content').innerHTML = `<div class="dv2-showcase-copy"><strong>${htmlEscape(selected.title)}</strong><span>${htmlEscape(selected.status_label)} · ${htmlEscape(formatSnapshotTime(selected.calculated_at, '尚未计算'))}</span><p>${htmlEscape(selected.description)}</p><div>${chips.map((chip) => `<i>${htmlEscape(chip)}</i>`).join('')}</div></div><div class="dv2-showcase-cards">${cards.length ? cards.map((card) => `<article><b>${htmlEscape(card.title)}</b><span>${htmlEscape(card.metrics)}</span><small>${htmlEscape(card.detail)}</small></article>`).join('') : `<div class="dv2-empty"><b>${htmlEscape(selected.headline)}</b><span>${htmlEscape(selected.unmatched_reasons?.[0]?.reason || selected.data_cutoff_note || '')}</span></div>`}</div>`;
+  byId('dv2-showcase-more').hidden = !(selected.allocations || []).length;
+}
+
+function openShowcaseDialog() {
+  const { selected } = selectedShowcaseCase(state.snapshot?.algorithm_showcase);
+  if (!selected) return;
+  byId('dv2-algorithm-dialog-title').textContent = selected.title;
+  const cards = (selected.allocations || []).slice(0, 24).map(showcaseAllocationSummary);
+  byId('dv2-algorithm-dialog-content').innerHTML = `<div class="dv2-algorithm-dialog-summary"><strong>${htmlEscape(selected.headline)}</strong><p>${htmlEscape(selected.description)}</p></div>${cards.map((card) => `<article><h4>${htmlEscape(card.title)}</h4><p>${htmlEscape(card.metrics)}</p><small>${htmlEscape(card.detail)}</small></article>`).join('')}${(selected.unmatched_reasons || []).length ? `<section><h4>待调整原因</h4>${selected.unmatched_reasons.map((item) => `<p>${htmlEscape(item.reason)} · ${item.count} 项</p>`).join('')}</section>` : ''}`;
+  byId('dv2-algorithm-dialog').showModal();
+}
+
+function informationCacheKey() {
+  return `blacksoil:e02-information:v1:${API.getBaseUrl?.() || 'default'}`;
+}
+
+function readInformationCache() {
+  try {
+    const stored = JSON.parse(sessionStorage.getItem(informationCacheKey()) || 'null');
+    return stored && Date.now() - stored.savedAt <= 86400000 ? stored : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveInformationCache(payload, etag) {
+  try {
+    sessionStorage.setItem(informationCacheKey(), JSON.stringify({ payload, etag, savedAt: Date.now() }));
+  } catch {
+    // A full or blocked sessionStorage must not break the public dashboard.
+  }
+}
+
+function renderInformation(message = null) {
+  const items = (state.information?.items || []).filter((item) => item.kind === state.informationKind);
+  const list = byId('dv2-information-list');
+  if (!items.length) {
+    list.innerHTML = `<div class="dv2-empty">${htmlEscape(message || (state.informationKind === 'NEWS' ? '暂无园区动态' : '暂无政策资讯'))}</div>`;
+    return;
+  }
+  byId('dv2-information-retry').hidden = true;
+  list.innerHTML = items.map((item) => {
+    const content = `<small>${htmlEscape(item.category)} · ${htmlEscape(formatSnapshotTime(item.published_at, '时间待补充'))}</small><strong>${htmlEscape(item.title)}</strong><span>${htmlEscape(item.summary)}</span><em>${htmlEscape(item.source_name)}</em>`;
+    return item.source_url ? `<a class="tone-${item.tone.toLowerCase()}" href="${htmlEscape(item.source_url)}" target="_blank" rel="noopener noreferrer">${content}</a>` : `<article class="tone-${item.tone.toLowerCase()}">${content}</article>`;
+  }).join('');
+}
+
+async function refreshInformation() {
+  if (!API.getPublicInformation) return;
+  const cached = readInformationCache();
+  const etag = state.informationEtag || cached?.etag || null;
+  try {
+    const result = await API.getPublicInformation(8, etag);
+    if (result.status === 304) {
+      if (!state.information && cached?.payload) state.information = cached.payload;
+      byId('dv2-information-state').textContent = '目录已是最新';
+      renderInformation();
+      return;
+    }
+    const payload = safeEnvelopeData(result);
+    if (!payload) throw Object.assign(new Error(responseError(result)), { status: result.status });
+    state.information = payload;
+    state.informationEtag = result.etag;
+    saveInformationCache(payload, result.etag);
+    byId('dv2-information-state').textContent = `更新至 ${formatSnapshotTime(payload.data_cutoff, '—')}`;
+    renderInformation();
+  } catch (error) {
+    if (!state.information && cached?.payload) state.information = cached.payload;
+    if (state.information) {
+      byId('dv2-information-state').textContent = '更新失败，显示上次内容';
+      renderInformation();
+    } else {
+      byId('dv2-information-state').textContent = error.status === 404 ? '功能正在更新' : '资讯暂不可用';
+      renderInformation(error.status === 404 ? '园区资讯功能正在更新' : '园区资讯暂不可用');
+      byId('dv2-information-retry').hidden = false;
+    }
+  }
+}
+
+function startInformationTimer() {
+  window.clearInterval(state.informationTimer);
+  window.clearInterval(state.informationScrollTimer);
+  state.informationTimer = window.setInterval(() => { if (state.active && !document.hidden) refreshInformation(); }, 300000);
+  state.informationScrollTimer = window.setInterval(() => {
+    const list = byId('dv2-information-list');
+    if (!state.active || document.hidden || !list || list.matches(':hover, :focus-within')) return;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    const next = list.scrollTop + Math.max(42, Math.floor(list.clientHeight * 0.72));
+    list.scrollTo({ top: next >= list.scrollHeight - list.clientHeight ? 0 : next, behavior: 'smooth' });
+  }, 4000);
+}
+
+function startShowcaseRotation() {
+  window.clearInterval(state.showcaseTimer);
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  state.showcaseTimer = window.setInterval(() => {
+    if (!state.active || document.hidden || Date.now() < state.showcasePauseUntil || byId('dv2-algorithm-dialog')?.open) return;
+    const panel = byId('dv2-showcase-content')?.closest('.dv2-showcase-panel');
+    if (panel?.matches(':hover, :focus-within')) return;
+    const kinds = ['CARPOOL', 'WAREHOUSE', 'PROCUREMENT', 'FORECAST'];
+    state.showcasePanel = kinds[(kinds.indexOf(state.showcasePanel) + 1) % kinds.length];
+    renderShowcase(state.snapshot?.algorithm_showcase);
+  }, 10000);
 }
 
 function renderSnapshot(snapshot) {
@@ -285,24 +485,28 @@ function renderSnapshot(snapshot) {
   renderRanking(snapshot);
   renderQuality(snapshot);
   renderMap(snapshot);
+  renderShowcase(snapshot.algorithm_showcase);
   byId('public-sync-state').textContent = state.source === 'demo' ? '本地演示快照' : '数据同步正常';
 }
 
 async function refresh({ force = false } = {}) {
   if (state.loading && !force) return;
+  const generation = ++state.refreshGeneration;
   state.loading = true;
   byId('public-sync-state').textContent = '正在同步数据';
   setSource(state.source || 'live', '连接中');
   try {
-    await ensureMap();
     const result = await API.getDashboardSnapshot(state.period, false);
     const snapshot = adaptDashboardSnapshot(safeEnvelopeData(result));
     if (!snapshot) throw new Error(responseError(result));
+    if (generation !== state.refreshGeneration) return;
+    await ensureMap(snapshot.public_map?.schema_version === '2.0' ? 'changchun' : 'legacy');
     state.snapshot = snapshot;
     state.source = snapshot.demo_mode || API.isMock() ? 'demo' : 'live';
     state.lastSuccessfulAt = new Date();
     setSource(state.source, state.source === 'demo' ? '演示数据' : '实时数据');
     renderSnapshot(snapshot);
+    renderShowcase(snapshot.algorithm_showcase);
   } catch (error) {
     if (state.snapshot) {
       setSource(state.source || 'error', '保留上次数据');
@@ -323,6 +527,10 @@ async function refresh({ force = false } = {}) {
   } finally {
     state.loading = false;
   }
+}
+
+async function refreshAll() {
+  await Promise.all([refresh({ force: true }), refreshInformation()]);
 }
 
 function renderAssistantChart(chartSpec, { remember = true } = {}) {
@@ -379,6 +587,7 @@ function setTheme(theme) {
     renderDemandChart(state.snapshot);
     renderMix(state.snapshot);
     renderMap(state.snapshot);
+    renderShowcase(state.snapshot.algorithm_showcase);
   }
   renderStoredDialog();
 }
@@ -502,15 +711,27 @@ async function activateE01Section(section) {
 }
 
 function activate() {
+  if (state.active) return;
   state.active = true;
   state.theme = document.body.classList.contains('screen-day') ? 'day' : 'night';
-  refresh();
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    refresh();
+    refreshInformation();
+    chartInstances.forEach((chart) => chart.resize());
+  }));
   startRealtimeEvents();
-  requestAnimationFrame(() => chartInstances.forEach((chart) => chart.resize()));
+  startInformationTimer();
+  startShowcaseRotation();
 }
 
 function deactivate() {
   state.active = false;
+  window.clearInterval(state.informationTimer);
+  state.informationTimer = null;
+  window.clearInterval(state.informationScrollTimer);
+  state.informationScrollTimer = null;
+  window.clearInterval(state.showcaseTimer);
+  state.showcaseTimer = null;
   if (voice.busy) voice.cancel('已离开 E02 大屏，本次语音提问已停止');
 }
 
@@ -534,7 +755,16 @@ function startRealtimeEvents() {
   if (realtimeCoordinator || typeof API.subscribeDashboardEvents !== 'function') return;
   realtimeCoordinator = new RealtimeCoordinator({
     subscribe: API.subscribeDashboardEvents,
-    onEvent: (event) => queueRealtimeRefresh(eventTargets(event.topic)),
+    onEvent: (event) => {
+      const declaredTargets = Array.isArray(event?.targets) ? event.targets : [];
+      const targets = declaredTargets.length
+        ? [
+            ...(declaredTargets.includes('public-dashboard') ? ['public'] : []),
+            ...(declaredTargets.includes('e01-overview') ? ['overview', 'enterprise', 'production', 'inventory', 'transport'] : []),
+          ]
+        : eventTargets(event.topic);
+      queueRealtimeRefresh(targets);
+    },
     onPoll: () => queueRealtimeRefresh(['overview', 'enterprise', 'production', 'inventory', 'transport']),
     onState: (connectionState) => {
       if (!state.active) return;
@@ -601,6 +831,30 @@ function bindEvents() {
   byId('dv2-dialog-close')?.addEventListener('click', () => byId('dv2-chart-dialog').close());
   byId('dv2-chart-dialog')?.addEventListener('close', () => { state.dialogContent = null; });
   byId('dv2-chart-dialog')?.addEventListener('click', (event) => { if (event.target === byId('dv2-chart-dialog')) event.target.close(); });
+  document.querySelectorAll('#dv2-showcase-tabs [data-kind]').forEach((button) => button.addEventListener('click', () => {
+    state.showcasePanel = button.dataset.kind;
+    state.showcasePauseUntil = Date.now() + 60000;
+    renderShowcase(state.snapshot?.algorithm_showcase);
+  }));
+  byId('dv2-showcase-cases')?.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-case]');
+    if (!button) return;
+    state.showcaseCase[state.showcasePanel] = button.dataset.case;
+    state.showcasePauseUntil = Date.now() + 60000;
+    renderShowcase(state.snapshot?.algorithm_showcase);
+  });
+  byId('dv2-showcase-more')?.addEventListener('click', openShowcaseDialog);
+  byId('dv2-algorithm-dialog-close')?.addEventListener('click', () => byId('dv2-algorithm-dialog').close());
+  byId('dv2-algorithm-dialog')?.addEventListener('click', (event) => { if (event.target === byId('dv2-algorithm-dialog')) event.target.close(); });
+  document.querySelectorAll('.dv2-information-tabs [data-kind]').forEach((button) => button.addEventListener('click', () => {
+    state.informationKind = button.dataset.kind;
+    document.querySelectorAll('.dv2-information-tabs [data-kind]').forEach((item) => item.setAttribute('aria-selected', String(item === button)));
+    renderInformation();
+  }));
+  byId('dv2-information-retry')?.addEventListener('click', () => {
+    byId('dv2-information-retry').hidden = true;
+    refreshInformation();
+  });
   window.addEventListener('resize', () => chartInstances.forEach((chart) => chart.resize()));
   window.addEventListener('app:public-theme-change', (event) => setTheme(event.detail?.theme));
   document.addEventListener('visibilitychange', () => {
@@ -608,6 +862,7 @@ function bindEvents() {
       if (voice.busy) voice.cancel('页面已隐藏，本次语音提问已停止');
       return;
     }
+    if (state.active) refreshInformation();
     queueRealtimeRefresh(['overview', 'enterprise', 'production', 'inventory', 'transport']);
     startRealtimeEvents();
   });
@@ -624,7 +879,7 @@ function bindEvents() {
 
 async function initializeDashboard() {
   try {
-    const result = await API.getDictionaries?.();
+    const result = await (API.getPublicDictionaries?.() || API.getDictionaries?.());
     const dictionaries = safeEnvelopeData(result);
     if (dictionaries) {
       applyDashboardDictionaries(dictionaries);
@@ -650,6 +905,7 @@ window.DashboardV2 = {
   activate,
   deactivate,
   refresh,
+  refreshAll,
   setTheme,
   refreshE01(section = state.currentSection) {
     state.e01Snapshot = null;

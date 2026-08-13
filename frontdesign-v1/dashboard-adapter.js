@@ -50,7 +50,16 @@ function demandTotals(rows) {
 
 export function adaptDashboardSnapshot(source) {
   if (!source || typeof source !== 'object') return null;
-  if (source.headline && source.daily_trend) return source;
+  if (source.headline && source.daily_trend) {
+    return {
+      ...source,
+      currency: source.currency || 'CNY',
+      sales_amount_unit: source.sales_amount_unit || 'yuan',
+      order_count_unit: source.order_count_unit || '单',
+      public_map: source.public_map || (source.map?.schema_version === '2.0' ? source.map : null),
+      algorithm_showcase: source.algorithm_showcase || null,
+    };
+  }
 
   const summary = source.summary || {};
   const charts = source.charts || {};
@@ -164,6 +173,11 @@ export function adaptDashboardSnapshot(source) {
     data_cutoff: source.data_cutoff ?? null,
     data_cutoff_note: source.data_cutoff_note || null,
     generated_at: source.generated_at,
+    currency: source.currency || 'CNY',
+    sales_amount_unit: source.sales_amount_unit || 'yuan',
+    order_count_unit: source.order_count_unit || '单',
+    public_map: source.map?.schema_version === '2.0' ? source.map : null,
+    algorithm_showcase: source.algorithm_showcase || null,
     headline: {
       preorder_count: number(summary.preorder_count),
       demand_totals: demandTotals(demandRows),
