@@ -20,7 +20,9 @@ const criticalAssets = [
   'scripts.js',
   'assets/maps/changchun-service-area.geojson',
   'assets/maps/changchun-road-basemap.v2.geojson',
+  'assets/maps/changchun-road-basemap.v3.geojson',
   'assets/maps/changchun-showcase-routes.v1.json',
+  'assets/maps/changchun-showcase-routes.v2.json',
 ];
 
 async function filesUnder(directory) {
@@ -42,12 +44,14 @@ assert.equal(
 
 const html = await readFile(join(dist, 'index.html'), 'utf8');
 for (const marker of [
-  '20260814-dashboard-presentation-3',
+  '20260814-dashboard-presentation-4',
   'class="dv2-panel dv2-information-panel"',
   'class="dv2-panel dv2-showcase-panel"',
   'id="dv2-algorithm-dialog"',
   '长春市及近郊供销网络',
   '人民币 · B02 移动履约与经营日报',
+  'id="dv2-map-zoom-in"',
+  'id="dv2-map-overview"',
 ]) {
   assert.ok(html.includes(marker), `missing production marker: ${marker}`);
 }
@@ -68,20 +72,20 @@ assert.equal(map.metadata?.crs, 'EPSG:4326');
 assert.equal(map.metadata?.license, 'ODbL 1.0');
 assert.deepEqual(map.metadata?.bounds, [125.15, 43.6, 125.6, 44.02]);
 
-const basemapBytes = await readFile(join(dist, 'assets/maps/changchun-road-basemap.v2.geojson'));
+const basemapBytes = await readFile(join(dist, 'assets/maps/changchun-road-basemap.v3.geojson'));
 const basemap = JSON.parse(basemapBytes.toString('utf8'));
 const basemapHash = createHash('sha256').update(basemapBytes).digest('hex');
-assert.equal(basemapHash, '00e3325b010726d78468d6a4439ed6f423ae50a7953b3f2a08f50adce631cdfa');
-assert.ok(basemapBytes.byteLength <= 1.5 * 1024 * 1024, 'road basemap exceeds 1.5 MiB');
-assert.ok(gzipSync(basemapBytes, { level: 9 }).byteLength <= 250 * 1024, 'road basemap gzip exceeds 250 KiB');
+assert.equal(basemapHash, '2e5e2aa1836ddb254ae32f42e4f372e3b88926f256276c748441d1d8c65b7ed2');
+assert.ok(basemapBytes.byteLength <= 750 * 1024, 'road basemap exceeds 750 KiB');
+assert.ok(gzipSync(basemapBytes, { level: 9 }).byteLength <= 200 * 1024, 'road basemap gzip exceeds 200 KiB');
 assert.equal(basemap.metadata?.crs, 'EPSG:4326');
 assert.equal(basemap.metadata?.coordinate_order, 'longitude,latitude');
 assert.equal(basemap.metadata?.license, 'ODbL 1.0');
 assert.equal(basemap.metadata?.attribution, '© OpenStreetMap contributors');
 assert.deepEqual(basemap.metadata?.clip_bounds, [125.15, 43.6, 125.6, 44.1]);
-assert.ok(basemap.features.length <= 800, 'road basemap exceeds 800 features');
+assert.ok(basemap.features.length >= 350 && basemap.features.length <= 600, 'road basemap feature gate failed');
 const basemapLayers = new Set(basemap.features.map((feature) => feature.properties?.layer));
-for (const layer of ['motorway', 'primary', 'secondary', 'railway', 'waterway', 'place_label']) {
+for (const layer of ['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'railway', 'waterway', 'place_label', 'road_label']) {
   assert.ok(basemapLayers.has(layer), `road basemap is missing ${layer}`);
 }
 function pointsOf(value) {
@@ -90,16 +94,20 @@ function pointsOf(value) {
   return value.flatMap(pointsOf);
 }
 const basemapPoints = basemap.features.flatMap((feature) => pointsOf(feature.geometry?.coordinates));
-assert.ok(basemapPoints.length <= 12000, 'road basemap exceeds 12,000 coordinate points');
+assert.ok(basemapPoints.length >= 6000 && basemapPoints.length <= 9000, 'road basemap coordinate gate failed');
 for (const point of basemapPoints) {
   assert.ok(point[0] >= 125.15 && point[0] <= 125.6 && point[1] >= 43.6 && point[1] <= 44.1, 'road basemap coordinate is out of bounds');
 }
 
-const showcaseRoutes = JSON.parse(await readFile(join(dist, 'assets/maps/changchun-showcase-routes.v1.json'), 'utf8'));
+const showcaseRoutes = JSON.parse(await readFile(join(dist, 'assets/maps/changchun-showcase-routes.v2.json'), 'utf8'));
+assert.equal(showcaseRoutes.schema_version, '2.0');
 assert.equal(showcaseRoutes.routes?.length, 5);
 assert.match(showcaseRoutes.disclaimer, /预设路线演示/);
 assert.match(showcaseRoutes.disclaimer, /不代表实时履约或道路导航/);
-assert.ok(showcaseRoutes.routes.every((route) => Array.isArray(route.coordinates) && route.coordinates.length >= 2));
+assert.ok(showcaseRoutes.routes.every((route) => Array.isArray(route.coordinates) && route.coordinates.length >= 25));
+assert.ok(showcaseRoutes.routes.every((route) => route.origin_snap_distance_m <= 100 && route.destination_snap_distance_m <= 100));
+assert.ok(showcaseRoutes.routes.every((route) => route.maximum_cross_track_error_m <= 15 && route.maximum_point_spacing_m <= 250));
+assert.ok(showcaseRoutes.routes.every((route) => route.focus_zoom >= 1.4 && route.focus_zoom <= 6));
 assert.ok(!/(?:vehicle_id|driver_id|object_version|license_plate|telemetry)/i.test(JSON.stringify(showcaseRoutes)));
 
 const forbidden = [];

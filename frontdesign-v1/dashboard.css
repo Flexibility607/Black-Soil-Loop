@@ -11,6 +11,11 @@
   --dv2-yellow: oklch(83% 0.17 83);
   --dv2-red: oklch(69% 0.21 28);
   --dv2-purple: oklch(72% 0.17 305);
+  --dv2-route-01: var(--dv2-green);
+  --dv2-route-02: var(--dv2-blue);
+  --dv2-route-03: var(--dv2-yellow);
+  --dv2-route-04: var(--dv2-purple);
+  --dv2-route-05: var(--dv2-red);
   --dv2-shadow: oklch(5% 0.04 252 / 0.72);
   --e01-border: oklch(86% 0.04 210);
   --e01-surface: oklch(99% 0.007 210);
@@ -933,6 +938,58 @@ body.screen-mode.screen-day .dv2-brand-mark img {
   font-size: 11px;
 }
 
+.dv2-map-header-tools {
+  display: grid;
+  justify-items: end;
+  gap: 5px;
+  min-width: 0;
+}
+
+.dv2-map-viewport-controls {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.dv2-map-viewport-controls button,
+.dv2-map-viewport-controls output {
+  display: inline-grid;
+  min-width: 25px;
+  height: 22px;
+  place-items: center;
+  border: 1px solid var(--dv2-chip-border);
+  border-radius: 3px;
+  padding: 0 5px;
+  color: var(--dv2-muted);
+  background: var(--dv2-chip-surface);
+  font: inherit;
+  font-size: 9px;
+  line-height: 1;
+}
+
+.dv2-map-viewport-controls button {
+  cursor: pointer;
+}
+
+.dv2-map-viewport-controls button:hover {
+  border-color: var(--dv2-blue);
+  color: var(--dv2-ink);
+}
+
+.dv2-map-viewport-controls button:focus-visible {
+  outline: 2px solid var(--dv2-green);
+  outline-offset: 2px;
+}
+
+.dv2-map-viewport-controls button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+#dv2-map-overview {
+  min-width: 42px;
+}
+
 .dv2-map-legend span::before {
   display: inline-block;
   width: 7px;
@@ -984,7 +1041,11 @@ body.screen-mode.screen-day .dv2-brand-mark img {
 .dv2-route-panel b { color: var(--dv2-ink); font-size: 10px; }
 .dv2-route-panel nav { display: flex; gap: 4px; margin-top: 5px; }
 .dv2-route-panel button {
+  --dv2-route-color: var(--dv2-blue);
   min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   border: 1px solid var(--dv2-chip-border);
   border-radius: 3px;
   padding: 3px 7px;
@@ -994,7 +1055,19 @@ body.screen-mode.screen-day .dv2-brand-mark img {
   font-size: 8.5px;
   cursor: pointer;
 }
-.dv2-route-panel button[aria-pressed="true"] { border-color: var(--dv2-green); color: var(--dv2-green); }
+.dv2-route-panel button::before {
+  width: 3px;
+  height: 11px;
+  border-radius: 2px;
+  background: var(--dv2-route-color);
+  content: "";
+}
+.dv2-route-panel button[data-route-no="01"] { --dv2-route-color: var(--dv2-route-01); }
+.dv2-route-panel button[data-route-no="02"] { --dv2-route-color: var(--dv2-route-02); }
+.dv2-route-panel button[data-route-no="03"] { --dv2-route-color: var(--dv2-route-03); }
+.dv2-route-panel button[data-route-no="04"] { --dv2-route-color: var(--dv2-route-04); }
+.dv2-route-panel button[data-route-no="05"] { --dv2-route-color: var(--dv2-route-05); }
+.dv2-route-panel button[aria-pressed="true"] { border-color: var(--dv2-route-color); color: var(--dv2-route-color); }
 .dv2-route-detail { display: grid; grid-template-columns: minmax(0, 1fr); align-content: center; gap: 2px; }
 .dv2-route-detail strong,
 .dv2-route-detail span,

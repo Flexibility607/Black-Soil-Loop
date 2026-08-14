@@ -1,4 +1,4 @@
-import { SCREEN_PALETTES } from './dashboard-format.js?v=20260814-dashboard-presentation-3';
+import { SCREEN_PALETTES } from './dashboard-format.js?v=20260814-dashboard-presentation-4';
 
 export const REFERENCE_CITIES = [
   { name: '哈尔滨市', value: [126.642, 45.757] },
@@ -164,6 +164,7 @@ export function buildNortheastMapOption(snapshot, palette = SCREEN_PALETTES.nigh
       {
         name: '估算运输路线',
         type: 'lines',
+        polyline: true,
         coordinateSystem: 'geo',
         zlevel: 2,
         silent: false,
@@ -240,13 +241,63 @@ function publicRouteTooltip(route) {
 
 export function localShowcaseRoutesAreValid(catalog) {
   const routes = catalog?.routes;
-  if (catalog?.schema_version !== '1.0' || catalog?.crs !== 'EPSG:4326' || !Array.isArray(routes) || routes.length !== 5) return false;
+  if (!['1.0', '2.0'].includes(catalog?.schema_version) || catalog?.crs !== 'EPSG:4326' || !Array.isArray(routes) || routes.length !== 5) return false;
   return routes.every((route, index) => route.route_no === String(index + 1).padStart(2, '0')
     && route.destination_name
     && Number.isFinite(Number(route.estimated_distance_km))
     && Array.isArray(route.coordinates)
-    && route.coordinates.length >= 2
-    && route.coordinates.every((point) => Array.isArray(point) && point.length === 2 && point.every(Number.isFinite)));
+    && route.coordinates.length >= (catalog.schema_version === '2.0' ? 25 : 2)
+    && route.coordinates.every((point) => Array.isArray(point) && point.length === 2 && point.every(Number.isFinite))
+    && (catalog.schema_version !== '2.0' || (
+      Array.isArray(route.bounds) && route.bounds.length === 4 && route.bounds.every(Number.isFinite)
+      && Array.isArray(route.focus_center) && route.focus_center.length === 2 && route.focus_center.every(Number.isFinite)
+      && Number(route.focus_zoom) >= 1.4 && Number(route.focus_zoom) <= 6
+      && Number.isInteger(route.branch_start_index) && route.branch_start_index >= 1 && route.branch_start_index < route.coordinates.length
+      && Number(route.origin_snap_distance_m) <= 100 && Number(route.destination_snap_distance_m) <= 100
+    )));
+}
+
+export const MAP_SCALE_LIMIT = Object.freeze({ min: 1, max: 8 });
+
+export function normalizeMapViewport(viewport = {}) {
+  const zoom = Math.min(MAP_SCALE_LIMIT.max, Math.max(MAP_SCALE_LIMIT.min, Number(viewport.zoom) || 1));
+  const center = Array.isArray(viewport.center) && viewport.center.length === 2 && viewport.center.every(Number.isFinite)
+    ? viewport.center.map(Number)
+    : null;
+  return { mode: viewport.mode || 'OVERVIEW', center, zoom, selectedRouteKey: viewport.selectedRouteKey || null };
+}
+
+export function overviewMapViewport(basemap = null) {
+  const bounds = basemap?.metadata?.clip_bounds;
+  const center = Array.isArray(bounds) && bounds.length === 4 && bounds.every(Number.isFinite)
+    ? [Number(((bounds[0] + bounds[2]) / 2).toFixed(7)), Number(((bounds[1] + bounds[3]) / 2).toFixed(7))]
+    : [125.375, 43.85];
+  return { mode: 'OVERVIEW', center, zoom: 1, selectedRouteKey: null };
+}
+
+function routeBounds(route) {
+  if (Array.isArray(route?.showcase?.bounds) && route.showcase.bounds.length === 4) return route.showcase.bounds;
+  const coordinates = route?.coordinates || [];
+  if (!coordinates.length) return null;
+  const longitudes = coordinates.map((point) => Number(point[0])).filter(Number.isFinite);
+  const latitudes = coordinates.map((point) => Number(point[1])).filter(Number.isFinite);
+  if (!longitudes.length || !latitudes.length) return null;
+  return [Math.min(...longitudes), Math.min(...latitudes), Math.max(...longitudes), Math.max(...latitudes)];
+}
+
+export function routeFocusViewport(route) {
+  if (Array.isArray(route?.showcase?.focus_center) && route.showcase.focus_center.length === 2
+    && route.showcase.focus_center.every(Number.isFinite) && Number.isFinite(Number(route.showcase.focus_zoom))) {
+    return normalizeMapViewport({ mode: 'ROUTE_FOCUS', center: route.showcase.focus_center, zoom: route.showcase.focus_zoom, selectedRouteKey: route.key });
+  }
+  const bounds = routeBounds(route);
+  if (!bounds) return normalizeMapViewport({ mode: 'ROUTE_FOCUS', zoom: 1.4, selectedRouteKey: route?.key });
+  const [minLongitude, minLatitude, maxLongitude, maxLatitude] = bounds;
+  const center = [Number(((minLongitude + maxLongitude) / 2).toFixed(7)), Number(((minLatitude + maxLatitude) / 2).toFixed(7))];
+  const longitudeSpan = Math.max(0.001, maxLongitude - minLongitude);
+  const latitudeSpan = Math.max(0.001, maxLatitude - minLatitude);
+  const zoom = Math.max(1.4, Math.min(6, 0.48 / Math.max(longitudeSpan, latitudeSpan * 1.18)));
+  return normalizeMapViewport({ mode: 'ROUTE_FOCUS', center, zoom, selectedRouteKey: route?.key });
 }
 
 const LIVE_STATUS_PRIORITY = Object.freeze({ IN_TRANSIT: 5, PICKED_UP: 4, DRIVER_ACCEPTED: 3, PUBLISHED: 2, READY: 1 });
@@ -307,7 +358,25 @@ function showcaseRouteTooltip(route) {
   return `路线 ${route.routeNo} · 展示车辆<br/>${data.origin.display_name} → ${data.destination_name}<br/>估算距离：${data.estimated_distance_km} km<br/>预设路线演示 · 无实时定位与遥测<br/>不代表道路导航或实时履约`;
 }
 
-function basemapSeries(basemap, colors) {
+const BASEMAP_SERIES_IDS = Object.freeze({
+  motorway: 'basemap-motorway', trunk: 'basemap-trunk', primary: 'basemap-primary',
+  secondary: 'basemap-secondary', tertiary: 'basemap-tertiary', railway: 'basemap-railway',
+  waterway: 'basemap-water', district_boundary: 'basemap-districts',
+});
+
+function mapDetailLevel(zoom) {
+  if (zoom >= 2.6) return 3;
+  if (zoom >= 1.6) return 2;
+  return 1;
+}
+
+function layerVisible(layer, detailLevel) {
+  if (layer === 'secondary') return detailLevel >= 2;
+  if (layer === 'tertiary') return detailLevel >= 3;
+  return true;
+}
+
+function basemapSeries(basemap, colors, zoom = 1) {
   if (!Array.isArray(basemap?.features)) return [];
   const layerStyles = {
     motorway: { color: colors.mapRoadMotorway, width: 1.8 },
@@ -320,12 +389,20 @@ function basemapSeries(basemap, colors) {
     district_boundary: { color: colors.mapDistrict, width: 0.7, type: 'dashed' },
   };
   const groups = new Map();
-  const labels = [];
+  const placeLabels = [];
+  const roadLabels = [];
+  const detailRoadLabels = [];
+  const detailLevel = mapDetailLevel(zoom);
   for (const feature of basemap.features) {
     const layer = feature?.properties?.layer;
     const geometry = feature?.geometry;
     if (layer === 'place_label' && geometry?.type === 'Point') {
-      labels.push({ name: feature.properties.name, value: geometry.coordinates });
+      placeLabels.push({ name: feature.properties.name, value: geometry.coordinates });
+      continue;
+    }
+    if (layer === 'road_label' && geometry?.type === 'Point') {
+      const target = Number(feature.properties.detail_level || 2) >= 3 ? detailRoadLabels : roadLabels;
+      target.push({ name: feature.properties.name, value: geometry.coordinates });
       continue;
     }
     if (!['LineString', 'MultiLineString'].includes(geometry?.type) || !layerStyles[layer]) continue;
@@ -335,46 +412,99 @@ function basemapSeries(basemap, colors) {
   }
   const names = { motorway: '高速与快速路', trunk: '国省干线', primary: '城市主干路', secondary: '城市次干路', tertiary: '连接道路', railway: '铁路', waterway: '主要水系', district_boundary: '片区边界' };
   const result = [...groups].map(([layer, data], index) => ({
-    name: names[layer], type: 'lines', coordinateSystem: 'geo', z: index + 1, silent: true,
+    id: BASEMAP_SERIES_IDS[layer], name: names[layer], type: 'lines', polyline: true, coordinateSystem: 'geo', z: index + 1, silent: true,
     animation: false,
-    lineStyle: { opacity: 1, curveness: 0, ...layerStyles[layer] }, data,
+    lineStyle: { curveness: 0, ...layerStyles[layer], opacity: layerVisible(layer, detailLevel) ? layerStyles[layer].opacity ?? 1 : 0 }, data,
   }));
-  if (labels.length) result.push({
-    name: '长春片区标签', type: 'scatter', coordinateSystem: 'geo', zlevel: 1, silent: true,
+  if (placeLabels.length) result.push({
+    id: 'basemap-place-labels', name: '长春片区标签', type: 'scatter', coordinateSystem: 'geo', zlevel: 1, silent: true,
     symbolSize: 2, itemStyle: { color: 'transparent' },
     label: { show: true, formatter: '{b}', position: 'top', color: colors.mapPlaceLabel, fontSize: 9, textBorderColor: colors.mapTextBorder, textBorderWidth: 2 },
-    data: labels,
+    labelLayout: { hideOverlap: true }, data: placeLabels,
+  });
+  if (roadLabels.length) result.push({
+    id: 'basemap-road-labels', name: '主要道路名称', type: 'scatter', coordinateSystem: 'geo', zlevel: 2, silent: true,
+    symbolSize: 1, itemStyle: { color: 'transparent' },
+    label: { show: detailLevel >= 2, formatter: '{b}', position: 'top', color: colors.mapRoadLabel, fontSize: 8, textBorderColor: colors.mapTextBorder, textBorderWidth: 2 },
+    labelLayout: { hideOverlap: true }, data: roadLabels,
+  });
+  if (detailRoadLabels.length) result.push({
+    id: 'basemap-road-labels-detail', name: '路线周边道路名称', type: 'scatter', coordinateSystem: 'geo', zlevel: 2, silent: true,
+    symbolSize: 1, itemStyle: { color: 'transparent' },
+    label: { show: detailLevel >= 3, formatter: '{b}', position: 'top', color: colors.mapRoadLabel, fontSize: 8.5, textBorderColor: colors.mapTextBorder, textBorderWidth: 2 },
+    labelLayout: { hideOverlap: true }, data: detailRoadLabels,
   });
   return result;
+}
+
+export function basemapVisibilityPatch(zoom = 1) {
+  const detailLevel = mapDetailLevel(zoom);
+  return [
+    { id: BASEMAP_SERIES_IDS.secondary, lineStyle: { opacity: detailLevel >= 2 ? 1 : 0 } },
+    { id: BASEMAP_SERIES_IDS.tertiary, lineStyle: { opacity: detailLevel >= 3 ? 0.72 : 0 } },
+    { id: 'basemap-road-labels', label: { show: detailLevel >= 2 } },
+    { id: 'basemap-road-labels-detail', label: { show: detailLevel >= 3 } },
+  ];
+}
+
+function routeColor(route, colors) {
+  const index = Math.max(0, Math.min(4, Number.parseInt(route.routeNo, 10) - 1));
+  return colors.routeColors?.[index] || (route.destinationType === 'THIRD_SPACE' ? colors.thirdSpace : colors.traditional);
+}
+
+function routeCoordinates(route, selectedKey, overview) {
+  const branchIndex = Number(route.showcase?.branch_start_index);
+  if (route.mode === 'SHOWCASE' && Number.isInteger(branchIndex) && branchIndex > 0 && overview) {
+    return route.coordinates.slice(branchIndex);
+  }
+  if (route.mode === 'SHOWCASE' && Number.isInteger(branchIndex) && branchIndex > 0 && selectedKey && route.key !== selectedKey) {
+    return route.coordinates.slice(branchIndex);
+  }
+  return route.coordinates;
 }
 
 export function buildChangchunMapOption(snapshot, palette = SCREEN_PALETTES.night, basemap = null, showcaseCatalog = null, displayOptions = {}) {
   const colors = { ...SCREEN_PALETTES.night, ...palette };
   const publicMap = snapshot.public_map || snapshot.map || {};
   const routePresentation = selectChangchunRoutes(snapshot, showcaseCatalog);
-  const selectedKey = displayOptions.selectedRouteKey || routePresentation.routes[0]?.key || null;
+  const selectedKey = displayOptions.selectedRouteKey || null;
+  const viewport = normalizeMapViewport(displayOptions.viewport || { zoom: 1, center: null, selectedRouteKey: selectedKey });
+  const overview = !selectedKey;
   const reducedMotion = displayOptions.reducedMotion ?? globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
   const points = (publicMap.points || []).map((point) => ({
     name: point.display_name,
     value: [Number(point.longitude), Number(point.latitude)],
     point,
-    symbolSize: point.point_type === 'THIRD_SPACE' ? 14 : 10,
-    itemStyle: { color: point.point_type === 'THIRD_SPACE' ? colors.thirdSpace : colors.traditional },
+    symbolSize: point.point_type === 'THIRD_SPACE' ? 13 : 9,
+    itemStyle: {
+      color: point.point_type === 'THIRD_SPACE' ? colors.thirdSpace : colors.traditional,
+      opacity: selectedKey && point.display_name !== routePresentation.routes.find((route) => route.key === selectedKey)?.showcase?.destination_name ? 0.28 : 1,
+    },
   })).filter((point) => point.value.every(Number.isFinite));
   const routes = routePresentation.routes.map((route) => {
     const selected = route.key === selectedKey;
+    const coordinates = routeCoordinates(route, selectedKey, overview);
     return {
       name: route.name,
-      coords: route.coordinates,
+      coords: coordinates,
       routeDisplay: route,
       lineStyle: {
-        color: route.destinationType === 'THIRD_SPACE' ? colors.thirdSpace : colors.traditional,
+        color: routeColor(route, colors),
         type: route.mode === 'LIVE' && (route.live.latest_location?.freshness === 'DELAYED' || route.live.fallback) ? 'dashed' : 'solid',
-        width: selected ? 3.5 : 1.5,
-        opacity: selected ? 0.96 : 0.34,
+        width: overview ? 2.2 : selected ? 4.5 : 1,
+        opacity: overview ? 0.72 : selected ? 1 : 0.12,
       },
     };
   });
+  const movingRoutes = reducedMotion ? [] : routes.filter((route) => overview || route.routeDisplay.key === selectedKey);
+  const sharedCoordinates = routePresentation.mode === 'SHOWCASE' && overview && Array.isArray(showcaseCatalog?.shared_corridor)
+    ? showcaseCatalog.shared_corridor : [];
+  const endpoints = routes.map((route) => ({
+    name: `路线 ${route.routeDisplay.routeNo}`,
+    value: route.coords.at(-1),
+    routeDisplay: route.routeDisplay,
+    itemStyle: { color: routeColor(route.routeDisplay, colors), opacity: overview || route.routeDisplay.key === selectedKey ? 1 : 0.2 },
+  }));
   const alerts = routes.filter((item) => item.routeDisplay.mode === 'LIVE' && Number(item.routeDisplay.live.alert_count || item.routeDisplay.live.alerts?.length || 0) > 0).map((item) => ({
     name: `${item.routeDisplay.live.to?.display_name || '运输目标点'}报警`,
     value: item.coords.at(-1),
@@ -382,6 +512,7 @@ export function buildChangchunMapOption(snapshot, palette = SCREEN_PALETTES.nigh
   }));
   return {
     animation: false,
+    animationDurationUpdate: 0,
     tooltip: {
       trigger: 'item',
       backgroundColor: colors.tooltipBackground,
@@ -389,7 +520,7 @@ export function buildChangchunMapOption(snapshot, palette = SCREEN_PALETTES.nigh
       textStyle: { color: colors.text },
       formatter(params) {
         if (params.seriesName === '精选点位') return publicPointTooltip(params.data.point);
-        if (params.seriesName === '配送展示路线') return params.data.routeDisplay.mode === 'SHOWCASE'
+        if (['配送展示路线', '路线流动车辆', '路线终点标识'].includes(params.seriesName)) return params.data.routeDisplay.mode === 'SHOWCASE'
           ? showcaseRouteTooltip(params.data.routeDisplay)
           : publicRouteTooltip(params.data.routeDisplay.live);
         if (params.seriesName === '独立温湿度报警') return publicRouteTooltip(params.data.routeDisplay.live);
@@ -398,7 +529,10 @@ export function buildChangchunMapOption(snapshot, palette = SCREEN_PALETTES.nigh
     },
     geo: {
       map: 'changchun-service-area',
-      roam: false,
+      roam: true,
+      center: viewport.center || undefined,
+      zoom: viewport.zoom,
+      scaleLimit: MAP_SCALE_LIMIT,
       layoutCenter: ['50%', '51%'],
       layoutSize: '97%',
       label: { show: false },
@@ -406,19 +540,34 @@ export function buildChangchunMapOption(snapshot, palette = SCREEN_PALETTES.nigh
       emphasis: { itemStyle: { areaColor: colors.mapEmphasis } },
     },
     series: [
-      ...basemapSeries(basemap, colors),
+      ...basemapSeries(basemap, colors, viewport.zoom),
       {
-        name: '配送展示路线', type: 'lines', coordinateSystem: 'geo', z: 20,
-        effect: { show: !reducedMotion, period: 8, trailLength: 0, symbol: 'arrow', symbolSize: 6, color: colors.mapEffect },
+        id: 'shared-route-corridor', name: '园区共同配送干线', type: 'lines', polyline: true, coordinateSystem: 'geo', z: 18, silent: true,
+        lineStyle: { color: colors.mapSharedRoute, width: 3, opacity: sharedCoordinates.length ? 0.78 : 0, curveness: 0 },
+        data: sharedCoordinates.length ? [{ name: '园区共同配送干线', coords: sharedCoordinates }] : [],
+      },
+      {
+        id: 'delivery-routes', name: '配送展示路线', type: 'lines', polyline: true, coordinateSystem: 'geo', z: 20,
         lineStyle: { curveness: 0 }, data: routes,
       },
       {
-        name: '精选点位', type: 'scatter', coordinateSystem: 'geo', z: 30,
-        label: { show: true, formatter: '{b}', position: 'right', distance: 6, color: colors.text, fontSize: 10, textBorderColor: colors.mapTextBorder, textBorderWidth: 3 },
+        id: 'route-vehicles', name: '路线流动车辆', type: 'lines', polyline: true, coordinateSystem: 'geo', z: 25, silent: false,
+        effect: { show: !reducedMotion && movingRoutes.length > 0, period: 9, trailLength: 0, symbol: 'arrow', symbolSize: 7, color: colors.mapEffect },
+        lineStyle: { width: 0, opacity: 0, curveness: 0 }, data: movingRoutes,
+      },
+      {
+        id: 'business-points', name: '精选点位', type: 'scatter', coordinateSystem: 'geo', z: 30,
+        label: { show: viewport.zoom >= 1.25 || overview, formatter: '{b}', position: 'right', distance: 6, color: colors.text, fontSize: 10, textBorderColor: colors.mapTextBorder, textBorderWidth: 3 },
+        labelLayout: { hideOverlap: true },
         data: points,
       },
       {
-        name: '独立温湿度报警', type: 'effectScatter', coordinateSystem: 'geo', z: 40,
+        id: 'route-endpoints', name: '路线终点标识', type: 'scatter', coordinateSystem: 'geo', z: 34, symbol: 'pin', symbolSize: 18,
+        label: { show: true, formatter: (params) => params.data.routeDisplay.routeNo, position: 'inside', color: colors.mapTextBorder, fontSize: 8, fontWeight: 700 },
+        labelLayout: { hideOverlap: true }, data: endpoints,
+      },
+      {
+        id: 'route-alerts', name: '独立温湿度报警', type: 'effectScatter', coordinateSystem: 'geo', z: 40,
         symbolSize: 19, rippleEffect: { scale: 3.5, brushType: 'stroke' },
         itemStyle: { color: colors.danger }, data: alerts,
       },

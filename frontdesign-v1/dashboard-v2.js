@@ -14,28 +14,39 @@ import {
   responseError,
   safeEnvelopeData,
   sortDemandTotals,
-} from './dashboard-format.js?v=20260814-dashboard-presentation-3';
+} from './dashboard-format.js?v=20260814-dashboard-presentation-4';
 import {
   applyDashboardMapDictionaries,
+  basemapVisibilityPatch,
   buildChangchunMapOption,
   buildNortheastMapOption,
   localGeoJsonIsChangchunRoadBasemap,
   localGeoJsonIsChangchunServiceArea,
   localGeoJsonIsNortheast,
   localShowcaseRoutesAreValid,
+  MAP_SCALE_LIMIT,
+  normalizeMapViewport,
+  overviewMapViewport,
+  routeFocusViewport,
   selectChangchunRoutes,
-} from './dashboard-map.js?v=20260814-dashboard-presentation-3';
-import { createSeamlessLoop } from './dashboard-loop.js?v=20260814-dashboard-presentation-3';
-import { VOICE_STATES, VoiceQuestionController } from './dashboard-voice.js?v=20260814-dashboard-presentation-3';
-import { adaptDashboardSnapshot, applyDashboardDictionaries } from './dashboard-adapter.js?v=20260814-dashboard-presentation-3';
-import { eventTargets, RealtimeCoordinator } from './dashboard-realtime.js?v=20260814-dashboard-presentation-3';
+} from './dashboard-map.js?v=20260814-dashboard-presentation-4';
+import { createSeamlessLoop } from './dashboard-loop.js?v=20260814-dashboard-presentation-4';
+import { VOICE_STATES, VoiceQuestionController } from './dashboard-voice.js?v=20260814-dashboard-presentation-4';
+import { adaptDashboardSnapshot, applyDashboardDictionaries } from './dashboard-adapter.js?v=20260814-dashboard-presentation-4';
+import { eventTargets, RealtimeCoordinator } from './dashboard-realtime.js?v=20260814-dashboard-presentation-4';
 
 const echarts = window.echarts;
 const API = window.API;
 const DEMO_FIXTURE = './frontend-mocks-v0.1/e02-dashboard-snapshot.json';
 const CHANGCHUN_MAP_FIXTURE = './assets/maps/changchun-service-area.geojson';
-const CHANGCHUN_ROAD_BASEMAP = './assets/maps/changchun-road-basemap.v2.geojson';
-const CHANGCHUN_SHOWCASE_ROUTES = './assets/maps/changchun-showcase-routes.v1.json';
+const CHANGCHUN_ROAD_BASEMAPS = Object.freeze([
+  './assets/maps/changchun-road-basemap.v3.geojson',
+  './assets/maps/changchun-road-basemap.v2.geojson',
+]);
+const CHANGCHUN_SHOWCASE_ROUTE_CATALOGS = Object.freeze([
+  './assets/maps/changchun-showcase-routes.v2.json',
+  './assets/maps/changchun-showcase-routes.v1.json',
+]);
 const LEGACY_MAP_FIXTURE = './assets/maps/northeast-china-admin1.geojson';
 const chartInstances = new Map();
 const state = {
@@ -50,8 +61,11 @@ const state = {
   mapBasemap: null,
   mapShowcaseRoutes: null,
   mapBasemapFallback: false,
-  selectedRouteKey: null,
+  mapBasemapFallbackLevel: null,
+  mapRouteFallbackLevel: null,
+  mapViewport: overviewMapViewport(),
   mapRoutePresentation: null,
+  mapRendered: false,
   refreshGeneration: 0,
   information: null,
   informationEtag: null,
@@ -197,17 +211,27 @@ async function loadDemoSnapshot() {
 async function ensureMap(mode = 'changchun') {
   if (state.mapReady && state.mapMode === mode) return;
   if (mode === 'changchun') {
-    try {
-      const basemapResponse = await fetch(CHANGCHUN_ROAD_BASEMAP, { cache: 'force-cache' });
-      if (!basemapResponse.ok) throw new Error(`HTTP ${basemapResponse.status}`);
-      const basemap = await basemapResponse.json();
-      if (!localGeoJsonIsChangchunRoadBasemap(basemap)) throw new Error('结构校验失败');
-      const boundaryFeatures = basemap.features.filter((feature) => feature.properties?.layer === 'service_boundary');
-      if (!boundaryFeatures.length) throw new Error('服务范围边界缺失');
-      echarts.registerMap('changchun-service-area', { type: 'FeatureCollection', features: boundaryFeatures });
-      state.mapBasemap = basemap;
-      state.mapBasemapFallback = false;
-    } catch {
+    state.mapBasemap = null;
+    state.mapBasemapFallback = false;
+    state.mapBasemapFallbackLevel = null;
+    for (let index = 0; index < CHANGCHUN_ROAD_BASEMAPS.length; index += 1) {
+      try {
+        const basemapResponse = await fetch(CHANGCHUN_ROAD_BASEMAPS[index], { cache: 'force-cache' });
+        if (!basemapResponse.ok) throw new Error(`HTTP ${basemapResponse.status}`);
+        const basemap = await basemapResponse.json();
+        if (!localGeoJsonIsChangchunRoadBasemap(basemap)) throw new Error('结构校验失败');
+        const boundaryFeatures = basemap.features.filter((feature) => feature.properties?.layer === 'service_boundary');
+        if (!boundaryFeatures.length) throw new Error('服务范围边界缺失');
+        echarts.registerMap('changchun-service-area', { type: 'FeatureCollection', features: boundaryFeatures });
+        state.mapBasemap = basemap;
+        state.mapBasemapFallback = index > 0;
+        state.mapBasemapFallbackLevel = index > 0 ? 'v2' : null;
+        break;
+      } catch {
+        // 继续尝试下一级首方静态资产。
+      }
+    }
+    if (!state.mapBasemap) {
       const fallbackResponse = await fetch(CHANGCHUN_MAP_FIXTURE, { cache: 'force-cache' });
       if (!fallbackResponse.ok) throw new Error(`本地地图资源加载失败（HTTP ${fallbackResponse.status}）`);
       const fallback = await fallbackResponse.json();
@@ -215,15 +239,24 @@ async function ensureMap(mode = 'changchun') {
       echarts.registerMap('changchun-service-area', fallback);
       state.mapBasemap = null;
       state.mapBasemapFallback = true;
+      state.mapBasemapFallbackLevel = 'service-area';
     }
-    try {
-      const routeResponse = await fetch(CHANGCHUN_SHOWCASE_ROUTES, { cache: 'force-cache' });
-      if (!routeResponse.ok) throw new Error(`HTTP ${routeResponse.status}`);
-      const routeCatalog = await routeResponse.json();
-      state.mapShowcaseRoutes = localShowcaseRoutesAreValid(routeCatalog) ? routeCatalog : null;
-    } catch {
-      state.mapShowcaseRoutes = null;
+    state.mapShowcaseRoutes = null;
+    state.mapRouteFallbackLevel = null;
+    for (let index = 0; index < CHANGCHUN_SHOWCASE_ROUTE_CATALOGS.length; index += 1) {
+      try {
+        const routeResponse = await fetch(CHANGCHUN_SHOWCASE_ROUTE_CATALOGS[index], { cache: 'force-cache' });
+        if (!routeResponse.ok) throw new Error(`HTTP ${routeResponse.status}`);
+        const routeCatalog = await routeResponse.json();
+        if (!localShowcaseRoutesAreValid(routeCatalog)) throw new Error('路线目录结构校验失败');
+        state.mapShowcaseRoutes = routeCatalog;
+        state.mapRouteFallbackLevel = index > 0 ? 'v1' : null;
+        break;
+      } catch {
+        // 继续尝试简化路线回退资产。
+      }
     }
+    state.mapViewport = overviewMapViewport(state.mapBasemap);
   } else {
     const response = await fetch(LEGACY_MAP_FIXTURE, { cache: 'force-cache' });
     if (!response.ok) throw new Error(`本地地图资源加载失败（HTTP ${response.status}）`);
@@ -233,6 +266,7 @@ async function ensureMap(mode = 'changchun') {
   }
   state.mapReady = true;
   state.mapMode = mode;
+  state.mapRendered = false;
 }
 
 function setSource(source, message) {
@@ -393,21 +427,62 @@ function routeDetailMarkup(route) {
 function renderRoutePresentation(presentation) {
   state.mapRoutePresentation = presentation;
   const routes = presentation.routes || [];
-  if (!routes.some((route) => route.key === state.selectedRouteKey)) state.selectedRouteKey = routes[0]?.key || null;
+  const selectedKey = state.mapViewport.selectedRouteKey;
+  if (selectedKey && !routes.some((route) => route.key === selectedKey)) {
+    state.mapViewport = overviewMapViewport(state.mapBasemap);
+  }
   const controls = byId('dv2-route-controls');
-  if (controls) controls.innerHTML = routes.map((route) => `<button type="button" data-route-key="${htmlEscape(route.key)}" aria-pressed="${route.key === state.selectedRouteKey}">路线 ${htmlEscape(route.routeNo)}</button>`).join('');
+  if (controls) controls.innerHTML = routes.map((route) => `<button type="button" data-route-key="${htmlEscape(route.key)}" data-route-no="${htmlEscape(route.routeNo)}" aria-pressed="${route.key === state.mapViewport.selectedRouteKey}">路线 ${htmlEscape(route.routeNo)}</button>`).join('');
   const detail = byId('dv2-route-detail');
-  const selected = routes.find((route) => route.key === state.selectedRouteKey) || routes[0];
-  if (detail) detail.innerHTML = routeDetailMarkup(selected);
+  const selected = routes.find((route) => route.key === state.mapViewport.selectedRouteKey) || null;
+  if (detail) detail.innerHTML = selected
+    ? routeDetailMarkup(selected)
+    : '<strong>五条配送路线全览</strong><span>选择路线 01—05 可自动聚焦并查看车辆信息。</span><small>也可使用滚轮、拖动或右上角缩放控件浏览道路。</small>';
   const mode = byId('dv2-route-mode');
   if (mode) mode.textContent = presentation.label;
+}
+
+function setMapViewport(viewport, { render = true } = {}) {
+  state.mapViewport = normalizeMapViewport(viewport);
+  updateMapZoomControls();
+  if (render && state.snapshot) renderMap(state.snapshot);
+}
+
+function selectMapRoute(route) {
+  if (!route) return;
+  setMapViewport(routeFocusViewport(route));
 }
 
 function onMapRouteClick(params) {
   const route = params?.data?.routeDisplay;
   if (!route) return;
-  state.selectedRouteKey = route.key;
-  if (state.snapshot) renderMap(state.snapshot);
+  selectMapRoute(route);
+}
+
+function onMapGeoRoam() {
+  const chart = chartInstances.get('dv2-map-chart');
+  const geo = chart?.getOption()?.geo?.[0];
+  if (!geo) return;
+  state.mapViewport = normalizeMapViewport({
+    ...state.mapViewport,
+    mode: 'MANUAL',
+    center: Array.isArray(geo.center) ? geo.center.map(Number) : state.mapViewport.center,
+    zoom: Number(geo.zoom) || state.mapViewport.zoom,
+  });
+  const seriesIds = new Set((chart.getOption().series || []).map((series) => series.id));
+  const visibility = basemapVisibilityPatch(state.mapViewport.zoom).filter((series) => seriesIds.has(series.id));
+  if (visibility.length) chart.setOption({ series: visibility }, { notMerge: false, lazyUpdate: true });
+  updateMapZoomControls();
+}
+
+function updateMapZoomControls() {
+  const zoom = state.mapViewport.zoom;
+  const zoomIn = byId('dv2-map-zoom-in');
+  const zoomOut = byId('dv2-map-zoom-out');
+  if (zoomIn) zoomIn.disabled = zoom >= MAP_SCALE_LIMIT.max - 0.001;
+  if (zoomOut) zoomOut.disabled = zoom <= MAP_SCALE_LIMIT.min + 0.001;
+  const status = byId('dv2-map-zoom-status');
+  if (status) status.textContent = `${formatNumber(zoom, 2)}×`;
 }
 
 function renderMap(snapshot) {
@@ -416,16 +491,34 @@ function renderMap(snapshot) {
   const presentation = selectChangchunRoutes(snapshot, state.mapShowcaseRoutes);
   renderRoutePresentation(presentation);
   const option = snapshot.public_map?.schema_version === '2.0'
-    ? buildChangchunMapOption(snapshot, screenPalette(), state.mapBasemap, state.mapShowcaseRoutes, { selectedRouteKey: state.selectedRouteKey })
+    ? buildChangchunMapOption(snapshot, screenPalette(), state.mapBasemap, state.mapShowcaseRoutes, {
+      selectedRouteKey: state.mapViewport.selectedRouteKey,
+      viewport: state.mapViewport,
+    })
     : buildNortheastMapOption(snapshot, screenPalette());
-  chart.setOption(option, true);
+  if (!state.mapRendered) {
+    chart.setOption(option, true);
+    state.mapRendered = true;
+  } else {
+    chart.setOption(option, { notMerge: false, replaceMerge: ['series'], lazyUpdate: false });
+  }
   chart.off('click', onMapRouteClick);
   chart.on('click', onMapRouteClick);
+  chart.off('georoam', onMapGeoRoam);
+  chart.on('georoam', onMapGeoRoam);
+  updateMapZoomControls();
   const excluded = snapshot.public_map?.excluded_route_summary?.count || 0;
   const alerts = (snapshot.public_map?.active_routes || []).reduce((sum, route) => sum + Number(route.alert_count || 0), 0);
-  if (byId('dv2-map-summary')) byId('dv2-map-summary').textContent = state.mapBasemapFallback
-    ? `道路底图暂不可用，当前显示长春服务范围图 · ${presentation.label}`
-    : `${presentation.label} · 未解决报警 ${alerts} 条 · 排除 ${excluded} 项`;
+  if (byId('dv2-map-summary')) {
+    const fallback = state.mapBasemapFallbackLevel === 'v2'
+      ? '精细底图暂不可用，当前显示基础道路图'
+      : state.mapBasemapFallbackLevel === 'service-area'
+        ? '道路底图暂不可用，当前显示长春服务范围图'
+        : state.mapRouteFallbackLevel === 'v1'
+          ? '道路级路线暂不可用，当前显示简化路线'
+          : null;
+    byId('dv2-map-summary').textContent = `${fallback ? `${fallback} · ` : ''}${presentation.label} · 未解决报警 ${alerts} 条 · 排除 ${excluded} 项`;
+  }
 }
 
 function showcaseAllocationSummary(allocation) {
@@ -1034,9 +1127,16 @@ function bindEvents() {
   byId('dv2-route-controls')?.addEventListener('click', (event) => {
     const button = event.target.closest('[data-route-key]');
     if (!button) return;
-    state.selectedRouteKey = button.dataset.routeKey;
-    if (state.snapshot) renderMap(state.snapshot);
+    const route = state.mapRoutePresentation?.routes?.find((item) => item.key === button.dataset.routeKey);
+    selectMapRoute(route);
   });
+  byId('dv2-map-zoom-in')?.addEventListener('click', () => setMapViewport({
+    ...state.mapViewport, mode: 'MANUAL', zoom: Math.min(MAP_SCALE_LIMIT.max, state.mapViewport.zoom * 1.25),
+  }));
+  byId('dv2-map-zoom-out')?.addEventListener('click', () => setMapViewport({
+    ...state.mapViewport, mode: 'MANUAL', zoom: Math.max(MAP_SCALE_LIMIT.min, state.mapViewport.zoom / 1.25),
+  }));
+  byId('dv2-map-overview')?.addEventListener('click', () => setMapViewport(overviewMapViewport(state.mapBasemap)));
   byId('dv2-information-retry')?.addEventListener('click', () => {
     byId('dv2-information-retry').hidden = true;
     refreshInformation();
