@@ -6,6 +6,7 @@
   "scripts": {
     "build": "node build-cloudflare.mjs",
     "build:demo": "node build-cloudflare.mjs --demo",
+    "build:map": "node scripts/build-changchun-route-corridors-v4.mjs",
     "test:frontend": "npm run build && node --test \"frontdesign-v1/tests/*.test.mjs\"",
     "cf:check": "npm run build && wrangler deploy --dry-run",
     "cf:dev": "npm run build && wrangler dev",

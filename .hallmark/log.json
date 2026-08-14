@@ -30,6 +30,22 @@
       "critique": { "philosophy": 5, "hierarchy": 5, "execution": 4, "specificity": 5, "restraint": 5, "variety": 5 },
       "slop_test": "pass",
       "visual_qa": "真实 B01 API 登录、算法结果、E02 大屏、第三空间、估算路线和无模型助手均已在桌面浏览器验证；移动端导航已复核"
+    },
+    {
+      "date": "2026-08-14",
+      "surface": "E02 Changchun delivery route focus and corridor map",
+      "genre": "atmospheric",
+      "theme": "studied-DNA",
+      "source": "production presentation-4 screenshot and route geometry audit",
+      "macrostructure": "map-diagram with progressive route disclosure",
+      "navigation": "route rail plus detail full overview scope control",
+      "footer": "existing inline dashboard status rule",
+      "enrichment": "first-party OSM corridor graph and restrained single-vehicle motion",
+      "palette": "frozen blue, Jipin green, route semantic colors, alert red",
+      "tokens": "frontdesign-v1/dashboard.css semantic variables",
+      "critique": { "philosophy": 5, "hierarchy": 5, "execution": 5, "specificity": 5, "restraint": 5, "variety": 4 },
+      "slop_test": "pass",
+      "visual_qa": "1920x1080 day and night, 1440x900, 390x844, 320x844; routes 01-05 detail, route 03 full, corridor overview, theme and zoom persistence; zero current-preview console errors"
     }
   ]
 }

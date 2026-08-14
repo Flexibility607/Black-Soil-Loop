@@ -1,4 +1,4 @@
-/* Hallmark · pre-emit critique: P5 H5 E4 S5 R4 V5 · genre: atmospheric · macrostructure: map-diagram · theme: studied-DNA (source: user reference screenshot) · enrichment: tier-c · nav: N9 · footer: Ft2 · contrast: pass (40–41) · slop: pass (42–45) · honest: pass (46) · chrome: pass (47) · tokens: pass (48) · responsive: pass (49) · icons: pass (30) · mobile: pass (34, 49, 50–57) */
+/* Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V4 · genre: atmospheric · macrostructure: map-diagram · theme: studied-DNA (source: user reference screenshot) · enrichment: first-party route corridors · nav: N9 · footer: Ft2 · contrast: pass (40–41) · slop: pass (42–45) · honest: pass (46) · chrome: pass (47) · tokens: pass (48) · responsive: pass (49) · icons: pass (30) · mobile: pass (34, 49, 50–57) */
 :root {
   --dv2-ink: oklch(96% 0.018 222);
   --dv2-muted: oklch(76% 0.045 226);
@@ -1024,22 +1024,25 @@ body.screen-mode.screen-day .dv2-brand-mark img {
 .dv2-route-panel {
   position: absolute;
   right: 12px;
+  top: 70px;
   bottom: 40px;
-  left: 12px;
+  width: 218px;
   z-index: 3;
   display: grid;
-  grid-template-columns: minmax(220px, 0.72fr) minmax(0, 1.28fr);
-  gap: 8px;
+  grid-template-rows: auto minmax(0, auto) 28px minmax(0, 1fr);
+  align-content: start;
+  gap: 7px;
   border: 1px solid var(--dv2-panel-rule);
-  padding: 7px 9px;
+  padding: 9px;
   background: var(--dv2-answer-surface);
+  color: var(--dv2-ink);
   box-shadow: var(--dv2-panel-shadow);
   backdrop-filter: blur(8px);
 }
 
-.dv2-route-panel > div { min-width: 0; }
-.dv2-route-panel b { color: var(--dv2-ink); font-size: 10px; }
-.dv2-route-panel nav { display: flex; gap: 4px; margin-top: 5px; }
+.dv2-route-panel > * { min-width: 0; }
+.dv2-route-panel > b { color: var(--dv2-ink); font-size: 10px; }
+.dv2-route-panel nav { display: grid; grid-template-columns: 1fr; gap: 4px; }
 .dv2-route-panel button {
   --dv2-route-color: var(--dv2-blue);
   min-width: 0;
@@ -1048,13 +1051,17 @@ body.screen-mode.screen-day .dv2-brand-mark img {
   gap: 4px;
   border: 1px solid var(--dv2-chip-border);
   border-radius: 3px;
+  min-height: 27px;
   padding: 3px 7px;
   color: var(--dv2-muted);
   background: var(--dv2-chip-surface);
   font: inherit;
   font-size: 8.5px;
+  white-space: nowrap;
   cursor: pointer;
 }
+.dv2-route-panel nav button b { width: 20px; color: var(--dv2-route-color); font-size: 9px; font-variant-numeric: tabular-nums; }
+.dv2-route-panel nav button span { overflow: hidden; text-overflow: ellipsis; }
 .dv2-route-panel button::before {
   width: 3px;
   height: 11px;
@@ -1068,15 +1075,24 @@ body.screen-mode.screen-day .dv2-brand-mark img {
 .dv2-route-panel button[data-route-no="04"] { --dv2-route-color: var(--dv2-route-04); }
 .dv2-route-panel button[data-route-no="05"] { --dv2-route-color: var(--dv2-route-05); }
 .dv2-route-panel button[aria-pressed="true"] { border-color: var(--dv2-route-color); color: var(--dv2-route-color); }
-.dv2-route-detail { display: grid; grid-template-columns: minmax(0, 1fr); align-content: center; gap: 2px; }
+.dv2-route-scope { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+.dv2-route-scope button { justify-content: center; padding-inline: 3px; }
+.dv2-route-scope button::before { display: none; }
+.dv2-route-scope button[aria-pressed="true"] { border-color: var(--dv2-green); color: var(--dv2-green); background: var(--dv2-answer-surface); }
+.dv2-route-scope button:disabled { cursor: not-allowed; opacity: 0.42; }
+.dv2-route-detail { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 5px; border-top: 1px solid var(--dv2-panel-rule); padding-top: 8px; }
 .dv2-route-detail strong,
 .dv2-route-detail span,
 .dv2-route-detail small,
-.dv2-route-detail em { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dv2-route-detail strong { color: var(--dv2-ink); font-size: 10px; }
-.dv2-route-detail span { color: var(--dv2-green); font-size: 9px; }
+.dv2-route-detail em { overflow-wrap: anywhere; }
+.dv2-route-detail strong { color: var(--dv2-ink); font-size: 11px; }
+.dv2-route-detail span { color: var(--dv2-green); font-size: 9px; line-height: 1.45; }
 .dv2-route-detail small,
-.dv2-route-detail em { color: var(--dv2-muted); font-size: 8px; font-style: normal; }
+.dv2-route-detail em { color: var(--dv2-muted); font-size: 8.5px; font-style: normal; line-height: 1.45; }
+
+@media (hover: hover) and (pointer: fine) {
+  .dv2-route-panel button:hover { border-color: var(--dv2-route-color); color: var(--dv2-ink); }
+}
 
 .dv2-showcase-panel {
   position: relative;

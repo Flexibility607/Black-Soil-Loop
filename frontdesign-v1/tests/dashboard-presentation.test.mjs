@@ -9,12 +9,30 @@ import {
   localShowcaseRoutesAreValid,
   normalizeMapViewport,
   overviewMapViewport,
+  reconstructShowcaseRoute,
   routeFocusViewport,
   selectChangchunRoutes,
 } from '../dashboard-map.js';
 import { SCREEN_PALETTES } from '../dashboard-format.js';
 
 const projectRoot = new URL('../../', import.meta.url);
+
+const pointKey = (point) => `${Number(point[0]).toFixed(7)},${Number(point[1]).toFixed(7)}`;
+const edgeKey = (start, end) => {
+  const first = pointKey(start);
+  const second = pointKey(end);
+  return first < second ? `${first}|${second}` : `${second}|${first}`;
+};
+const edgesOf = (coordinates) => coordinates.slice(1).map((point, index) => edgeKey(coordinates[index], point));
+const radians = (degrees) => degrees * Math.PI / 180;
+const lineLengthKm = (coordinates) => coordinates.slice(1).reduce((total, point, index) => {
+  const previous = coordinates[index];
+  const dLat = radians(point[1] - previous[1]);
+  const dLon = radians(point[0] - previous[0]);
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(radians(previous[1])) * Math.cos(radians(point[1])) * Math.sin(dLon / 2) ** 2;
+  return total + 6371.0088 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}, 0);
 
 test('长春服务范围 GeoJSON 只包含有效面几何并进入本地构建', async () => {
   const source = JSON.parse(await readFile(new URL('frontdesign-v1/assets/maps/changchun-service-area.geojson', projectRoot), 'utf8'));
@@ -23,15 +41,15 @@ test('长春服务范围 GeoJSON 只包含有效面几何并进入本地构建',
   assert.match(JSON.stringify(source), /EPSG:4326/);
 });
 
-test('长春道路底图 v3 固定为首方 ODbL 矢量资产并通过规模门禁', async () => {
-  const bytes = await readFile(new URL('frontdesign-v1/assets/maps/changchun-road-basemap.v3.geojson', projectRoot));
+test('长春道路底图 v4 固定为首方 ODbL 矢量资产并补齐路线连接道路', async () => {
+  const bytes = await readFile(new URL('frontdesign-v1/assets/maps/changchun-road-basemap.v4.geojson', projectRoot));
   const source = JSON.parse(bytes.toString('utf8'));
   assert.equal(localGeoJsonIsChangchunRoadBasemap(source), true);
   assert.equal(source.metadata.crs, 'EPSG:4326');
   assert.equal(source.metadata.coordinate_order, 'longitude,latitude');
   assert.equal(source.metadata.license, 'ODbL 1.0');
   assert.deepEqual(source.metadata.clip_bounds, [125.15, 43.6, 125.6, 44.1]);
-  assert.ok(source.features.length >= 350 && source.features.length <= 600);
+  assert.ok(source.features.length >= 450 && source.features.length <= 650);
   assert.ok(bytes.length <= 750 * 1024);
   const coordinateCount = source.features.reduce((sum, feature) => {
     if (feature.geometry.type === 'Point') return sum + 1;
@@ -39,9 +57,9 @@ test('长春道路底图 v3 固定为首方 ODbL 矢量资产并通过规模门�
     if (feature.geometry.type === 'MultiLineString') return sum + feature.geometry.coordinates.flat(1).length;
     return sum + feature.geometry.coordinates.length;
   }, 0);
-  assert.ok(coordinateCount >= 6000 && coordinateCount <= 9000);
+  assert.ok(coordinateCount >= 6000 && coordinateCount <= 10000);
   const layers = new Set(source.features.map((feature) => feature.properties.layer));
-  for (const layer of ['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'railway', 'waterway', 'place_label', 'road_label']) assert.ok(layers.has(layer));
+  for (const layer of ['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'railway', 'waterway', 'district_boundary', 'route_connector', 'place_label', 'road_label']) assert.ok(layers.has(layer));
 });
 
 test('长春地图每个活动任务只有一条线路且报警只形成红色光圈', () => {
@@ -65,7 +83,7 @@ test('长春地图每个活动任务只有一条线路且报警只形成红色�
 });
 
 test('长春道路、标签与业务覆盖层共用可缩放 geo 坐标系', async () => {
-  const basemap = JSON.parse(await readFile(new URL('frontdesign-v1/assets/maps/changchun-road-basemap.v3.geojson', projectRoot), 'utf8'));
+  const basemap = JSON.parse(await readFile(new URL('frontdesign-v1/assets/maps/changchun-road-basemap.v4.geojson', projectRoot), 'utf8'));
   const option = buildChangchunMapOption({ public_map: { points: [], active_routes: [] } }, SCREEN_PALETTES.day, basemap);
   assert.equal(option.geo.roam, true);
   assert.deepEqual(option.geo.scaleLimit, { min: 1, max: 8 });
@@ -80,18 +98,19 @@ test('长春道路、标签与业务覆盖层共用可缩放 geo 坐标系', asy
 });
 
 test('地图视域按上下限归一化且路线聚焦使用冻结目录参数', async () => {
-  const basemap = JSON.parse(await readFile(new URL('frontdesign-v1/assets/maps/changchun-road-basemap.v3.geojson', projectRoot), 'utf8'));
-  const catalog = JSON.parse(await readFile(new URL('frontdesign-v1/assets/maps/changchun-showcase-routes.v2.json', projectRoot), 'utf8'));
+  const basemap = JSON.parse(await readFile(new URL('frontdesign-v1/assets/maps/changchun-road-basemap.v4.geojson', projectRoot), 'utf8'));
+  const catalog = JSON.parse(await readFile(new URL('frontdesign-v1/assets/maps/changchun-showcase-routes.v3.json', projectRoot), 'utf8'));
   const overview = overviewMapViewport(basemap);
-  assert.deepEqual(overview, { mode: 'OVERVIEW', center: [125.375, 43.85], zoom: 1, selectedRouteKey: null });
+  assert.deepEqual(overview, { mode: 'OVERVIEW', center: [125.375, 43.85], zoom: 1, selectedRouteKey: null, focusScope: 'DETAIL' });
   assert.equal(normalizeMapViewport({ zoom: 99 }).zoom, 8);
   assert.equal(normalizeMapViewport({ zoom: 0.1 }).zoom, 1);
   const presentation = selectChangchunRoutes({ public_map: { active_routes: [] } }, catalog);
   const focused = routeFocusViewport(presentation.routes[0]);
-  assert.equal(focused.mode, 'ROUTE_FOCUS');
-  assert.deepEqual(focused.center, catalog.routes[0].focus_center);
-  assert.equal(focused.zoom, catalog.routes[0].focus_zoom);
+  assert.equal(focused.mode, 'ROUTE_DETAIL');
+  assert.deepEqual(focused.center, catalog.routes[0].detail_focus.center);
+  assert.equal(focused.zoom, catalog.routes[0].detail_focus.zoom);
   assert.equal(focused.selectedRouteKey, 'showcase-01');
+  assert.equal(routeFocusViewport(presentation.routes[0], 'FULL').mode, 'ROUTE_FULL');
   assert.equal(basemapVisibilityPatch(1)[0].lineStyle.opacity, 0);
   assert.equal(basemapVisibilityPatch(1.6)[0].lineStyle.opacity, 1);
   assert.equal(basemapVisibilityPatch(2.6)[1].lineStyle.opacity, 0.72);
@@ -103,7 +122,7 @@ test('地图缩放控件和增量更新保留用户视域且不触发地图网�
   for (const id of ['dv2-map-zoom-in', 'dv2-map-zoom-out', 'dv2-map-overview', 'dv2-map-zoom-status']) assert.match(html, new RegExp(`id="${id}"`));
   assert.match(html, /支持滚轮缩放和鼠标拖动/);
   assert.match(dashboard, /chart\.on\('georoam', onMapGeoRoam\)/);
-  assert.match(dashboard, /replaceMerge:\s*\['series'\]/);
+  assert.doesNotMatch(dashboard, /replaceMerge:\s*\['series'\]/);
   assert.match(dashboard, /state\.mapViewport\.zoom \* 1\.25/);
   assert.match(dashboard, /state\.mapViewport\.zoom \/ 1\.25/);
   assert.match(dashboard, /overviewMapViewport\(state\.mapBasemap\)/);
@@ -125,7 +144,7 @@ test('E02 同屏展示资讯双栏与四类协同方案并使用无认证公开�
 });
 
 test('无实时任务时使用五条诚实演示路线，实时任务存在时互斥且最多五条', async () => {
-  const catalog = JSON.parse(await readFile(new URL('frontdesign-v1/assets/maps/changchun-showcase-routes.v2.json', projectRoot), 'utf8'));
+  const catalog = JSON.parse(await readFile(new URL('frontdesign-v1/assets/maps/changchun-showcase-routes.v3.json', projectRoot), 'utf8'));
   assert.equal(localShowcaseRoutesAreValid(catalog), true);
   assert.equal(catalog.routes.length, 5);
   assert.match(catalog.disclaimer, /预设路线演示/);
@@ -146,24 +165,62 @@ test('无实时任务时使用五条诚实演示路线，实时任务存在时�
   assert.ok(live.routes.every((route) => !route.showcase));
 });
 
-test('配送线路每条只有一个无拖尾移动符号，减少动态时关闭移动', async () => {
-  const catalog = JSON.parse(await readFile(new URL('frontdesign-v1/assets/maps/changchun-showcase-routes.v2.json', projectRoot), 'utf8'));
-  const moving = buildChangchunMapOption({ public_map: { points: [], active_routes: [] } }, SCREEN_PALETTES.night, null, catalog);
+test('全览保持静态，聚焦线路只有一个无拖尾且不可见路径的车辆符号', async () => {
+  const catalog = JSON.parse(await readFile(new URL('frontdesign-v1/assets/maps/changchun-showcase-routes.v3.json', projectRoot), 'utf8'));
+  const overview = buildChangchunMapOption({ public_map: { points: [], active_routes: [] } }, SCREEN_PALETTES.night, null, catalog);
+  assert.equal(overview.series.find((item) => item.name === '路线流动车辆').data.length, 0);
+  const presentation = selectChangchunRoutes({ public_map: { active_routes: [] } }, catalog);
+  const moving = buildChangchunMapOption({ public_map: { points: [], active_routes: [] } }, SCREEN_PALETTES.night, null, catalog, {
+    selectedRouteKey: 'showcase-02', viewport: routeFocusViewport(presentation.routes[1], 'DETAIL'),
+  });
   const routeSeries = moving.series.find((item) => item.name === '路线流动车辆');
-  assert.equal(routeSeries.data.length, 5);
+  assert.equal(routeSeries.data.length, 1);
   assert.equal(routeSeries.effect.trailLength, 0);
   assert.equal(routeSeries.effect.symbol, 'arrow');
   assert.equal(routeSeries.polyline, true);
-  const still = buildChangchunMapOption({ public_map: { points: [], active_routes: [] } }, SCREEN_PALETTES.night, null, catalog, { reducedMotion: true });
+  assert.ok(routeSeries.data.every((item) => item.lineStyle.width === 0 && item.lineStyle.opacity === 0));
+  const still = buildChangchunMapOption({ public_map: { points: [], active_routes: [] } }, SCREEN_PALETTES.night, null, catalog, { reducedMotion: true, selectedRouteKey: 'showcase-02', viewport: routeFocusViewport(presentation.routes[1], 'DETAIL') });
   assert.equal(still.series.find((item) => item.name === '路线流动车辆').effect.show, false);
-  assert.equal(moving.series.find((item) => item.name === '园区共同配送干线').data.length, 1);
-  assert.equal(moving.series.find((item) => item.name === '园区共同配送干线').polyline, true);
   assert.equal(moving.series.find((item) => item.name === '配送展示路线').polyline, true);
-  const selected = buildChangchunMapOption({ public_map: { points: [], active_routes: [] } }, SCREEN_PALETTES.night, null, catalog, {
-    selectedRouteKey: 'showcase-02', viewport: routeFocusViewport(selectChangchunRoutes({ public_map: { active_routes: [] } }, catalog).routes[1]),
-  });
-  assert.equal(selected.series.find((item) => item.name === '路线流动车辆').data.length, 1);
-  assert.equal(selected.series.find((item) => item.name === '配送展示路线').data.find((item) => item.routeDisplay.key === 'showcase-02').lineStyle.width, 4.5);
+  assert.equal(moving.series.find((item) => item.name === '配送展示路线').data[0].lineStyle.width, 5);
+  assert.equal(moving.series.find((item) => item.name === '配送路线外侧衬线').lineStyle.width, 8);
+  for (const series of moving.series) assert.equal(series.zlevel || 0, 0);
+});
+
+test('路线走廊 v3 去重保存并可连续重建五条终段与全程', async () => {
+  const catalog = JSON.parse(await readFile(new URL('frontdesign-v1/assets/maps/changchun-showcase-routes.v3.json', projectRoot), 'utf8'));
+  const legacy = JSON.parse(await readFile(new URL('frontdesign-v1/assets/maps/changchun-showcase-routes.v2.json', projectRoot), 'utf8'));
+  const basemap = JSON.parse(await readFile(new URL('frontdesign-v1/assets/maps/changchun-road-basemap.v4.geojson', projectRoot), 'utf8'));
+  assert.equal(catalog.schema_version, '3.0');
+  assert.equal(localShowcaseRoutesAreValid(catalog), true);
+  assert.equal(new Set(catalog.corridors.map((corridor) => JSON.stringify(corridor.coordinates))).size, catalog.corridors.length);
+  const corridorEdges = new Set();
+  for (const corridor of catalog.corridors) {
+    for (const edge of edgesOf(corridor.coordinates)) {
+      assert.equal(corridorEdges.has(edge), false, `corridor edge is duplicated: ${corridor.corridor_key}`);
+      corridorEdges.add(edge);
+    }
+  }
+  const visibleConnectorEdges = new Set(basemap.features
+    .filter((feature) => feature.properties?.layer === 'route_connector')
+    .flatMap((feature) => edgesOf(feature.geometry.coordinates)));
+  for (const corridor of catalog.corridors.filter((item) => item.kind !== 'ENTRANCE')) {
+    for (const edge of edgesOf(corridor.coordinates)) {
+      assert.ok(visibleConnectorEdges.has(edge), `route corridor is missing from the visible basemap: ${corridor.corridor_key}`);
+    }
+  }
+  for (const route of catalog.routes) {
+    const full = reconstructShowcaseRoute(catalog, route.corridor_keys);
+    const detail = reconstructShowcaseRoute(catalog, route.detail_corridor_keys);
+    const previousRoute = legacy.routes.find((item) => item.route_no === route.route_no);
+    assert.ok(full.length >= detail.length && detail.length >= 2);
+    assert.ok(route.detail_distance_km >= 10 && route.detail_distance_km <= 15);
+    assert.deepEqual(full[0], [catalog.origin.longitude, catalog.origin.latitude]);
+    assert.deepEqual(full.at(-1), previousRoute.coordinates.at(-1));
+    assert.ok(Math.abs(lineLengthKm(full) - lineLengthKm(previousRoute.coordinates)) / lineLengthKm(previousRoute.coordinates) < 0.01);
+    assert.ok(route.full_focus.zoom >= 1 && route.full_focus.zoom <= 6);
+    assert.ok(route.detail_focus.zoom >= 1.4 && route.detail_focus.zoom <= 6);
+  }
 });
 
 test('道路级路线 v2 包含五条完整折线、聚焦信息和小于百米吸附', async () => {

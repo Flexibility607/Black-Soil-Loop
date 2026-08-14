@@ -14,7 +14,7 @@ import {
   responseError,
   safeEnvelopeData,
   sortDemandTotals,
-} from './dashboard-format.js?v=20260814-dashboard-presentation-4';
+} from './dashboard-format.js?v=20260814-dashboard-presentation-5';
 import {
   applyDashboardMapDictionaries,
   basemapVisibilityPatch,
@@ -29,21 +29,23 @@ import {
   overviewMapViewport,
   routeFocusViewport,
   selectChangchunRoutes,
-} from './dashboard-map.js?v=20260814-dashboard-presentation-4';
-import { createSeamlessLoop } from './dashboard-loop.js?v=20260814-dashboard-presentation-4';
-import { VOICE_STATES, VoiceQuestionController } from './dashboard-voice.js?v=20260814-dashboard-presentation-4';
-import { adaptDashboardSnapshot, applyDashboardDictionaries } from './dashboard-adapter.js?v=20260814-dashboard-presentation-4';
-import { eventTargets, RealtimeCoordinator } from './dashboard-realtime.js?v=20260814-dashboard-presentation-4';
+} from './dashboard-map.js?v=20260814-dashboard-presentation-5';
+import { createSeamlessLoop } from './dashboard-loop.js?v=20260814-dashboard-presentation-5';
+import { VOICE_STATES, VoiceQuestionController } from './dashboard-voice.js?v=20260814-dashboard-presentation-5';
+import { adaptDashboardSnapshot, applyDashboardDictionaries } from './dashboard-adapter.js?v=20260814-dashboard-presentation-5';
+import { eventTargets, RealtimeCoordinator } from './dashboard-realtime.js?v=20260814-dashboard-presentation-5';
 
 const echarts = window.echarts;
 const API = window.API;
 const DEMO_FIXTURE = './frontend-mocks-v0.1/e02-dashboard-snapshot.json';
 const CHANGCHUN_MAP_FIXTURE = './assets/maps/changchun-service-area.geojson';
 const CHANGCHUN_ROAD_BASEMAPS = Object.freeze([
+  './assets/maps/changchun-road-basemap.v4.geojson',
   './assets/maps/changchun-road-basemap.v3.geojson',
   './assets/maps/changchun-road-basemap.v2.geojson',
 ]);
 const CHANGCHUN_SHOWCASE_ROUTE_CATALOGS = Object.freeze([
+  './assets/maps/changchun-showcase-routes.v3.json',
   './assets/maps/changchun-showcase-routes.v2.json',
   './assets/maps/changchun-showcase-routes.v1.json',
 ]);
@@ -64,6 +66,8 @@ const state = {
   mapBasemapFallbackLevel: null,
   mapRouteFallbackLevel: null,
   mapViewport: overviewMapViewport(),
+  mapViewportInitialized: false,
+  mapPresentationMode: null,
   mapRoutePresentation: null,
   mapRendered: false,
   refreshGeneration: 0,
@@ -225,7 +229,7 @@ async function ensureMap(mode = 'changchun') {
         echarts.registerMap('changchun-service-area', { type: 'FeatureCollection', features: boundaryFeatures });
         state.mapBasemap = basemap;
         state.mapBasemapFallback = index > 0;
-        state.mapBasemapFallbackLevel = index > 0 ? 'v2' : null;
+        state.mapBasemapFallbackLevel = index === 1 ? 'v3' : index === 2 ? 'v2' : null;
         break;
       } catch {
         // 继续尝试下一级首方静态资产。
@@ -250,13 +254,15 @@ async function ensureMap(mode = 'changchun') {
         const routeCatalog = await routeResponse.json();
         if (!localShowcaseRoutesAreValid(routeCatalog)) throw new Error('路线目录结构校验失败');
         state.mapShowcaseRoutes = routeCatalog;
-        state.mapRouteFallbackLevel = index > 0 ? 'v1' : null;
+        state.mapRouteFallbackLevel = index === 1 ? 'v2' : index === 2 ? 'v1' : null;
         break;
       } catch {
         // 继续尝试简化路线回退资产。
       }
     }
     state.mapViewport = overviewMapViewport(state.mapBasemap);
+    state.mapViewportInitialized = false;
+    state.mapPresentationMode = null;
   } else {
     const response = await fetch(LEGACY_MAP_FIXTURE, { cache: 'force-cache' });
     if (!response.ok) throw new Error(`本地地图资源加载失败（HTTP ${response.status}）`);
@@ -415,7 +421,10 @@ function routeDetailMarkup(route) {
   if (!route) return '<strong>当前无可展示线路</strong><span>精选门店仍正常显示。</span>';
   if (route.mode === 'SHOWCASE') {
     const data = route.showcase;
-    return `<strong>路线 ${htmlEscape(route.routeNo)} · 展示车辆</strong><span>${htmlEscape(data.origin.display_name)} → ${htmlEscape(data.destination_name)}</span><small>估算 ${htmlEscape(formatNumber(data.estimated_distance_km, 1))} km · 预设路线演示</small><em>无实时定位与遥测；不代表道路导航或实时履约。</em>`;
+    const detail = Number(data.detail_distance_km ?? data.estimated_distance_km);
+    const full = Number(data.full_distance_km ?? data.estimated_distance_km);
+    const scope = state.mapViewport.focusScope === 'FULL' ? 'FULL' : 'DETAIL';
+    return `<strong>路线 ${htmlEscape(route.routeNo)} · 展示车辆</strong><span>${htmlEscape(data.origin.display_name)} → ${htmlEscape(data.destination_name)}</span><small>${scope === 'DETAIL' ? `当前显示终点前 ${htmlEscape(formatNumber(detail, 1))} km` : `当前显示完整路线 ${htmlEscape(formatNumber(full, 1))} km`}</small><em>${scope === 'DETAIL' ? `完整路线 ${htmlEscape(formatNumber(full, 1))} km，可切换“全程”` : '预设路线演示 · 无实时定位与遥测'}；不代表道路导航或实时履约。</em>`;
   }
   const live = route.live;
   const location = live.latest_location;
@@ -427,19 +436,36 @@ function routeDetailMarkup(route) {
 function renderRoutePresentation(presentation) {
   state.mapRoutePresentation = presentation;
   const routes = presentation.routes || [];
+  const modeChanged = state.mapPresentationMode && state.mapPresentationMode !== presentation.mode;
   const selectedKey = state.mapViewport.selectedRouteKey;
-  if (selectedKey && !routes.some((route) => route.key === selectedKey)) {
+  if (routes.length && (!state.mapViewportInitialized || modeChanged || (selectedKey && !routes.some((route) => route.key === selectedKey)))) {
+    state.mapViewport = routeFocusViewport(routes[0], 'DETAIL');
+    state.mapViewportInitialized = true;
+  } else if (!routes.length) {
     state.mapViewport = overviewMapViewport(state.mapBasemap);
+    state.mapViewportInitialized = true;
   }
+  state.mapPresentationMode = presentation.mode;
   const controls = byId('dv2-route-controls');
-  if (controls) controls.innerHTML = routes.map((route) => `<button type="button" data-route-key="${htmlEscape(route.key)}" data-route-no="${htmlEscape(route.routeNo)}" aria-pressed="${route.key === state.mapViewport.selectedRouteKey}">路线 ${htmlEscape(route.routeNo)}</button>`).join('');
+  if (controls) controls.innerHTML = routes.map((route) => {
+    const destination = route.showcase?.destination_name || route.live?.to?.display_name || '目的地';
+    const shortName = destination.replace('国信', '').replace('温泉', '').replace(/(水饺|生煎).*/, '').replace(/（.*?）/g, '');
+    return `<button type="button" data-route-key="${htmlEscape(route.key)}" data-route-no="${htmlEscape(route.routeNo)}" aria-pressed="${route.key === state.mapViewport.selectedRouteKey}"><b>${htmlEscape(route.routeNo)}</b><span>${htmlEscape(shortName)}</span></button>`;
+  }).join('');
   const detail = byId('dv2-route-detail');
   const selected = routes.find((route) => route.key === state.mapViewport.selectedRouteKey) || null;
   if (detail) detail.innerHTML = selected
     ? routeDetailMarkup(selected)
-    : '<strong>五条配送路线全览</strong><span>选择路线 01—05 可自动聚焦并查看车辆信息。</span><small>也可使用滚轮、拖动或右上角缩放控件浏览道路。</small>';
+    : '<strong>五条配送路线全览</strong><span>共线路段只绘制一次，彩色分支对应路线 01—05。</span><small>选择路线可查看终段或全程。</small>';
   const mode = byId('dv2-route-mode');
   if (mode) mode.textContent = presentation.label;
+  const detailScope = byId('dv2-route-scope-detail');
+  const fullScope = byId('dv2-route-scope-full');
+  const overviewScope = byId('dv2-route-scope-overview');
+  const hasSelection = Boolean(selected);
+  if (detailScope) { detailScope.disabled = !hasSelection; detailScope.setAttribute('aria-pressed', String(hasSelection && state.mapViewport.focusScope !== 'FULL' && state.mapViewport.mode !== 'OVERVIEW')); }
+  if (fullScope) { fullScope.disabled = !hasSelection; fullScope.setAttribute('aria-pressed', String(hasSelection && state.mapViewport.focusScope === 'FULL' && state.mapViewport.mode !== 'OVERVIEW')); }
+  if (overviewScope) overviewScope.setAttribute('aria-pressed', String(state.mapViewport.mode === 'OVERVIEW'));
 }
 
 function setMapViewport(viewport, { render = true } = {}) {
@@ -448,9 +474,9 @@ function setMapViewport(viewport, { render = true } = {}) {
   if (render && state.snapshot) renderMap(state.snapshot);
 }
 
-function selectMapRoute(route) {
+function selectMapRoute(route, focusScope = 'DETAIL') {
   if (!route) return;
-  setMapViewport(routeFocusViewport(route));
+  setMapViewport(routeFocusViewport(route, focusScope));
 }
 
 function onMapRouteClick(params) {
@@ -500,7 +526,7 @@ function renderMap(snapshot) {
     chart.setOption(option, true);
     state.mapRendered = true;
   } else {
-    chart.setOption(option, { notMerge: false, replaceMerge: ['series'], lazyUpdate: false });
+    chart.setOption(option, { notMerge: false, lazyUpdate: false });
   }
   chart.off('click', onMapRouteClick);
   chart.on('click', onMapRouteClick);
@@ -510,11 +536,15 @@ function renderMap(snapshot) {
   const excluded = snapshot.public_map?.excluded_route_summary?.count || 0;
   const alerts = (snapshot.public_map?.active_routes || []).reduce((sum, route) => sum + Number(route.alert_count || 0), 0);
   if (byId('dv2-map-summary')) {
-    const fallback = state.mapBasemapFallbackLevel === 'v2'
-      ? '精细底图暂不可用，当前显示基础道路图'
+    const fallback = state.mapBasemapFallbackLevel === 'v3'
+      ? '路线连接底图暂不可用，当前显示精细道路图'
+      : state.mapBasemapFallbackLevel === 'v2'
+        ? '精细底图暂不可用，当前显示基础道路图'
       : state.mapBasemapFallbackLevel === 'service-area'
         ? '道路底图暂不可用，当前显示长春服务范围图'
-        : state.mapRouteFallbackLevel === 'v1'
+        : state.mapRouteFallbackLevel === 'v2'
+          ? '走廊路线暂不可用，当前显示完整折线路线'
+          : state.mapRouteFallbackLevel === 'v1'
           ? '道路级路线暂不可用，当前显示简化路线'
           : null;
     byId('dv2-map-summary').textContent = `${fallback ? `${fallback} · ` : ''}${presentation.label} · 未解决报警 ${alerts} 条 · 排除 ${excluded} 项`;
@@ -1130,6 +1160,15 @@ function bindEvents() {
     const route = state.mapRoutePresentation?.routes?.find((item) => item.key === button.dataset.routeKey);
     selectMapRoute(route);
   });
+  byId('dv2-route-scope-detail')?.addEventListener('click', () => {
+    const route = state.mapRoutePresentation?.routes?.find((item) => item.key === state.mapViewport.selectedRouteKey);
+    selectMapRoute(route, 'DETAIL');
+  });
+  byId('dv2-route-scope-full')?.addEventListener('click', () => {
+    const route = state.mapRoutePresentation?.routes?.find((item) => item.key === state.mapViewport.selectedRouteKey);
+    selectMapRoute(route, 'FULL');
+  });
+  byId('dv2-route-scope-overview')?.addEventListener('click', () => setMapViewport(overviewMapViewport(state.mapBasemap)));
   byId('dv2-map-zoom-in')?.addEventListener('click', () => setMapViewport({
     ...state.mapViewport, mode: 'MANUAL', zoom: Math.min(MAP_SCALE_LIMIT.max, state.mapViewport.zoom * 1.25),
   }));

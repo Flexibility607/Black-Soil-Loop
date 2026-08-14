@@ -14,12 +14,13 @@
 
 - `assets/maps/changchun-road-basemap.v2.geojson`：固定日期构建的轻量长春区划、主干道、水系、铁路和片区标签，坐标为 WGS84 / EPSG:4326；页面永久显示 OpenStreetMap contributors 与 ODbL 署名。
 - `assets/maps/changchun-service-area.geojson`：道路底图加载或校验失败时使用的长春服务范围回退图。
-- `assets/maps/changchun-showcase-routes.v1.json`：五条冻结的预设路线演示折线，不含数据库 ID、车牌、司机或遥测；浏览器不调用在线路由服务。
+- `assets/maps/changchun-road-basemap.v4.geojson`：长春轻量道路底图，补充路线连接道路与服务区划边界；v3、v2 和服务范围简图按顺序回退。
+- `assets/maps/changchun-showcase-routes.v3.json`：去重的五条预设路线走廊目录，共线路段只保存和绘制一次；v2、v1 保留为回退。
 - `assets/maps/northeast-china-admin1.geojson`：旧网页回滚兼容资源，新版 E02 不再把它作为正常地图。
 - `assets/backgrounds/northeast-winter-corn-v1.webp`：无文字的玉米、冰晶、雪花与黑土地背景。
 - `vendor/echarts/` 与 `vendor/fonts/`：构建时复制到 `dist`，浏览器不加载 CDN、在线字体或在线地图。
 
-地图保持固定视域并关闭拖动缩放。公开快照含活动线路时最多显示五条真实下一站线路；活动线路为空时只显示五条带“预设路线演示 · 非实时车辆”标记的冻结线路，两种模式不混合。预设线路不提供虚构速度、温湿度或定位时间。
+地图支持滚轮缩放、鼠标拖动和按钮缩放。首次进入选择路线 01 的终段；路线 01—05 均可切换终段、全程和五线全览。全览中的共线路段只绘制一次且保持静态，聚焦状态只有当前路线显示一个无拖尾车辆符号。公开快照含活动线路时最多显示五条真实下一站线路；活动线路为空时使用带“预设路线演示 · 非实时车辆”标记的冻结线路，两种模式不混合。预设线路不提供虚构速度、温湿度或定位时间。
 
 ## 数据加载与演示回退
 
