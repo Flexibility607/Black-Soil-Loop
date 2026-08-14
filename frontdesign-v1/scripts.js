@@ -27,6 +27,32 @@ const RESOURCE_GROUPS = {
   ],
 };
 
+const RESOURCE_TABLE_SCHEMAS = Object.freeze({
+  enterprises: ['enterprise_name', 'industry', 'status', 'updated_at', 'source_updated_at'],
+  stores: ['store_name', 'channel', 'city', 'status', 'updated_at', 'source_updated_at'],
+  products: ['product_name', 'category', 'unit', 'status', 'updated_at', 'source_updated_at'],
+  suppliers: ['supplier_name', 'category', 'delivery_score', 'quality_score', 'status', 'updated_at'],
+  'transport-orders': ['order_no', 'enterprise_name', 'product_name', 'quantity', 'unit', 'status', 'planned_departure_at', 'updated_at'],
+  'transport-plans': ['plan_no', 'status', 'order_count', 'enterprise_count', 'capacity_utilization_pct', 'planned_departure_at', 'updated_at'],
+  receipts: ['receipt_no', 'store_name', 'receipt_status_label', 'expected_total', 'received_total', 'difference_total', 'business_at'],
+  'inventory-movements': ['product_name', 'movement_type_label', 'quantity_before', 'quantity_delta', 'quantity_after', 'business_at'],
+  'stockout-demands': ['store_name', 'product_name', 'requested_quantity', 'unit', 'status_label', 'business_at'],
+  'store-daily-reports': ['store_name', 'report_date', 'order_count', 'sales_amount', 'status_label', 'updated_at'],
+  warehouses: ['warehouse_name', 'temperature_zone', 'available_volume_m3', 'status', 'updated_at'],
+  'transport-tasks': ['task_no', 'vehicle_label', 'status_label', 'next_stop_name', 'recorded_at', 'updated_at'],
+  alerts: ['alert_type_label', 'message', 'status_label', 'opened_at', 'updated_at'],
+  'telemetry-issues': ['status_label', 'message', 'business_at', 'updated_at'],
+  vehicles: ['license_plate', 'vehicle_type', 'mass_capacity_kg', 'volume_capacity_m3', 'status', 'updated_at'],
+});
+
+const RESOURCE_PRIMARY_ID_FIELDS = Object.freeze({
+  enterprises: 'enterprise_id', stores: 'store_id', products: 'product_id', suppliers: 'supplier_id',
+  'transport-orders': 'order_id', 'transport-plans': 'plan_id', receipts: 'receipt_id',
+  'inventory-movements': 'movement_id', 'stockout-demands': 'stockout_id',
+  'store-daily-reports': 'report_id', warehouses: 'warehouse_id', 'transport-tasks': 'task_id',
+  alerts: 'alert_id', 'telemetry-issues': 'issue_id', vehicles: 'vehicle_id',
+});
+
 const state = {
   activeSection: 'overview',
   resource: {
@@ -52,6 +78,8 @@ const state = {
   procurementAggregation: null,
   forecastBatch: null,
   calculationContext: null,
+  resourceRows: { enterprise: [], production: [], inventory: [], transport: [] },
+  resourceDetail: null,
 };
 
 function newIdempotencyKey(prefix) {
@@ -113,7 +141,7 @@ const FIELD_LABELS = {
   source_stockout_id: '来源缺货需求', requested_quantity: '缺货需求量', status_label: '状态', business_at: '业务发生时间',
   source_report_id: '来源经营日报', report_date: '日报日期', order_count: '经营订单数',
   authorized_for_dashboard: '经营数据展示授权', product_unit: '商品单位', store_channel: '门店类型',
-  enterprise_id: '企业编号', enterprise_name: '企业名称', enterprise_display_name: '企业名称', park_id: '所属园区',
+  enterprise_id: '企业编号', enterprise_name: '企业名称', enterprise_display_name: '企业名称', industry: '所属行业', contact_name: '联系人/负责组', park_id: '所属园区',
   store_id: '门店编号', store_name: '门店名称', city: '城市', channel_type: '渠道类型', reporting_authorized: '日报上报授权',
   partner_id: '合作方编号', partner_name: '合作方名称', preorder_id: '预订单编号', order_id: '订单编号', product_id: '产品编号',
   product_name: '产品名称', category: '品类', quantity: '数量', unit: '单位', amount: '金额', sales_amount: '营业额',
@@ -264,6 +292,57 @@ function renderTable(target, items, emptyMessage = '暂无数据') {
   el.innerHTML = `<div class="table-scroll"><table><thead><tr>${keys.map((key) => `<th>${escapeHtml(displayField(key))}</th>`).join('')}</tr></thead><tbody>${items.map((item) => `<tr>${keys.map((key) => `<td>${escapeHtml(displayCell(item[key], key))}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
 }
 
+function isTechnicalField(key) {
+  return key === 'id' || key.endsWith('_id') || key === 'object_version' || key.endsWith('_versions')
+    || ['trace_id', 'rules_version', 'input_snapshot', 'output_snapshot', 'raw_json'].includes(key);
+}
+
+function resourceColumns(resource, items) {
+  const declared = RESOURCE_TABLE_SCHEMAS[resource] || [];
+  const available = new Set(items.flatMap((item) => Object.keys(item || {})));
+  const selected = declared.filter((key) => available.has(key));
+  if (selected.length) return selected;
+  return [...available].filter((key) => !isTechnicalField(key) && !['source_system', 'source_record_id', 'remark'].includes(key)).slice(0, 6);
+}
+
+function todayOrdinal(page, pageSize, rowIndex) {
+  return String((Math.max(1, Number(page) || 1) - 1) * Math.max(1, Number(pageSize) || 20) + rowIndex + 1).padStart(2, '0');
+}
+
+function renderResourceTable(target, items, { resource, section, page, pageSize } = {}) {
+  const el = document.getElementById(target);
+  if (!el) return;
+  if (!Array.isArray(items) || !items.length) {
+    el.innerHTML = '<div class="empty-state">暂无数据</div>';
+    return;
+  }
+  const keys = resourceColumns(resource, items);
+  el.innerHTML = `<div class="table-scroll"><table class="resource-table"><thead><tr><th>今日序号</th>${keys.map((key) => `<th>${escapeHtml(displayField(key))}</th>`).join('')}<th>更多详细信息</th></tr></thead><tbody>${items.map((item, rowIndex) => `<tr><td><b class="daily-ordinal">${todayOrdinal(page, pageSize, rowIndex)}</b></td>${keys.map((key) => `<td>${escapeHtml(displayCell(item[key], key))}</td>`).join('')}<td><button type="button" class="resource-detail-button" data-row-index="${rowIndex}">查看详情</button></td></tr>`).join('')}</tbody></table></div>`;
+  el.querySelectorAll('.resource-detail-button').forEach((button) => button.addEventListener('click', () => openResourceDetail(section, Number(button.dataset.rowIndex))));
+}
+
+function closeResourceDetail() {
+  state.resourceDetail = null;
+  const dialog = document.getElementById('e01-resource-dialog');
+  if (dialog?.open) dialog.close();
+  const content = document.getElementById('e01-resource-dialog-content');
+  if (content) content.textContent = '';
+}
+
+function openResourceDetail(section, rowIndex) {
+  const row = state.resourceRows[section]?.[rowIndex];
+  const resource = state.resource[section];
+  if (!row || !getAPI().getSession?.()?.user) return;
+  state.resourceDetail = { section, rowIndex };
+  const title = RESOURCE_GROUPS[section]?.find((item) => item.value === resource)?.label || '业务记录';
+  document.getElementById('e01-resource-dialog-title').textContent = `${title} · 今日序号 ${todayOrdinal(state.resourcePage[section], 20, rowIndex)}`;
+  const visibleEntries = Object.entries(row).filter(([key, value]) => !isTechnicalField(key) && !['source_record_id', 'source_system'].includes(key) && (value === null || ['string', 'number', 'boolean'].includes(typeof value)));
+  const primaryIdKey = RESOURCE_PRIMARY_ID_FIELDS[resource] || Object.keys(row).find((key) => key === 'id' || key.endsWith('_id'));
+  const primaryId = primaryIdKey ? row[primaryIdKey] : null;
+  document.getElementById('e01-resource-dialog-content').innerHTML = `<section><h4>业务信息</h4><dl>${visibleEntries.map(([key, value]) => `<div><dt>${escapeHtml(displayField(key))}</dt><dd>${escapeHtml(displayCell(value, key))}</dd></div>`).join('')}</dl></section><details${primaryId ? '' : ' hidden'}><summary>技术追溯信息</summary><dl><div><dt>原始记录编号</dt><dd>${escapeHtml(primaryId)}</dd></div></dl><p>原始编号仅用于登录态问题追溯；今日序号不会进入业务请求。</p></details>`;
+  document.getElementById('e01-resource-dialog').showModal();
+}
+
 function renderStructuredResult(target, data) {
   const el = document.getElementById(target);
   if (!el) return;
@@ -290,7 +369,7 @@ function renderStructuredResult(target, data) {
   const lists = listEntries.map(([key, value]) => {
     if (!value.length) return `<section><h4>${escapeHtml(displayField(key))}</h4><p>暂无记录</p></section>`;
     if (value.every((item) => item && typeof item === 'object' && !Array.isArray(item))) {
-      const keys = [...new Set(value.slice(0, 20).flatMap((item) => Object.keys(item)))];
+      const keys = [...new Set(value.slice(0, 20).flatMap((item) => Object.keys(item)))].filter((field) => !hiddenMetadata.has(field) && !isTechnicalField(field));
       return `<section><h4>${escapeHtml(displayField(key))}</h4><div class="table-scroll"><table><thead><tr>${keys.map((field) => `<th>${escapeHtml(displayField(field))}</th>`).join('')}</tr></thead><tbody>${value.slice(0, 20).map((item) => `<tr>${keys.map((field) => `<td>${escapeHtml(displayCell(item[field], field))}</td>`).join('')}</tr>`).join('')}</tbody></table></div></section>`;
     }
     return `<section><h4>${escapeHtml(displayField(key))}</h4><p>${value.map((item) => displayCell(item, key)).map(escapeHtml).join('、')}</p></section>`;
@@ -818,6 +897,8 @@ function renderAuthState(user) {
 
 function requireAuth(result) {
   if (result && result.status === 401 && !getAPI().isMock()) {
+    closeResourceDetail();
+    Object.keys(state.resourceRows).forEach((section) => { state.resourceRows[section] = []; });
     updateCalculationFields();
     document.getElementById('auth-panel').hidden = false;
     setMessage('E01 园区管理台接口需要登录，请先输入后端账号。', 'warning');
@@ -1004,6 +1085,7 @@ async function loadOperationsSummary() {
 }
 
 async function loadResource(section) {
+  closeResourceDetail();
   const resource = state.resource[section];
   const resultTarget = `${section}-table`;
   setLoading(resultTarget);
@@ -1019,7 +1101,8 @@ async function loadResource(section) {
   const visibleItems = getAPI().isMock() && keyword
     ? (data.items || []).filter((item) => JSON.stringify(item).toLowerCase().includes(keyword.toLowerCase()))
     : data.items || [];
-  renderTable(resultTarget, visibleItems);
+  state.resourceRows[section] = visibleItems;
+  renderResourceTable(resultTarget, visibleItems, { resource, section, page, pageSize: Number(data.page_size || 20) });
   const total = document.getElementById(`${section}-total`);
   const recordTotal = getAPI().isMock() && keyword ? visibleItems.length : Number(data.total || 0);
   if (total) total.textContent = `${recordTotal} 条记录`;
@@ -1417,6 +1500,8 @@ async function handleLogin(event) {
 
 async function handleLogout() {
   await getAPI().logout();
+  closeResourceDetail();
+  Object.keys(state.resourceRows).forEach((section) => { state.resourceRows[section] = []; });
   updateCalculationFields();
   renderAuthState(null);
   document.getElementById('auth-panel').hidden = false;
@@ -1430,6 +1515,9 @@ async function initPage() {
   document.getElementById('open-login').addEventListener('click', () => { document.getElementById('auth-panel').hidden = false; });
   document.getElementById('close-login').addEventListener('click', () => { document.getElementById('auth-panel').hidden = true; });
   document.getElementById('logout-button').addEventListener('click', handleLogout);
+  document.getElementById('e01-resource-dialog-close')?.addEventListener('click', closeResourceDetail);
+  document.getElementById('e01-resource-dialog')?.addEventListener('click', (event) => { if (event.target === event.currentTarget) closeResourceDetail(); });
+  document.getElementById('e01-resource-dialog')?.addEventListener('close', () => { state.resourceDetail = null; });
   document.getElementById('login-form').addEventListener('submit', handleLogin);
   document.getElementById('calc-kind').addEventListener('change', updateCalculationFields);
   document.getElementById('calc-scenario').addEventListener('change', updateCalculationFields);

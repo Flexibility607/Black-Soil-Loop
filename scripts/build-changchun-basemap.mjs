@@ -3,7 +3,7 @@ import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const BOUNDS = [125.15, 43.60, 125.60, 44.02];
+const BOUNDS = [125.15, 43.60, 125.60, 44.10];
 const LABEL_NAMES = new Set([
   '长春市', '朝阳区', '南关区', '宽城区', '二道区', '绿园区',
   '净月街道', '长春净月高新技术产业开发区', '长春汽车经济技术开发区',
@@ -13,6 +13,17 @@ const ROAD_LAYERS = new Set([
   'motorway', 'motorway_link', 'trunk', 'trunk_link', 'primary', 'primary_link',
   'secondary', 'secondary_link', 'tertiary', 'tertiary_link',
 ]);
+const V2_PRIMARY_NAMES = new Set([
+  '人民大街', '亚泰大街', '远达大街', '新城大街', '生态大街', '东南湖大路',
+  '卫星路', '北环城路', '南环城路', '西环城路', '开运街', '硅谷大街',
+  '吉林大路', '南湖大路', '工农大路', '景阳大路', '自由大路', '解放大路',
+  '长白公路', '东风大街', '前进大街', '西安大路', '皓月大路', '机场路',
+]);
+const V2_SECONDARY_NAMES = new Set([
+  '临河街', '富锦路', '福祉大路', '聚业大街', '城南大路', '生态东街',
+  '世纪大街', '博学路', '飞跃路', '繁荣路', '湖畔街', '长伊线',
+]);
+const V2_RAILWAY_NAMES = new Set(['京哈线', '长图线', '长白线', '长珲城际线']);
 const TOLERANCE = Object.freeze({
   motorway: 0.00012, motorway_link: 0.00008, trunk: 0.00012, trunk_link: 0.00008,
   primary: 0.0001, primary_link: 0.00007, secondary: 0.00009, secondary_link: 0.00006,
@@ -139,10 +150,79 @@ function sortFeatures(left, right) {
   return leftKey.localeCompare(rightKey, 'en');
 }
 
+function v2Keep(feature) {
+  const { layer, name } = feature.properties || {};
+  if (layer === 'place_label' || layer === 'waterway' || layer === 'district_boundary' || layer === 'service_boundary') return true;
+  if (layer === 'motorway' || layer === 'trunk') return Boolean(name);
+  if (layer === 'primary') return V2_PRIMARY_NAMES.has(name);
+  if (layer === 'secondary' || layer === 'tertiary') return V2_SECONDARY_NAMES.has(name);
+  if (layer === 'railway') return V2_RAILWAY_NAMES.has(name);
+  return false;
+}
+
+function dissolveFeatures(features) {
+  const points = [];
+  const groups = new Map();
+  for (const feature of features.filter(v2Keep)) {
+    if (feature.geometry.type === 'Point' || feature.geometry.type === 'Polygon') {
+      points.push(feature);
+      continue;
+    }
+    const key = `${feature.properties.layer}\0${feature.properties.name || ''}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(feature.geometry.coordinates);
+  }
+  const lines = [...groups].map(([key, coordinates]) => {
+    const [layer, name] = key.split('\0');
+    const partCap = ({ motorway: 6, trunk: 5, primary: 4, secondary: 3, tertiary: 2, railway: 5, waterway: 5, district_boundary: 5 })[layer] || 4;
+    const selected = coordinates
+      .map((line) => ({ line, length: line.slice(1).reduce((sum, point, index) => sum + Math.hypot(point[0] - line[index][0], point[1] - line[index][1]), 0) }))
+      .sort((left, right) => right.length - left.length || JSON.stringify(left.line).localeCompare(JSON.stringify(right.line), 'en'))
+      .slice(0, partCap)
+      .map((item) => item.line)
+      .sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right), 'en'));
+    return {
+      type: 'Feature',
+      properties: { layer, name: name || null },
+      geometry: selected.length === 1
+        ? { type: 'LineString', coordinates: selected[0] }
+        : { type: 'MultiLineString', coordinates: selected },
+    };
+  });
+  return [...lines, ...points].sort(sortFeatures);
+}
+
+function supplementalNorthFeatures() {
+  return [{
+    type: 'Feature',
+    properties: { layer: 'service_boundary', name: '长春市及近郊服务范围' },
+    geometry: {
+      type: 'Polygon',
+      coordinates: [[
+        [125.15, 44.09], [125.15, 43.82], [125.19, 43.70], [125.28, 43.62],
+        [125.42, 43.60], [125.54, 43.64], [125.60, 43.72], [125.60, 43.87],
+        [125.56, 43.98], [125.50, 44.02], [125.30, 44.02], [125.20, 44.09],
+        [125.15, 44.09],
+      ]],
+    },
+  }, {
+    type: 'Feature',
+    properties: { layer: 'trunk', name: '北青年路' },
+    geometry: {
+      type: 'LineString',
+      coordinates: [
+        [125.1711273, 44.0872187], [125.1723744, 44.0824075], [125.1733559, 44.0784428],
+        [125.1744733, 44.0731074], [125.1752583, 44.0690937], [125.1766265, 44.0619234],
+        [125.1826365, 44.0527908], [125.1905, 44.043], [125.202, 44.0305], [125.213, 44.018],
+      ],
+    },
+  }];
+}
+
 async function main() {
   const root = dirname(dirname(fileURLToPath(import.meta.url)));
   const sourceDir = resolve(argument('--source-dir', join(root, '..', '..', 'release-artifacts', 'changchun-basemap-source-20260813')));
-  const output = resolve(argument('--output', join(root, 'frontdesign-v1', 'assets', 'maps', 'changchun-road-basemap.v1.geojson')));
+  const output = resolve(argument('--output', join(root, 'frontdesign-v1', 'assets', 'maps', 'changchun-road-basemap.v2.geojson')));
   const sourceDate = argument('--source-date', '2026-08-13');
   const sourceFiles = (await readdir(sourceDir)).filter((name) => /^(roads-(nw|ne|sw|se)|context)\.json$/.test(name)).sort();
   if (sourceFiles.length !== 5) throw new Error(`expected 5 source files, found ${sourceFiles.length}`);
@@ -164,14 +244,15 @@ async function main() {
       }
     }
   }
-  const layers = new Set(features.map((feature) => feature.properties.layer));
+  const v2Features = dissolveFeatures([...features, ...supplementalNorthFeatures()]);
+  const layers = new Set(v2Features.map((feature) => feature.properties.layer));
   for (const required of ['motorway', 'primary', 'secondary', 'railway', 'waterway', 'place_label']) {
     if (!layers.has(required)) throw new Error(`required basemap layer missing: ${required}`);
   }
   const sourceSha256 = sha256(sourceHashes.join('\n'));
   const outputDocument = {
     type: 'FeatureCollection',
-    name: 'changchun-road-basemap-v1',
+    name: 'changchun-road-basemap-v2',
     metadata: {
       crs: 'EPSG:4326', coordinate_order: 'longitude,latitude',
       source_url: 'https://overpass-api.de/ and compatible Overpass API instances',
@@ -180,13 +261,24 @@ async function main() {
       attribution: '© OpenStreetMap contributors', clip_bounds: BOUNDS,
       simplification_method: 'Douglas-Peucker after Liang-Barsky clipping',
       simplification_tolerance_degrees: TOLERANCE,
-      generator_version: 'build-changchun-basemap-v1',
+      supplemental_source: 'OpenStreetMap way geometry for 北青年路, queried 2026-08-14',
+      generator_version: 'build-changchun-basemap-v2',
     },
-    features: features.sort(sortFeatures),
+    features: v2Features,
   };
   const serialized = `${JSON.stringify(outputDocument)}\n`;
   await writeFile(output, serialized, 'utf8');
-  process.stdout.write(`${basename(output)} ${Buffer.byteLength(serialized)} bytes sha256=${sha256(serialized)} features=${features.length}\n`);
+  const coordinateCount = v2Features.reduce((sum, feature) => {
+    const coordinates = feature.geometry.coordinates;
+    if (feature.geometry.type === 'Point') return sum + 1;
+    if (feature.geometry.type === 'LineString') return sum + coordinates.length;
+    if (feature.geometry.type === 'Polygon') return sum + coordinates.reduce((subtotal, ring) => subtotal + ring.length, 0);
+    return sum + coordinates.reduce((subtotal, line) => subtotal + line.length, 0);
+  }, 0);
+  if (v2Features.length > 800 || coordinateCount > 12000 || Buffer.byteLength(serialized) > 1572864) {
+    throw new Error(`v2 release gates failed features=${v2Features.length} coordinates=${coordinateCount} bytes=${Buffer.byteLength(serialized)}`);
+  }
+  process.stdout.write(`${basename(output)} ${Buffer.byteLength(serialized)} bytes sha256=${sha256(serialized)} features=${v2Features.length} coordinates=${coordinateCount}\n`);
 }
 
 await main();

@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="vendor/fonts/noto-sans-sc/index.css" />
   <link rel="stylesheet" href="vendor/fonts/zcool-qingke-huangyou/400.css" />
   <link rel="stylesheet" href="vendor/fonts/jetbrains-mono/index.css" />
-  <link rel="stylesheet" href="dashboard.css?v=20260813-dashboard-presentation-2" />
+  <link rel="stylesheet" href="dashboard.css?v=20260814-dashboard-presentation-3" />
 </head>
 <body>
   <div class="app-shell">
@@ -147,13 +147,13 @@
             </div>
 
             <div class="dv2-center-stack">
-              <section class="dv2-panel dv2-map-panel"><header><div><small>长春本地服务范围</small><h3>长春市及近郊供销网络</h3></div><div class="dv2-map-legend"><span class="store">普通销售门店</span><span class="third">第三空间</span></div></header><div id="dv2-map-chart" class="dv2-map-chart" role="img" aria-label="长春市及近郊门店与有效运输任务地图"></div><div class="dv2-map-caption"><span id="dv2-map-summary">经纬度估算路线，不代表道路导航</span><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap contributors · ODbL</a></div></section>
+              <section class="dv2-panel dv2-map-panel"><header><div><small>长春本地服务范围</small><h3>长春市及近郊供销网络</h3></div><div class="dv2-map-legend"><span class="store">普通销售门店</span><span class="third">第三空间</span></div></header><div id="dv2-map-chart" class="dv2-map-chart" role="img" aria-label="长春市及近郊门店与配送路线地图"></div><aside class="dv2-route-panel" aria-label="配送路线选择与车辆信息"><div><b id="dv2-route-mode">正在读取线路</b><nav id="dv2-route-controls" aria-label="配送路线"></nav></div><div id="dv2-route-detail" class="dv2-route-detail"><strong>正在读取线路</strong></div></aside><div class="dv2-map-caption"><span id="dv2-map-summary">经纬度估算路线，不代表道路导航</span><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap contributors · ODbL</a></div></section>
               <section class="dv2-panel dv2-showcase-panel" aria-labelledby="dv2-showcase-title"><header><div><small>预设场景测算与真实经营投影</small><h3 id="dv2-showcase-title">协同运算方案</h3></div><span id="dv2-showcase-state">等待生成</span></header><div id="dv2-showcase-tabs" class="dv2-showcase-tabs" role="tablist" aria-label="协同运算类别"><button type="button" role="tab" data-kind="CARPOOL" aria-selected="true">拼车联配</button><button type="button" role="tab" data-kind="WAREHOUSE" aria-selected="false">共享仓匹配</button><button type="button" role="tab" data-kind="PROCUREMENT" aria-selected="false">集中采购</button><button type="button" role="tab" data-kind="FORECAST" aria-selected="false">下周预测</button></div><div id="dv2-showcase-cases" class="dv2-showcase-cases"></div><div id="dv2-showcase-content" class="dv2-showcase-content"><div class="dv2-empty">等待生成分配方案</div></div><footer class="dv2-showcase-footer"><div id="dv2-showcase-summary" class="dv2-showcase-summary"></div><button id="dv2-showcase-more" class="dv2-showcase-more" type="button" hidden>查看方案详情</button></footer></section>
             </div>
 
             <div class="dv2-right-stack">
               <section class="dv2-panel dv2-mix-panel"><header><div><small>渠道构成</small><h3>终端经营渠道占比</h3></div><span>仅 B02 移动履约与经营日报</span></header><div class="dv2-donut-grid"><div><div id="dv2-order-donut" class="dv2-donut" role="img" aria-label="传统门店与第三空间经营订单量占比"></div><b>经营订单量占比</b></div><div><div id="dv2-sales-donut" class="dv2-donut" role="img" aria-label="传统门店与第三空间营业额占比"></div><b>营业额占比</b></div></div><div id="dv2-mix-legend" class="dv2-mix-legend"></div></section>
-              <section class="dv2-panel dv2-information-panel"><header><div><small>公开审核目录</small><h3>园区动态与政策资讯</h3></div><div class="dv2-loop-controls"><span id="dv2-information-state">正在读取</span><button id="dv2-information-loop-toggle" type="button" aria-label="暂停园区资讯自动循环" aria-pressed="false">暂停</button></div></header><div class="dv2-information-tabs" role="tablist" aria-label="资讯类别"><button type="button" role="tab" data-kind="NEWS" aria-selected="true">园区动态</button><button type="button" role="tab" data-kind="POLICY" aria-selected="false">政策资讯</button></div><div id="dv2-information-list" class="dv2-information-list"></div><button id="dv2-information-retry" class="dv2-information-retry" type="button" hidden>重试</button></section>
+              <section class="dv2-panel dv2-information-panel"><header><div><small>公开审核目录</small><h3>园区动态与政策资讯</h3></div><div class="dv2-loop-controls"><span id="dv2-information-state">正在读取</span><button id="dv2-information-loop-toggle" type="button" aria-label="暂停园区资讯自动循环" aria-pressed="false">暂停</button></div></header><div class="dv2-information-columns"><section aria-labelledby="dv2-news-title"><h4 id="dv2-news-title">园区动态</h4><div id="dv2-information-news" class="dv2-information-list"></div></section><section aria-labelledby="dv2-policy-title"><h4 id="dv2-policy-title">政策资讯</h4><div id="dv2-information-policy" class="dv2-information-list"></div></section></div><button id="dv2-information-retry" class="dv2-information-retry" type="button" hidden>重试</button></section>
               <section class="dv2-panel dv2-voice-panel">
                 <header><div><small>数据智能助手</small><h3>文字与语音助手</h3></div><span id="dv2-voice-state">等待提问</span></header>
                 <p id="dv2-voice-hint">输入文字、选择预设问题或使用最长 30 秒的语音提问。</p>
@@ -162,7 +162,7 @@
                   <div><input id="dv2-assistant-input" maxlength="500" minlength="2" placeholder="例如：当前有多少条未处理运输报警？" required /><button type="submit">发送</button></div>
                 </form>
                 <div class="dv2-examples"><span>可问</span><button type="button" data-example="第三空间营业额占比是多少？">第三空间营业额占比</button><button type="button" data-example="最近的需求趋势如何？">最近需求趋势</button><button type="button" data-example="第三空间销售排行">第三空间排行</button></div>
-                <div class="dv2-mic-zone"><button id="dv2-mic-button" class="dv2-mic" type="button" aria-label="开始语音提问" aria-pressed="false"><i></i><span>开始提问</span></button><button id="dv2-voice-cancel" class="dv2-voice-secondary" type="button" hidden>取消</button><button id="dv2-voice-retry" class="dv2-voice-secondary" type="button" hidden>重试</button></div>
+                <div class="dv2-mic-zone"><button id="dv2-mic-button" class="dv2-mic" type="button" aria-label="开始语音提问" aria-pressed="false"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><path d="M12 15.5a3.5 3.5 0 0 0 3.5-3.5V5a3.5 3.5 0 1 0-7 0v7a3.5 3.5 0 0 0 3.5 3.5Z"/><path d="M5.5 11.5V12a6.5 6.5 0 0 0 13 0v-.5M12 18.5V22M8.5 22h7"/></svg><span>开始提问</span></button><button id="dv2-voice-cancel" class="dv2-voice-secondary" type="button" hidden>取消</button><button id="dv2-voice-retry" class="dv2-voice-secondary" type="button" hidden>重试</button></div>
                 <p class="dv2-voice-privacy">录音会发送至本站服务器并交由阿里云智能语音交互处理，本站不保存原始录音；转写文字最长约保留 10 分钟，用于幂等重放并避免重复计费。语音只用于只读业务查询。</p>
                 <div id="dv2-transcript" class="dv2-transcript" hidden></div><div id="dv2-answer" class="dv2-answer" aria-live="polite">助手仅使用受控业务查询，并可打开条形图、折线图、环图或路线摘要。</div>
               </section>
@@ -177,10 +177,11 @@
       </section>
     </main>
   </div>
+  <dialog id="e01-resource-dialog" class="e01-resource-dialog"><header><div><small>登录态业务详情</small><h3 id="e01-resource-dialog-title">记录详情</h3></div><button id="e01-resource-dialog-close" type="button" aria-label="关闭记录详情">关闭</button></header><div id="e01-resource-dialog-content" class="e01-resource-dialog-content"></div></dialog>
   <script src="runtime-config.js"></script>
-  <script src="api.js?v=20260813-dashboard-presentation-2"></script>
-  <script src="scripts.js?v=20260813-dashboard-presentation-2"></script>
+  <script src="api.js?v=20260814-dashboard-presentation-3"></script>
+  <script src="scripts.js?v=20260814-dashboard-presentation-3"></script>
   <script src="vendor/echarts/echarts.min.js"></script>
-  <script type="module" src="dashboard-v2.js?v=20260813-dashboard-presentation-2"></script>
+  <script type="module" src="dashboard-v2.js?v=20260814-dashboard-presentation-3"></script>
 </body>
 </html>

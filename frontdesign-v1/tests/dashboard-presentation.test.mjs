@@ -5,6 +5,8 @@ import {
   buildChangchunMapOption,
   localGeoJsonIsChangchunRoadBasemap,
   localGeoJsonIsChangchunServiceArea,
+  localShowcaseRoutesAreValid,
+  selectChangchunRoutes,
 } from '../dashboard-map.js';
 import { SCREEN_PALETTES } from '../dashboard-format.js';
 
@@ -18,12 +20,13 @@ test('长春服务范围 GeoJSON 只包含有效面几何并进入本地构建',
 });
 
 test('长春道路底图固定为首方 ODbL 矢量资产并包含必要图层', async () => {
-  const source = JSON.parse(await readFile(new URL('frontdesign-v1/assets/maps/changchun-road-basemap.v1.geojson', projectRoot), 'utf8'));
+  const source = JSON.parse(await readFile(new URL('frontdesign-v1/assets/maps/changchun-road-basemap.v2.geojson', projectRoot), 'utf8'));
   assert.equal(localGeoJsonIsChangchunRoadBasemap(source), true);
   assert.equal(source.metadata.crs, 'EPSG:4326');
   assert.equal(source.metadata.coordinate_order, 'longitude,latitude');
   assert.equal(source.metadata.license, 'ODbL 1.0');
-  assert.deepEqual(source.metadata.clip_bounds, [125.15, 43.6, 125.6, 44.02]);
+  assert.deepEqual(source.metadata.clip_bounds, [125.15, 43.6, 125.6, 44.1]);
+  assert.ok(source.features.length <= 800);
   const layers = new Set(source.features.map((feature) => feature.properties.layer));
   for (const layer of ['motorway', 'primary', 'secondary', 'railway', 'waterway', 'place_label']) assert.ok(layers.has(layer));
 });
@@ -43,13 +46,13 @@ test('长春地图每个活动任务只有一条线路且报警只形成红色�
   };
   const option = buildChangchunMapOption(snapshot, SCREEN_PALETTES.night);
   assert.equal(option.geo.map, 'changchun-service-area');
-  assert.equal(option.series.find((item) => item.name === '有效运输路线').data.length, 1);
+  assert.equal(option.series.find((item) => item.name === '配送展示路线').data.length, 1);
   assert.equal(option.series.find((item) => item.name === '独立温湿度报警').data.length, 1);
-  assert.notEqual(option.series.find((item) => item.name === '有效运输路线').data[0].lineStyle.color, SCREEN_PALETTES.night.danger);
+  assert.notEqual(option.series.find((item) => item.name === '配送展示路线').data[0].lineStyle.color, SCREEN_PALETTES.night.danger);
 });
 
 test('长春道路、标签与业务覆盖层共用固定不可漫游 geo 坐标系', async () => {
-  const basemap = JSON.parse(await readFile(new URL('frontdesign-v1/assets/maps/changchun-road-basemap.v1.geojson', projectRoot), 'utf8'));
+  const basemap = JSON.parse(await readFile(new URL('frontdesign-v1/assets/maps/changchun-road-basemap.v2.geojson', projectRoot), 'utf8'));
   const option = buildChangchunMapOption({ public_map: { points: [], active_routes: [] } }, SCREEN_PALETTES.day, basemap);
   assert.equal(option.geo.roam, false);
   assert.ok(option.series.some((series) => series.name === '高速与快速路' && series.silent === true));
@@ -59,16 +62,50 @@ test('长春道路、标签与业务覆盖层共用固定不可漫游 geo 坐标
   for (const series of option.series) assert.equal(series.coordinateSystem, 'geo');
 });
 
-test('E02 包含资讯与四类协同方案并使用无认证公开请求', async () => {
+test('E02 同屏展示资讯双栏与四类协同方案并使用无认证公开请求', async () => {
   const html = await readFile(new URL('frontdesign-v1/index.html', projectRoot), 'utf8');
   const api = await readFile(new URL('frontdesign-v1/api.js', projectRoot), 'utf8');
   const dashboard = await readFile(new URL('frontdesign-v1/dashboard-v2.js', projectRoot), 'utf8');
-  for (const marker of ['dv2-information-list', 'dv2-showcase-content', 'dv2-algorithm-dialog']) assert.match(html, new RegExp(marker));
+  for (const marker of ['dv2-information-news', 'dv2-information-policy', 'dv2-showcase-content', 'dv2-algorithm-dialog']) assert.match(html, new RegExp(marker));
   for (const marker of ['dv2-ranking-loop-toggle', 'dv2-information-loop-toggle', 'dv2-showcase-summary']) assert.match(html, new RegExp(marker));
   for (const kind of ['CARPOOL', 'WAREHOUSE', 'PROCUREMENT', 'FORECAST']) assert.match(html, new RegExp(`data-kind="${kind}"`));
   assert.match(api, /getPublicInformation[\s\S]*authPolicy: 'omit'[\s\S]*credentialsPolicy: 'omit'/);
   assert.match(api, /getDashboardSnapshot[\s\S]*authPolicy: 'omit'[\s\S]*credentialsPolicy: 'omit'/);
   assert.doesNotMatch(dashboard, /SCENARIO_[123]/);
+  assert.doesNotMatch(html, /dv2-information-tabs/);
+});
+
+test('无实时任务时使用五条诚实演示路线，实时任务存在时互斥且最多五条', async () => {
+  const catalog = JSON.parse(await readFile(new URL('frontdesign-v1/assets/maps/changchun-showcase-routes.v1.json', projectRoot), 'utf8'));
+  assert.equal(localShowcaseRoutesAreValid(catalog), true);
+  assert.equal(catalog.routes.length, 5);
+  assert.match(catalog.disclaimer, /预设路线演示/);
+  assert.match(catalog.disclaimer, /不代表实时履约或道路导航/);
+  const showcase = selectChangchunRoutes({ public_map: { active_routes: [] } }, catalog);
+  assert.equal(showcase.mode, 'SHOWCASE');
+  assert.equal(showcase.routes.length, 5);
+  const active_routes = Array.from({ length: 7 }, (_, index) => ({
+    route_key: `live-${index}`, status: index === 6 ? 'IN_TRANSIT' : 'PUBLISHED',
+    from: { longitude: 125.2, latitude: 44 }, to: { longitude: 125.3, latitude: 43.9 },
+    alerts: index === 6 ? [{ message: '温度超限' }] : [],
+    latest_location: { freshness: 'FRESH', recorded_at: `2026-08-14T0${index}:00:00+08:00` },
+  }));
+  const live = selectChangchunRoutes({ public_map: { active_routes } }, catalog);
+  assert.equal(live.mode, 'LIVE');
+  assert.equal(live.routes.length, 5);
+  assert.equal(live.routes[0].live.route_key, 'live-6');
+  assert.ok(live.routes.every((route) => !route.showcase));
+});
+
+test('配送线路每条只有一个无拖尾移动符号，减少动态时关闭移动', async () => {
+  const catalog = JSON.parse(await readFile(new URL('frontdesign-v1/assets/maps/changchun-showcase-routes.v1.json', projectRoot), 'utf8'));
+  const moving = buildChangchunMapOption({ public_map: { points: [], active_routes: [] } }, SCREEN_PALETTES.night, null, catalog);
+  const routeSeries = moving.series.find((item) => item.name === '配送展示路线');
+  assert.equal(routeSeries.data.length, 5);
+  assert.equal(routeSeries.effect.trailLength, 0);
+  assert.equal(routeSeries.effect.symbol, 'arrow');
+  const still = buildChangchunMapOption({ public_map: { points: [], active_routes: [] } }, SCREEN_PALETTES.night, null, catalog, { reducedMotion: true });
+  assert.equal(still.series.find((item) => item.name === '配送展示路线').effect.show, false);
 });
 
 test('协同方案采用五行固定布局和两张结构化摘要卡', async () => {
@@ -79,6 +116,37 @@ test('协同方案采用五行固定布局和两张结构化摘要卡', async ()
   assert.match(dashboard, /allocations \|\| \[\]\)\.slice\(0, 2\)\.map\(showcaseAllocationSummary\)/);
   for (const field of ['primaryMetrics', 'secondaryMetrics', 'detail']) assert.match(dashboard, new RegExp(field));
   assert.match(dashboard, /首要原因：/);
+  assert.equal((dashboard.match(/renderShowcase\(snapshot\.algorithm_showcase\)/g) || []).length, 1);
+});
+
+test('麦克风使用居中的内联 SVG 且各状态只动画外层光圈', async () => {
+  const html = await readFile(new URL('frontdesign-v1/index.html', projectRoot), 'utf8');
+  const css = await readFile(new URL('frontdesign-v1/dashboard.css', projectRoot), 'utf8');
+  const mic = html.match(/<button id="dv2-mic-button"[\s\S]*?<\/button>/)?.[0] || '';
+  assert.match(mic, /<svg viewBox="0 0 24 24"/);
+  assert.doesNotMatch(mic, /<i><\/i>/);
+  assert.match(css, /\.dv2-mic\s*\{[^}]*place-items:\s*center/s);
+  assert.match(css, /\.dv2-mic svg\s*\{[^}]*width:\s*24px[^}]*height:\s*24px/s);
+  assert.match(css, /\.dv2-mic span\s*\{[^}]*position:\s*absolute/s);
+  assert.doesNotMatch(css, /\.dv2-mic i::after/);
+});
+
+test('E01 主表使用今日序号和列白名单，原编号只进入登录详情', async () => {
+  const html = await readFile(new URL('frontdesign-v1/index.html', projectRoot), 'utf8');
+  const scripts = await readFile(new URL('frontdesign-v1/scripts.js', projectRoot), 'utf8');
+  assert.match(html, /id="e01-resource-dialog"/);
+  assert.match(scripts, /const RESOURCE_TABLE_SCHEMAS/);
+  assert.match(scripts, /今日序号/);
+  assert.match(scripts, /padStart\(2, '0'\)/);
+  assert.match(scripts, /data-row-index=/);
+  assert.match(scripts, /原始记录编号/);
+  assert.doesNotMatch(scripts, /data-(?:id|record-id)=/);
+  assert.match(scripts, /!isTechnicalField\(field\)/);
+  const ordinalSource = scripts.match(/function todayOrdinal\([\s\S]*?\n\}/)?.[0];
+  const ordinal = Function(`${ordinalSource}; return todayOrdinal;`)();
+  assert.equal(ordinal(1, 20, 0), '01');
+  assert.equal(ordinal(2, 20, 0), '21');
+  assert.equal(ordinal(5, 20, 19), '100');
 });
 
 test('E02 双环放大且中心主值与单位分离', async () => {

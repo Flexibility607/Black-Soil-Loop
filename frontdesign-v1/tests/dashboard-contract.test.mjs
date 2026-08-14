@@ -50,8 +50,8 @@ test('E02 保留语音入口和两个经营占比环图', async () => {
   assert.match(html, /id="dv2-sales-donut"/);
   assert.match(html, /id="dv2-mic-button"/);
   assert.match(html, /本站不保存原始录音；转写文字最长约保留 10 分钟/);
-  assert.match(html, /dashboard-v2\.js\?v=20260813-dashboard-presentation-2/);
-  assert.match(html, /api\.js\?v=20260813-dashboard-presentation-2/);
+  assert.match(html, /dashboard-v2\.js\?v=20260814-dashboard-presentation-3/);
+  assert.match(html, /api\.js\?v=20260814-dashboard-presentation-3/);
   assert.doesNotMatch(html, /id="public-assistant-input"/);
 });
 
@@ -63,8 +63,8 @@ test('同源录音 Worklet 与 WAV Worker 完整进入生产构建', async () =>
     assert.equal(createHash('sha256').update(output).digest('hex'), createHash('sha256').update(source).digest('hex'));
   }
   const voice = await readFile(new URL('frontdesign-v1/dashboard-voice.js', projectRoot), 'utf8');
-  assert.match(voice, /new URL\('\.\/dashboard-audio-worklet\.js\?v=20260813-dashboard-presentation-2'/);
-  assert.match(voice, /new URL\('\.\/dashboard-wav-worker\.js\?v=20260813-dashboard-presentation-2'/);
+  assert.match(voice, /new URL\('\.\/dashboard-audio-worklet\.js\?v=20260814-dashboard-presentation-3'/);
+  assert.match(voice, /new URL\('\.\/dashboard-wav-worker\.js\?v=20260814-dashboard-presentation-3'/);
   assert.doesNotMatch(voice, /https?:\/\//);
 });
 

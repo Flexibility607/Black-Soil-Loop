@@ -1,4 +1,4 @@
-import { encodePcm16Wav } from './dashboard-wav-worker.js?v=20260813-dashboard-presentation-2';
+import { encodePcm16Wav } from './dashboard-wav-worker.js?v=20260814-dashboard-presentation-3';
 
 export const VOICE_STATES = Object.freeze({
   IDLE: 'idle',
@@ -99,7 +99,7 @@ export async function createPcmCaptureSession(stream, options = {}) {
   if (context.audioWorklet?.addModule && AudioWorkletNodeClass) {
     try {
       const moduleUrl = options.workletModuleUrl
-        || new URL('./dashboard-audio-worklet.js?v=20260813-dashboard-presentation-2', import.meta.url).href;
+        || new URL('./dashboard-audio-worklet.js?v=20260814-dashboard-presentation-3', import.meta.url).href;
       await context.audioWorklet.addModule(moduleUrl);
       node = new AudioWorkletNodeClass(context, 'black-soil-pcm-recorder');
       let resolveStopped;
@@ -156,7 +156,7 @@ export function encodeWavInWorker(chunks, sampleRate, { requestId, signal, Worke
   let worker;
   try {
     worker = new WorkerClass(
-      new URL('./dashboard-wav-worker.js?v=20260813-dashboard-presentation-2', import.meta.url),
+      new URL('./dashboard-wav-worker.js?v=20260814-dashboard-presentation-3', import.meta.url),
       { type: 'module', name: 'blacksoil-wav-encoder' },
     );
   } catch {

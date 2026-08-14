@@ -1,0 +1,59 @@
+{
+  "schema_version": "1.0",
+  "catalog_version": "2026-08-14.1",
+  "mode": "PRESET_SHOWCASE",
+  "crs": "EPSG:4326",
+  "coordinate_order": "longitude,latitude",
+  "source_date": "2026-08-14",
+  "source_name": "OpenStreetMap contributors and reviewed business point catalog",
+  "source_url": "https://www.openstreetmap.org/copyright",
+  "license": "ODbL 1.0",
+  "generator_version": "changchun-showcase-routes-v1",
+  "route_method": "CURATED_OSM_CORRIDOR",
+  "disclaimer": "预设路线演示，用于展示长春市及近郊配送路径；不代表实时履约或道路导航。",
+  "origin": {
+    "display_name": "新安食品产业园（西门）",
+    "address": "长春市农安县合隆镇北青年路9999号（公开地址入口近似点）",
+    "longitude": 125.1711273,
+    "latitude": 44.0872187,
+    "coordinate_accuracy": "ADDRESS_APPROXIMATE",
+    "verification_note": "公开监管资料确认园区位于合隆镇长春农安经济开发区；坐标取北青年路公开 OSM 道路线位的地址入口近似点。"
+  },
+  "routes": [
+    {
+      "route_no": "01",
+      "destination_name": "这有山",
+      "destination_type": "THIRD_SPACE",
+      "estimated_distance_km": 26.5,
+      "coordinates": [[125.1711273,44.0872187],[125.1826365,44.0527908],[125.213,44.018],[125.242,43.982],[125.274,43.945],[125.281,43.912],[125.28612,43.86884]]
+    },
+    {
+      "route_no": "02",
+      "destination_name": "净月潭",
+      "destination_type": "THIRD_SPACE",
+      "estimated_distance_km": 39.7,
+      "coordinates": [[125.1711273,44.0872187],[125.1826365,44.0527908],[125.213,44.018],[125.242,43.982],[125.29,43.94],[125.331,43.912],[125.37,43.85],[125.42,43.82],[125.44888,43.79942]]
+    },
+    {
+      "route_no": "03",
+      "destination_name": "国信南山温泉",
+      "destination_type": "THIRD_SPACE",
+      "estimated_distance_km": 53.9,
+      "coordinates": [[125.1711273,44.0872187],[125.1826365,44.0527908],[125.213,44.018],[125.242,43.982],[125.29,43.94],[125.331,43.912],[125.37,43.85],[125.42,43.82],[125.44888,43.79942],[125.47,43.76],[125.495,43.72],[125.5217,43.68356]]
+    },
+    {
+      "route_no": "04",
+      "destination_name": "柏记水饺临河街店",
+      "destination_type": "TRADITIONAL_STORE",
+      "estimated_distance_km": 31.3,
+      "coordinates": [[125.1711273,44.0872187],[125.1826365,44.0527908],[125.213,44.018],[125.242,43.982],[125.274,43.945],[125.32,43.9],[125.35,43.87],[125.3692,43.8469]]
+    },
+    {
+      "route_no": "05",
+      "destination_name": "鹤记生煎富锦路店",
+      "destination_type": "TRADITIONAL_STORE",
+      "estimated_distance_km": 27.1,
+      "coordinates": [[125.1711273,44.0872187],[125.1826365,44.0527908],[125.213,44.018],[125.242,43.982],[125.274,43.945],[125.285,43.9],[125.3037,43.8662]]
+    }
+  ]
+}

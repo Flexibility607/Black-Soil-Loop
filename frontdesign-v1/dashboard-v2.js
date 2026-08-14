@@ -14,7 +14,7 @@ import {
   responseError,
   safeEnvelopeData,
   sortDemandTotals,
-} from './dashboard-format.js?v=20260813-dashboard-presentation-2';
+} from './dashboard-format.js?v=20260814-dashboard-presentation-3';
 import {
   applyDashboardMapDictionaries,
   buildChangchunMapOption,
@@ -22,17 +22,20 @@ import {
   localGeoJsonIsChangchunRoadBasemap,
   localGeoJsonIsChangchunServiceArea,
   localGeoJsonIsNortheast,
-} from './dashboard-map.js?v=20260813-dashboard-presentation-2';
-import { createSeamlessLoop } from './dashboard-loop.js?v=20260813-dashboard-presentation-2';
-import { VOICE_STATES, VoiceQuestionController } from './dashboard-voice.js?v=20260813-dashboard-presentation-2';
-import { adaptDashboardSnapshot, applyDashboardDictionaries } from './dashboard-adapter.js?v=20260813-dashboard-presentation-2';
-import { eventTargets, RealtimeCoordinator } from './dashboard-realtime.js?v=20260813-dashboard-presentation-2';
+  localShowcaseRoutesAreValid,
+  selectChangchunRoutes,
+} from './dashboard-map.js?v=20260814-dashboard-presentation-3';
+import { createSeamlessLoop } from './dashboard-loop.js?v=20260814-dashboard-presentation-3';
+import { VOICE_STATES, VoiceQuestionController } from './dashboard-voice.js?v=20260814-dashboard-presentation-3';
+import { adaptDashboardSnapshot, applyDashboardDictionaries } from './dashboard-adapter.js?v=20260814-dashboard-presentation-3';
+import { eventTargets, RealtimeCoordinator } from './dashboard-realtime.js?v=20260814-dashboard-presentation-3';
 
 const echarts = window.echarts;
 const API = window.API;
 const DEMO_FIXTURE = './frontend-mocks-v0.1/e02-dashboard-snapshot.json';
 const CHANGCHUN_MAP_FIXTURE = './assets/maps/changchun-service-area.geojson';
-const CHANGCHUN_ROAD_BASEMAP = './assets/maps/changchun-road-basemap.v1.geojson';
+const CHANGCHUN_ROAD_BASEMAP = './assets/maps/changchun-road-basemap.v2.geojson';
+const CHANGCHUN_SHOWCASE_ROUTES = './assets/maps/changchun-showcase-routes.v1.json';
 const LEGACY_MAP_FIXTURE = './assets/maps/northeast-china-admin1.geojson';
 const chartInstances = new Map();
 const state = {
@@ -45,15 +48,18 @@ const state = {
   mapReady: false,
   mapMode: null,
   mapBasemap: null,
+  mapShowcaseRoutes: null,
   mapBasemapFallback: false,
+  selectedRouteKey: null,
+  mapRoutePresentation: null,
   refreshGeneration: 0,
   information: null,
   informationEtag: null,
-  informationKind: 'NEWS',
-  informationSignature: null,
+  informationSignatures: { NEWS: null, POLICY: null },
+  informationPaused: false,
   informationTimer: null,
   rankingLoop: null,
-  informationLoop: null,
+  informationLoops: { NEWS: null, POLICY: null },
   rankingSignature: null,
   showcasePanel: 'CARPOOL',
   showcaseCase: {},
@@ -83,7 +89,7 @@ function initChart(id) {
   if (!element || !echarts) return null;
   let chart = chartInstances.get(id);
   if (!chart) {
-    chart = echarts.init(element, null, { renderer: 'canvas' });
+    chart = echarts.init(element, null, { renderer: id === 'dv2-map-chart' ? 'svg' : 'canvas' });
     chartInstances.set(id, chart);
   }
   return chart;
@@ -190,25 +196,38 @@ async function loadDemoSnapshot() {
 
 async function ensureMap(mode = 'changchun') {
   if (state.mapReady && state.mapMode === mode) return;
-  const asset = mode === 'changchun' ? CHANGCHUN_MAP_FIXTURE : LEGACY_MAP_FIXTURE;
-  const response = await fetch(asset, { cache: 'force-cache' });
-  if (!response.ok) throw new Error(`本地地图资源加载失败（HTTP ${response.status}）`);
-  const geojson = await response.json();
   if (mode === 'changchun') {
-    if (!localGeoJsonIsChangchunServiceArea(geojson)) throw new Error('长春服务范围地图坐标校验失败');
-    echarts.registerMap('changchun-service-area', geojson);
     try {
       const basemapResponse = await fetch(CHANGCHUN_ROAD_BASEMAP, { cache: 'force-cache' });
       if (!basemapResponse.ok) throw new Error(`HTTP ${basemapResponse.status}`);
       const basemap = await basemapResponse.json();
       if (!localGeoJsonIsChangchunRoadBasemap(basemap)) throw new Error('结构校验失败');
+      const boundaryFeatures = basemap.features.filter((feature) => feature.properties?.layer === 'service_boundary');
+      if (!boundaryFeatures.length) throw new Error('服务范围边界缺失');
+      echarts.registerMap('changchun-service-area', { type: 'FeatureCollection', features: boundaryFeatures });
       state.mapBasemap = basemap;
       state.mapBasemapFallback = false;
     } catch {
+      const fallbackResponse = await fetch(CHANGCHUN_MAP_FIXTURE, { cache: 'force-cache' });
+      if (!fallbackResponse.ok) throw new Error(`本地地图资源加载失败（HTTP ${fallbackResponse.status}）`);
+      const fallback = await fallbackResponse.json();
+      if (!localGeoJsonIsChangchunServiceArea(fallback)) throw new Error('长春服务范围地图坐标校验失败');
+      echarts.registerMap('changchun-service-area', fallback);
       state.mapBasemap = null;
       state.mapBasemapFallback = true;
     }
+    try {
+      const routeResponse = await fetch(CHANGCHUN_SHOWCASE_ROUTES, { cache: 'force-cache' });
+      if (!routeResponse.ok) throw new Error(`HTTP ${routeResponse.status}`);
+      const routeCatalog = await routeResponse.json();
+      state.mapShowcaseRoutes = localShowcaseRoutesAreValid(routeCatalog) ? routeCatalog : null;
+    } catch {
+      state.mapShowcaseRoutes = null;
+    }
   } else {
+    const response = await fetch(LEGACY_MAP_FIXTURE, { cache: 'force-cache' });
+    if (!response.ok) throw new Error(`本地地图资源加载失败（HTTP ${response.status}）`);
+    const geojson = await response.json();
     if (!localGeoJsonIsNortheast(geojson)) throw new Error('东北三省地图坐标校验失败');
     echarts.registerMap('northeast-admin1', geojson);
   }
@@ -358,37 +377,75 @@ function renderQuality(snapshot) {
   byId('dv2-quality-list').innerHTML = items.map(([label, value]) => `<div><b>${htmlEscape(formatNumber(value))}</b><span>${htmlEscape(label)}</span></div>`).join('');
 }
 
+function routeDetailMarkup(route) {
+  if (!route) return '<strong>当前无可展示线路</strong><span>精选门店仍正常显示。</span>';
+  if (route.mode === 'SHOWCASE') {
+    const data = route.showcase;
+    return `<strong>路线 ${htmlEscape(route.routeNo)} · 展示车辆</strong><span>${htmlEscape(data.origin.display_name)} → ${htmlEscape(data.destination_name)}</span><small>估算 ${htmlEscape(formatNumber(data.estimated_distance_km, 1))} km · 预设路线演示</small><em>无实时定位与遥测；不代表道路导航或实时履约。</em>`;
+  }
+  const live = route.live;
+  const location = live.latest_location;
+  const telemetry = live.latest_telemetry;
+  const alerts = live.alerts || [];
+  return `<strong>路线 ${htmlEscape(route.routeNo)} · ${htmlEscape(live.vehicle_label || '配送车辆')}</strong><span>${htmlEscape(live.from?.display_name || '车辆当前位置')} → ${htmlEscape(live.to?.display_name || '运输目标点')} · ${htmlEscape(live.status_label || live.status || '状态待补充')}</span><small>${location ? `定位 ${htmlEscape(formatSnapshotTime(location.recorded_at, '时间待补充'))} · ${htmlEscape(formatNumber(location.speed_mps, 1))} 米/秒 · 精度 ${htmlEscape(formatNumber(location.accuracy_m, 1))} 米` : '暂无有效车辆位置，使用任务起点估算'}</small><em>${telemetry ? `温度 ${htmlEscape(formatNumber(telemetry.temperature_c, 1))} ℃ · 湿度 ${htmlEscape(formatNumber(telemetry.humidity_pct, 1))}%` : '暂无温湿度采样'}${alerts.length ? ` · ${htmlEscape(alerts[0].message || alerts[0].alert_type_label || '存在未解决报警')}` : ''}</em>`;
+}
+
+function renderRoutePresentation(presentation) {
+  state.mapRoutePresentation = presentation;
+  const routes = presentation.routes || [];
+  if (!routes.some((route) => route.key === state.selectedRouteKey)) state.selectedRouteKey = routes[0]?.key || null;
+  const controls = byId('dv2-route-controls');
+  if (controls) controls.innerHTML = routes.map((route) => `<button type="button" data-route-key="${htmlEscape(route.key)}" aria-pressed="${route.key === state.selectedRouteKey}">路线 ${htmlEscape(route.routeNo)}</button>`).join('');
+  const detail = byId('dv2-route-detail');
+  const selected = routes.find((route) => route.key === state.selectedRouteKey) || routes[0];
+  if (detail) detail.innerHTML = routeDetailMarkup(selected);
+  const mode = byId('dv2-route-mode');
+  if (mode) mode.textContent = presentation.label;
+}
+
+function onMapRouteClick(params) {
+  const route = params?.data?.routeDisplay;
+  if (!route) return;
+  state.selectedRouteKey = route.key;
+  if (state.snapshot) renderMap(state.snapshot);
+}
+
 function renderMap(snapshot) {
   const chart = initChart('dv2-map-chart');
   if (!chart) return;
+  const presentation = selectChangchunRoutes(snapshot, state.mapShowcaseRoutes);
+  renderRoutePresentation(presentation);
   const option = snapshot.public_map?.schema_version === '2.0'
-    ? buildChangchunMapOption(snapshot, screenPalette(), state.mapBasemap)
+    ? buildChangchunMapOption(snapshot, screenPalette(), state.mapBasemap, state.mapShowcaseRoutes, { selectedRouteKey: state.selectedRouteKey })
     : buildNortheastMapOption(snapshot, screenPalette());
   chart.setOption(option, true);
+  chart.off('click', onMapRouteClick);
+  chart.on('click', onMapRouteClick);
   const excluded = snapshot.public_map?.excluded_route_summary?.count || 0;
   const alerts = (snapshot.public_map?.active_routes || []).reduce((sum, route) => sum + Number(route.alert_count || 0), 0);
   if (byId('dv2-map-summary')) byId('dv2-map-summary').textContent = state.mapBasemapFallback
-    ? `道路底图暂不可用，当前显示长春服务范围图 · 报警 ${alerts} 条 · 排除 ${excluded} 项`
-    : `未解决报警 ${alerts} 条 · 范围外或无下一站 ${excluded} 项`;
+    ? `道路底图暂不可用，当前显示长春服务范围图 · ${presentation.label}`
+    : `${presentation.label} · 未解决报警 ${alerts} 条 · 排除 ${excluded} 项`;
 }
 
 function showcaseAllocationSummary(allocation) {
   if (allocation.type === 'CARPOOL') {
+    const stores = allocation.store_names || [];
     return {
-      title: `${allocation.vehicle_label} → ${(allocation.store_names || []).join('、') || '门店待补充'}`,
+      title: allocation.vehicle_label,
       statusLabel: allocation.decision_state_label,
-      primaryMetrics: `${allocation.order_count} 单 · ${allocation.enterprise_count} 家企业 · ${allocation.temperature_zone_label}`,
-      secondaryMetrics: `${formatNumber(allocation.total_weight_kg, 1)} kg · ${formatNumber(allocation.total_volume_m3, 1)} m³ · 利用率 ${formatPercent(allocation.capacity_utilization_pct)}`,
-      detail: `估算节省 ${formatNumber(allocation.mileage_benefit_estimated_km, 1)} km`,
+      primaryMetrics: stores.length > 1 ? `${stores[0]}等 ${stores.length} 个目的地` : stores[0] || '目的地待补充',
+      secondaryMetrics: `${allocation.order_count} 单 · ${formatNumber(allocation.total_weight_kg, 0)} kg · 利用率 ${formatPercent(allocation.capacity_utilization_pct)}`,
+      detail: `预计节省 ${formatNumber(allocation.mileage_benefit_estimated_km, 1)} km`,
     };
   }
   if (allocation.type === 'WAREHOUSE') {
     return {
       title: allocation.warehouse_name,
       statusLabel: allocation.decision_state_label,
-      primaryMetrics: `${allocation.order_count} 单 · ${allocation.enterprise_count} 家企业 · ${allocation.temperature_zone_label}`,
-      secondaryMetrics: `需要 ${formatNumber(allocation.required_volume_m3, 1)} m³ · 可用 ${formatNumber(allocation.available_volume_m3, 1)} m³ · 剩余 ${formatNumber(allocation.remaining_volume_m3, 1)} m³`,
-      detail: `最远估算 ${formatNumber(allocation.estimated_distance_km, 1)} km · ${(allocation.reasons || []).join('；')}`,
+      primaryMetrics: `${allocation.order_count} 单 · ${allocation.temperature_zone_label} · 距离 ${formatNumber(allocation.estimated_distance_km, 1)} km`,
+      secondaryMetrics: `需要 ${formatNumber(allocation.required_volume_m3, 1)} m³ · 剩余 ${formatNumber(allocation.remaining_volume_m3, 1)} m³`,
+      detail: (allocation.reasons || [])[0] || '满足共享仓约束',
     };
   }
   if (allocation.type === 'PROCUREMENT') {
@@ -397,8 +454,8 @@ function showcaseAllocationSummary(allocation) {
       title: allocation.product_name,
       statusLabel: allocation.confirmation_state_label,
       primaryMetrics: `采用 ${formatNumber(allocation.effective_quantity, 2)} ${allocation.base_unit} · ${allocation.quantity_source_label}`,
-      secondaryMetrics: supplier ? `首选 ${supplier.supplier_name} · 单价 ${formatCnyAmount(supplier.unit_price, { compact: false })}` : '暂无合格供应商',
-      detail: supplier ? `总额 ${formatCnyAmount(supplier.total_amount)} · 综合评分 ${formatNumber(supplier.composite_score, 1)}` : '等待补充报价和供货能力',
+      secondaryMetrics: supplier ? `首选 ${supplier.supplier_name} · ${formatCnyAmount(supplier.total_amount)}` : '暂无合格供应商',
+      detail: supplier ? `综合评分 ${formatNumber(supplier.composite_score, 1)}` : '等待补充报价和供货能力',
     };
   }
   return {
@@ -406,8 +463,15 @@ function showcaseAllocationSummary(allocation) {
     statusLabel: allocation.data_insufficient_count ? '部分数据不足' : '预测已生成',
     primaryMetrics: `预测 ${allocation.forecast_quantity ?? '数据不足'} · 建议采购 ${allocation.suggested_purchase_quantity ?? '数据不足'}`,
     secondaryMetrics: `区间 ${allocation.lower_bound ?? '数据不足'}—${allocation.upper_bound ?? '数据不足'} · ${allocation.enterprise_count} 家企业`,
-    detail: `MAE ${allocation.mae_average ?? '数据不足'} · sMAPE ${allocation.smape_average ?? '数据不足'} · ${(allocation.method_labels || []).join('、') || '方法待补充'}`,
+    detail: (allocation.method_labels || [])[0] || '方法待补充',
   };
+}
+
+function showcaseAllocationDetail(allocation) {
+  const compact = showcaseAllocationSummary(allocation);
+  if (allocation.type === 'CARPOOL') return { ...compact, primaryMetrics: `${(allocation.store_names || []).join('、') || '目的地待补充'}；${allocation.order_count} 单 · ${allocation.enterprise_count} 家企业 · ${allocation.temperature_zone_label}`, secondaryMetrics: `${formatNumber(allocation.total_weight_kg, 1)} kg · ${formatNumber(allocation.total_volume_m3, 1)} m³ · 综合利用率 ${formatPercent(allocation.capacity_utilization_pct)}`, detail: `估算节省 ${formatNumber(allocation.mileage_benefit_estimated_km, 1)} km；${allocation.explanation || '经纬度估算路线'}` };
+  if (allocation.type === 'WAREHOUSE') return { ...compact, primaryMetrics: `${allocation.order_count} 单 · ${allocation.enterprise_count} 家企业 · ${allocation.temperature_zone_label}`, secondaryMetrics: `需要 ${formatNumber(allocation.required_volume_m3, 1)} m³ · 可用 ${formatNumber(allocation.available_volume_m3, 1)} m³ · 剩余 ${formatNumber(allocation.remaining_volume_m3, 1)} m³`, detail: `最远估算 ${formatNumber(allocation.estimated_distance_km, 1)} km；${(allocation.reasons || []).join('；') || '满足共享仓约束'}` };
+  return compact;
 }
 
 function showcaseSummary(selected) {
@@ -451,13 +515,13 @@ function renderShowcase(showcase) {
   }
   const input = selected.input_summary || {};
   const chips = [
-    input.enterprise_count ? `${input.enterprise_count} 家企业` : null,
+    input.enterprise_count ? `${input.enterprise_count} 企` : null,
     input.order_count ? `${input.order_count} 单` : null,
-    input.product_count ? `${input.product_count} 个商品` : null,
-    ...(input.temperature_zones || []),
-  ].filter(Boolean);
+    input.product_count ? `${input.product_count} 品` : null,
+    (input.temperature_zones || []).join('/'),
+  ].filter(Boolean).slice(0, 4);
   const cards = (selected.allocations || []).slice(0, 2).map(showcaseAllocationSummary);
-  byId('dv2-showcase-content').innerHTML = `<div class="dv2-showcase-copy"><div><strong>${htmlEscape(selected.title)}</strong><span>${htmlEscape(selected.status_label)} · ${htmlEscape(formatSnapshotTime(selected.calculated_at, '尚未计算'))}</span><p>${htmlEscape(selected.description)}</p></div><div class="dv2-showcase-chips">${chips.map((chip) => `<i>${htmlEscape(chip)}</i>`).join('')}</div></div><div class="dv2-showcase-cards">${cards.length ? cards.map(showcaseCardMarkup).join('') : `<div class="dv2-empty"><b>${htmlEscape(selected.headline)}</b><span>${htmlEscape(selected.unmatched_reasons?.[0]?.reason || selected.data_cutoff_note || '')}</span></div>`}</div>`;
+  byId('dv2-showcase-content').innerHTML = `<div class="dv2-showcase-copy"><strong>${htmlEscape(selected.title)}</strong><div class="dv2-showcase-chips">${chips.map((chip) => `<i>${htmlEscape(chip)}</i>`).join('')}</div></div><div class="dv2-showcase-cards">${cards.length ? cards.map(showcaseCardMarkup).join('') : `<div class="dv2-empty"><b>${htmlEscape(selected.headline)}</b><span>${htmlEscape(selected.unmatched_reasons?.[0]?.reason || selected.data_cutoff_note || '')}</span></div>`}</div>`;
   const reason = selected.unmatched_reasons?.[0]?.reason || '';
   byId('dv2-showcase-summary').innerHTML = `<b>${htmlEscape(showcaseSummary(selected))}</b>${reason ? `<span>首要原因：${htmlEscape(reason)}</span>` : ''}`;
   const resultCount = (selected.allocations || []).length;
@@ -469,11 +533,11 @@ function openShowcaseDialog() {
   const { selected } = selectedShowcaseCase(state.snapshot?.algorithm_showcase);
   if (!selected) return;
   byId('dv2-algorithm-dialog-title').textContent = selected.title;
-  const cards = (selected.allocations || []).slice(0, 24).map(showcaseAllocationSummary);
-  byId('dv2-algorithm-dialog-content').innerHTML = `<div class="dv2-algorithm-dialog-summary"><strong>${htmlEscape(selected.headline)}</strong><p>${htmlEscape(selected.description)}</p></div>${cards.map((card) => `<article><h4>${htmlEscape(card.title)} · ${htmlEscape(card.statusLabel || '')}</h4><p>${htmlEscape(card.primaryMetrics)}</p><p>${htmlEscape(card.secondaryMetrics)}</p><small>${htmlEscape(card.detail)}</small></article>`).join('')}${(selected.unmatched_reasons || []).length ? `<section><h4>待调整原因</h4>${selected.unmatched_reasons.map((item) => `<p>${htmlEscape(item.reason)} · ${item.count} 项</p>`).join('')}</section>` : ''}`;
+  const cards = (selected.allocations || []).slice(0, 24).map(showcaseAllocationDetail);
+  byId('dv2-algorithm-dialog-content').innerHTML = `<div class="dv2-algorithm-dialog-summary"><strong>${htmlEscape(selected.headline)}</strong><p>${htmlEscape(selected.description)}</p><small>${htmlEscape(formatSnapshotTime(selected.calculated_at, '尚未计算'))} · ${htmlEscape(selected.data_cutoff_note || '预设场景测算')}</small></div>${cards.map((card) => `<article><h4>${htmlEscape(card.title)} · ${htmlEscape(card.statusLabel || '')}</h4><p>${htmlEscape(card.primaryMetrics)}</p><p>${htmlEscape(card.secondaryMetrics)}</p><small>${htmlEscape(card.detail)}</small></article>`).join('')}${(selected.unmatched_reasons || []).length ? `<section><h4>待调整原因</h4>${selected.unmatched_reasons.map((item) => `<p>${htmlEscape(item.reason)} · ${item.count} 项</p>`).join('')}</section>` : ''}`;
   byId('dv2-algorithm-dialog').showModal();
   state.rankingLoop?.refresh();
-  state.informationLoop?.refresh();
+  refreshInformationLoops();
 }
 
 function informationCacheKey() {
@@ -497,20 +561,23 @@ function saveInformationCache(payload, etag) {
   }
 }
 
-function renderInformation(message = null, { animate = true } = {}) {
-  const items = (state.information?.items || []).filter((item) => item.kind === state.informationKind);
-  const list = byId('dv2-information-list');
-  const signature = `${state.informationKind}:${state.information?.catalog_version || ''}:${items.map((item) => item.slug).join('|')}`;
-  if (animate && !message && state.informationSignature === signature && list.querySelector('.dv2-loop-track')) {
-    state.informationLoop?.refresh();
+function refreshInformationLoops() {
+  Object.values(state.informationLoops).forEach((loop) => loop?.refresh());
+}
+
+function renderInformationColumn(kind, message = null, { animate = true } = {}) {
+  const items = (state.information?.items || []).filter((item) => item.kind === kind);
+  const list = byId(kind === 'NEWS' ? 'dv2-information-news' : 'dv2-information-policy');
+  const signature = `${kind}:${state.information?.catalog_version || ''}:${items.map((item) => item.slug).join('|')}`;
+  if (animate && !message && state.informationSignatures[kind] === signature && list.querySelector('.dv2-loop-track')) {
+    state.informationLoops[kind]?.refresh();
     return;
   }
-  state.informationLoop?.destroy();
-  state.informationLoop = null;
-  state.informationSignature = signature;
+  state.informationLoops[kind]?.destroy();
+  state.informationLoops[kind] = null;
+  state.informationSignatures[kind] = signature;
   if (!items.length) {
-    list.innerHTML = `<div class="dv2-empty">${htmlEscape(message || (state.informationKind === 'NEWS' ? '暂无园区动态' : '暂无政策资讯'))}</div>`;
-    byId('dv2-information-loop-toggle').hidden = true;
+    list.innerHTML = `<div class="dv2-empty">${htmlEscape(message || (kind === 'NEWS' ? '暂无园区动态' : '暂无政策资讯'))}</div>`;
     return;
   }
   byId('dv2-information-retry').hidden = true;
@@ -522,12 +589,23 @@ function renderInformation(message = null, { animate = true } = {}) {
     byId('dv2-information-loop-toggle').hidden = true;
     return;
   }
-  state.informationLoop = createSeamlessLoop({
-    viewport: list, track: list.firstElementChild, pauseButton: byId('dv2-information-loop-toggle'),
+  state.informationLoops[kind] = createSeamlessLoop({
+    viewport: list, track: list.firstElementChild, pauseButton: null,
     signature, speedPxPerSecond: 8, itemCount: items.length,
     active: () => state.active && !document.hidden,
-    blocked: () => Boolean(document.querySelector('.dv2-chart-dialog[open]')),
+    blocked: () => state.informationPaused || Boolean(document.querySelector('.dv2-chart-dialog[open]')),
   });
+}
+
+function renderInformation(message = null, options = {}) {
+  renderInformationColumn('NEWS', message, options);
+  renderInformationColumn('POLICY', message, options);
+  const hasOverflowingColumn = ['NEWS', 'POLICY'].some((kind) => (state.information?.items || []).filter((item) => item.kind === kind).length > 3);
+  const toggle = byId('dv2-information-loop-toggle');
+  toggle.hidden = !hasOverflowingColumn;
+  toggle.textContent = state.informationPaused ? '播放' : '暂停';
+  toggle.setAttribute('aria-pressed', String(state.informationPaused));
+  toggle.setAttribute('aria-label', state.informationPaused ? '播放园区资讯自动循环' : '暂停园区资讯自动循环');
 }
 
 async function refreshInformation() {
@@ -608,7 +686,6 @@ async function refresh({ force = false } = {}) {
     state.lastSuccessfulAt = new Date();
     setSource(state.source, state.source === 'demo' ? '演示数据' : '实时数据');
     renderSnapshot(snapshot);
-    renderShowcase(snapshot.algorithm_showcase);
   } catch (error) {
     if (state.snapshot) {
       setSource(state.source || 'error', '保留上次数据');
@@ -831,7 +908,7 @@ function deactivate() {
   window.clearInterval(state.informationTimer);
   state.informationTimer = null;
   state.rankingLoop?.refresh();
-  state.informationLoop?.refresh();
+  refreshInformationLoops();
   window.clearInterval(state.showcaseTimer);
   state.showcaseTimer = null;
   if (voice.busy) voice.cancel('已离开 E02 大屏，本次语音提问已停止');
@@ -931,7 +1008,7 @@ function bindEvents() {
     requestAnimationFrame(() => renderDemandChart(state.snapshot, 'dv2-dialog-chart'));
   });
   byId('dv2-dialog-close')?.addEventListener('click', () => byId('dv2-chart-dialog').close());
-  byId('dv2-chart-dialog')?.addEventListener('close', () => { state.dialogContent = null; state.rankingLoop?.refresh(); state.informationLoop?.refresh(); });
+  byId('dv2-chart-dialog')?.addEventListener('close', () => { state.dialogContent = null; state.rankingLoop?.refresh(); refreshInformationLoops(); });
   byId('dv2-chart-dialog')?.addEventListener('click', (event) => { if (event.target === byId('dv2-chart-dialog')) event.target.close(); });
   document.querySelectorAll('#dv2-showcase-tabs [data-kind]').forEach((button) => button.addEventListener('click', () => {
     state.showcasePanel = button.dataset.kind;
@@ -947,23 +1024,38 @@ function bindEvents() {
   });
   byId('dv2-showcase-more')?.addEventListener('click', openShowcaseDialog);
   byId('dv2-algorithm-dialog-close')?.addEventListener('click', () => byId('dv2-algorithm-dialog').close());
-  byId('dv2-algorithm-dialog')?.addEventListener('close', () => { state.rankingLoop?.refresh(); state.informationLoop?.refresh(); });
+  byId('dv2-algorithm-dialog')?.addEventListener('close', () => { state.rankingLoop?.refresh(); refreshInformationLoops(); });
   byId('dv2-algorithm-dialog')?.addEventListener('click', (event) => { if (event.target === byId('dv2-algorithm-dialog')) event.target.close(); });
-  document.querySelectorAll('.dv2-information-tabs [data-kind]').forEach((button) => button.addEventListener('click', () => {
-    state.informationKind = button.dataset.kind;
-    state.informationSignature = null;
-    document.querySelectorAll('.dv2-information-tabs [data-kind]').forEach((item) => item.setAttribute('aria-selected', String(item === button)));
+  byId('dv2-information-loop-toggle')?.addEventListener('click', () => {
+    state.informationPaused = !state.informationPaused;
     renderInformation();
-  }));
+    refreshInformationLoops();
+  });
+  byId('dv2-route-controls')?.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-route-key]');
+    if (!button) return;
+    state.selectedRouteKey = button.dataset.routeKey;
+    if (state.snapshot) renderMap(state.snapshot);
+  });
   byId('dv2-information-retry')?.addEventListener('click', () => {
     byId('dv2-information-retry').hidden = true;
     refreshInformation();
   });
-  window.addEventListener('resize', () => chartInstances.forEach((chart) => chart.resize()));
+  let resizeFrame = null;
+  const resizeCharts = () => {
+    if (resizeFrame !== null) return;
+    resizeFrame = requestAnimationFrame(() => {
+      resizeFrame = null;
+      chartInstances.forEach((chart) => chart.resize());
+    });
+  };
+  window.addEventListener('resize', resizeCharts);
+  window.visualViewport?.addEventListener('resize', resizeCharts);
+  document.addEventListener('fullscreenchange', resizeCharts);
   window.addEventListener('app:public-theme-change', (event) => setTheme(event.detail?.theme));
   document.addEventListener('visibilitychange', () => {
     state.rankingLoop?.refresh();
-    state.informationLoop?.refresh();
+    refreshInformationLoops();
     if (document.hidden) {
       if (voice.busy) voice.cancel('页面已隐藏，本次语音提问已停止');
       return;

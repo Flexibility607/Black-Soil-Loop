@@ -19,7 +19,8 @@ const criticalAssets = [
   'dashboard.css',
   'scripts.js',
   'assets/maps/changchun-service-area.geojson',
-  'assets/maps/changchun-road-basemap.v1.geojson',
+  'assets/maps/changchun-road-basemap.v2.geojson',
+  'assets/maps/changchun-showcase-routes.v1.json',
 ];
 
 async function filesUnder(directory) {
@@ -41,7 +42,7 @@ assert.equal(
 
 const html = await readFile(join(dist, 'index.html'), 'utf8');
 for (const marker of [
-  '20260813-dashboard-presentation-2',
+  '20260814-dashboard-presentation-3',
   'class="dv2-panel dv2-information-panel"',
   'class="dv2-panel dv2-showcase-panel"',
   'id="dv2-algorithm-dialog"',
@@ -67,29 +68,39 @@ assert.equal(map.metadata?.crs, 'EPSG:4326');
 assert.equal(map.metadata?.license, 'ODbL 1.0');
 assert.deepEqual(map.metadata?.bounds, [125.15, 43.6, 125.6, 44.02]);
 
-const basemapBytes = await readFile(join(dist, 'assets/maps/changchun-road-basemap.v1.geojson'));
+const basemapBytes = await readFile(join(dist, 'assets/maps/changchun-road-basemap.v2.geojson'));
 const basemap = JSON.parse(basemapBytes.toString('utf8'));
 const basemapHash = createHash('sha256').update(basemapBytes).digest('hex');
-assert.equal(basemapHash, '717ec1bca14cab9660c1d794a0747098f2f966caec9e2475aa2c3ef4615fe256');
-assert.ok(basemapBytes.byteLength <= 4 * 1024 * 1024, 'road basemap exceeds 4 MiB');
-assert.ok(gzipSync(basemapBytes, { level: 9 }).byteLength <= 1024 * 1024, 'road basemap gzip exceeds 1 MiB');
+assert.equal(basemapHash, '00e3325b010726d78468d6a4439ed6f423ae50a7953b3f2a08f50adce631cdfa');
+assert.ok(basemapBytes.byteLength <= 1.5 * 1024 * 1024, 'road basemap exceeds 1.5 MiB');
+assert.ok(gzipSync(basemapBytes, { level: 9 }).byteLength <= 250 * 1024, 'road basemap gzip exceeds 250 KiB');
 assert.equal(basemap.metadata?.crs, 'EPSG:4326');
 assert.equal(basemap.metadata?.coordinate_order, 'longitude,latitude');
 assert.equal(basemap.metadata?.license, 'ODbL 1.0');
 assert.equal(basemap.metadata?.attribution, '© OpenStreetMap contributors');
-assert.deepEqual(basemap.metadata?.clip_bounds, [125.15, 43.6, 125.6, 44.02]);
+assert.deepEqual(basemap.metadata?.clip_bounds, [125.15, 43.6, 125.6, 44.1]);
+assert.ok(basemap.features.length <= 800, 'road basemap exceeds 800 features');
 const basemapLayers = new Set(basemap.features.map((feature) => feature.properties?.layer));
 for (const layer of ['motorway', 'primary', 'secondary', 'railway', 'waterway', 'place_label']) {
   assert.ok(basemapLayers.has(layer), `road basemap is missing ${layer}`);
 }
-for (const feature of basemap.features) {
-  const coordinates = feature.geometry?.type === 'Point' ? [feature.geometry.coordinates] : feature.geometry?.coordinates;
-  assert.ok(Array.isArray(coordinates) && coordinates.length >= (feature.geometry?.type === 'Point' ? 1 : 2));
-  for (const point of coordinates) {
-    assert.ok(point.every(Number.isFinite), 'road basemap contains non-finite coordinates');
-    assert.ok(point[0] >= 125.15 && point[0] <= 125.6 && point[1] >= 43.6 && point[1] <= 44.02, 'road basemap coordinate is out of bounds');
-  }
+function pointsOf(value) {
+  if (!Array.isArray(value)) return [];
+  if (value.length >= 2 && value.slice(0, 2).every(Number.isFinite)) return [value];
+  return value.flatMap(pointsOf);
 }
+const basemapPoints = basemap.features.flatMap((feature) => pointsOf(feature.geometry?.coordinates));
+assert.ok(basemapPoints.length <= 12000, 'road basemap exceeds 12,000 coordinate points');
+for (const point of basemapPoints) {
+  assert.ok(point[0] >= 125.15 && point[0] <= 125.6 && point[1] >= 43.6 && point[1] <= 44.1, 'road basemap coordinate is out of bounds');
+}
+
+const showcaseRoutes = JSON.parse(await readFile(join(dist, 'assets/maps/changchun-showcase-routes.v1.json'), 'utf8'));
+assert.equal(showcaseRoutes.routes?.length, 5);
+assert.match(showcaseRoutes.disclaimer, /预设路线演示/);
+assert.match(showcaseRoutes.disclaimer, /不代表实时履约或道路导航/);
+assert.ok(showcaseRoutes.routes.every((route) => Array.isArray(route.coordinates) && route.coordinates.length >= 2));
+assert.ok(!/(?:vehicle_id|driver_id|object_version|license_plate|telemetry)/i.test(JSON.stringify(showcaseRoutes)));
 
 const forbidden = [];
 for (const path of await filesUnder(dist)) {
