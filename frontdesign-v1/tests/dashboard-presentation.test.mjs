@@ -143,6 +143,20 @@ test('E02 同屏展示资讯双栏与四类协同方案并使用无认证公开�
   assert.doesNotMatch(html, /dv2-information-tabs/);
 });
 
+test('需求 KPI 只显示公斤主值并复用同一个明细窗口', async () => {
+  const html = await readFile(new URL('frontdesign-v1/index.html', projectRoot), 'utf8');
+  const dashboard = await readFile(new URL('frontdesign-v1/dashboard-v2.js', projectRoot), 'utf8');
+  assert.match(html, /id="dv2-demand-primary-value"/);
+  assert.match(html, /id="dv2-demand-open"[^>]*aria-haspopup="dialog"[^>]*aria-controls="dv2-chart-dialog"/);
+  assert.match(html, /id="dv2-demand-dialog-summary"/);
+  assert.match(html, /id="dv2-chart-dialog"[^>]*aria-labelledby="dv2-dialog-title"/);
+  assert.match(dashboard, /function demandDisplaySummary|demandDisplaySummary\(/);
+  assert.match(dashboard, /querySelectorAll\('\[data-open-chart="demand"\], #dv2-demand-open'\)/);
+  assert.match(dashboard, /function openDemandDialog\(/);
+  assert.match(dashboard, /园区需求量明细/);
+  assert.doesNotMatch(dashboard, /dv2-demand-totals/);
+});
+
 test('无实时任务时使用五条诚实演示路线，实时任务存在时互斥且最多五条', async () => {
   const catalog = JSON.parse(await readFile(new URL('frontdesign-v1/assets/maps/changchun-showcase-routes.v3.json', projectRoot), 'utf8'));
   assert.equal(localShowcaseRoutesAreValid(catalog), true);

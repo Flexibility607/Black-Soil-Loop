@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   channelValues,
   dashboardPalette,
+  demandDisplaySummary,
   demandSeries,
   formatCurrency,
   formatCnyAmount,
@@ -34,6 +35,30 @@ test('大屏统一中文单位与人民币格式', () => {
   assert.equal(formatCnyAmount(10000), '1 万元');
   assert.equal(formatCnyAmount(100000000), '1 亿元');
   assert.equal(formatCnyAmount(283744.6, { compact: false, fullPrecision: true }), '283,744.60 元');
+});
+
+test('需求 KPI 固定以公斤为主单位并保持其他单位独立', () => {
+  const summary = demandDisplaySummary([
+    { unit: 'kg', quantity: 0 },
+    { unit: 'kilograms', quantity: 10.25 },
+    { unit: '箱', quantity: 9999 },
+    { unit: '件', quantity: Number.NaN },
+    { unit: '袋', quantity: -1 },
+    { unit: '托', quantity: 2 },
+  ]);
+  assert.deepEqual(summary.primary, { unit: '公斤', quantity: 10.25, available: true });
+  assert.deepEqual(summary.all, [
+    { unit: '公斤', quantity: 10.25 },
+    { unit: '箱', quantity: 9999 },
+    { unit: '托', quantity: 2 },
+  ]);
+  assert.equal(summary.secondaryCount, 2);
+});
+
+test('公斤缺失时不自动替换主单位，零值仍然有效', () => {
+  assert.deepEqual(demandDisplaySummary([{ unit: '箱', quantity: 12 }]).primary, { unit: '公斤', quantity: null, available: false });
+  assert.deepEqual(demandDisplaySummary([{ unit: 'kg', quantity: 0 }]).primary, { unit: '公斤', quantity: 0, available: true });
+  assert.deepEqual(demandDisplaySummary([null, { unit: 'kg', quantity: null }, { unit: '件', quantity: Infinity }]).all, []);
 });
 
 test('零分母的渠道环图保持两个渠道和零值', () => {

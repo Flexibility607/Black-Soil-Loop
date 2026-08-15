@@ -1,4 +1,4 @@
-import { SCREEN_PALETTES } from './dashboard-format.js?v=20260814-dashboard-presentation-5';
+import { SCREEN_PALETTES } from './dashboard-format.js?v=20260815-demand-summary-1';
 
 export const REFERENCE_CITIES = [
   { name: '哈尔滨市', value: [126.642, 45.757] },

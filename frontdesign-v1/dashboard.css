@@ -693,7 +693,7 @@ body.screen-mode.screen-day .dv2-brand-mark img {
 }
 
 .dv2-kpi.warm strong,
-.dv2-demand-chips b {
+.dv2-demand-primary strong {
   color: var(--dv2-yellow);
 }
 
@@ -701,23 +701,67 @@ body.screen-mode.screen-day .dv2-brand-mark img {
   color: var(--dv2-green);
 }
 
-.dv2-demand-chips {
+.dv2-demand-kpi-head {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  min-height: 38px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
 }
 
-.dv2-demand-chips b {
-  border-right: 1px solid var(--dv2-demand-divider);
-  padding-right: 9px;
+.dv2-demand-open {
+  flex: 0 0 auto;
+  min-height: 24px;
+  padding: 3px 8px;
+  color: var(--dv2-blue);
+  border: 1px solid var(--dv2-border);
+  border-radius: 3px;
+  background: transparent;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.dv2-demand-open:hover,
+.dv2-demand-open:focus-visible {
+  color: var(--dv2-ink);
+  border-color: var(--dv2-blue);
+  background: var(--dv2-answer-surface);
+}
+
+.dv2-demand-open:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.dv2-demand-primary {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.dv2-demand-primary strong {
+  overflow: hidden;
   font-family: var(--dv2-mono-font);
-  font-size: 20px;
-  font-weight: 700;
+  font-size: 32px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.045em;
+  text-overflow: ellipsis;
 }
 
-.dv2-demand-chips b:last-child {
-  border-right: 0;
+.dv2-demand-primary span {
+  color: var(--dv2-yellow);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.dv2-demand-primary + small {
+  display: block;
+  min-height: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dv2-main-grid {
@@ -1552,6 +1596,67 @@ body.screen-mode.screen-day .dv2-brand-mark img {
   height: 580px;
 }
 
+.dv2-chart-dialog.is-demand {
+  height: min(720px, 86vh);
+}
+
+.dv2-chart-dialog.is-demand .dv2-dialog-chart {
+  height: 480px;
+}
+
+.dv2-demand-dialog-summary {
+  padding: 14px 20px 0;
+  color: var(--dv2-muted);
+}
+
+.dv2-demand-dialog-period {
+  margin-bottom: 10px;
+  font-size: 11px;
+}
+
+.dv2-demand-dialog-summary dl {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.dv2-demand-dialog-item {
+  padding: 10px 12px;
+  border: 1px solid var(--dv2-panel-rule);
+  border-radius: 3px;
+  background: var(--dv2-answer-surface);
+}
+
+.dv2-demand-dialog-item dt {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 5px;
+  color: var(--dv2-muted);
+  font-size: 11px;
+}
+
+.dv2-demand-dialog-item dt small {
+  color: var(--dv2-yellow);
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.dv2-demand-dialog-item dd {
+  margin: 6px 0 0;
+  color: var(--dv2-ink);
+  font-family: var(--dv2-mono-font);
+  font-size: 21px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dv2-demand-dialog-summary > p {
+  margin: 10px 0 0;
+  color: var(--dv2-muted);
+  font-size: 10px;
+}
+
 .dv2-empty,
 .dv2-error {
   display: grid;
@@ -1583,6 +1688,10 @@ body.screen-mode.screen-day .dv2-brand-mark img {
 }
 
 @media (max-width: 720px) {
+  .dv2-demand-dialog-summary dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .operations-summary {
     grid-template-columns: 1fr;
   }

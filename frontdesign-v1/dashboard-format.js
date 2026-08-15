@@ -143,6 +143,37 @@ export function sortDemandTotals(items = []) {
     .sort((a, b) => a.unit.localeCompare(b.unit, 'zh-CN'));
 }
 
+/**
+ * Returns the compact, progressive-disclosure view used by the E02 demand KPI.
+ * Units remain independent: the primary value is always kilograms when it is
+ * present, even when another unit has a larger numeric total.
+ */
+export function demandDisplaySummary(items = [], { primaryUnit = '公斤' } = {}) {
+  const totals = new Map();
+  for (const item of Array.isArray(items) ? items : []) {
+    if (!item || item.unit === null || item.unit === undefined || String(item.unit).trim() === '') continue;
+    if (item.quantity === null || item.quantity === undefined || item.quantity === '') continue;
+    const quantity = Number(item.quantity);
+    if (!Number.isFinite(quantity) || quantity < 0) continue;
+    const unit = formatUnit(item.unit);
+    if (!unit || unit === '未注明单位') continue;
+    totals.set(unit, (totals.get(unit) || 0) + quantity);
+  }
+  const fixedOrder = ['公斤', '箱', '件', '袋'];
+  const all = [...totals.entries()]
+    .sort(([unitA], [unitB]) => {
+      const rankA = fixedOrder.indexOf(unitA);
+      const rankB = fixedOrder.indexOf(unitB);
+      if (rankA >= 0 || rankB >= 0) return (rankA < 0 ? fixedOrder.length : rankA) - (rankB < 0 ? fixedOrder.length : rankB);
+      return unitA.localeCompare(unitB, 'zh-CN');
+    })
+    .map(([unit, quantity]) => ({ unit, quantity }));
+  const primary = totals.has(primaryUnit)
+    ? { unit: primaryUnit, quantity: totals.get(primaryUnit), available: true }
+    : { unit: primaryUnit, quantity: null, available: false };
+  return { primary, all, secondaryCount: all.filter((item) => item.unit !== primaryUnit).length };
+}
+
 export function demandSeries(dailyTrend = []) {
   const dates = [...new Set(dailyTrend.map((item) => String(item.date)))].sort();
   const units = [...new Set(dailyTrend.flatMap((item) => (item.demand_totals || []).map((total) => formatUnit(total.unit))))].sort((a, b) => a.localeCompare(b, 'zh-CN'));

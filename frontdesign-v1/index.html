@@ -6,11 +6,11 @@
   <meta name="description" content="黑土循环 B01 网页管理与经营服务的 E01 园区管理台和 E02 公开产销协同大屏" />
   <title>黑土循环 · E01 园区管理台 / E02 公开产销协同大屏</title>
   <link rel="stylesheet" href="tokens.css?v=20260806-real-api-1" />
-  <link rel="stylesheet" href="styles.css?v=20260815-fixed-showcase-1" />
+  <link rel="stylesheet" href="styles.css?v=20260815-demand-summary-1" />
   <link rel="stylesheet" href="vendor/fonts/noto-sans-sc/index.css" />
   <link rel="stylesheet" href="vendor/fonts/zcool-qingke-huangyou/400.css" />
   <link rel="stylesheet" href="vendor/fonts/jetbrains-mono/index.css" />
-  <link rel="stylesheet" href="dashboard.css?v=20260814-dashboard-presentation-5" />
+  <link rel="stylesheet" href="dashboard.css?v=20260815-demand-summary-1" />
 </head>
 <body>
   <div class="app-shell">
@@ -136,7 +136,7 @@
 
           <div class="dv2-kpi-grid">
             <article class="dv2-kpi warm"><span>园区有效预订单</span><strong id="dv2-preorder-count">—</strong><small>传统门店与第三空间需求笔数</small></article>
-            <article class="dv2-kpi demand"><span>园区需求量</span><div id="dv2-demand-totals" class="dv2-demand-chips"><b>—</b></div><small>公斤、件、箱等按单位拆分</small></article>
+            <article class="dv2-kpi demand"><div class="dv2-demand-kpi-head"><span>园区需求量</span><button id="dv2-demand-open" class="dv2-demand-open" type="button" aria-haspopup="dialog" aria-controls="dv2-chart-dialog" disabled>查看明细</button></div><div class="dv2-demand-primary"><strong id="dv2-demand-primary-value">—</strong><span id="dv2-demand-primary-unit">公斤</span></div><small id="dv2-demand-primary-meta">当前周期暂无需求数据</small></article>
             <article class="dv2-kpi"><span>终端经营订单</span><strong id="dv2-operation-orders">—</strong><small>B02 移动履约与设备服务 · 门店经营日报汇总</small></article>
             <article class="dv2-kpi"><span>终端营业额</span><strong id="dv2-sales-amount">—</strong><small>人民币 · B02 移动履约与经营日报</small></article>
             <article class="dv2-kpi green"><span>第三空间触点</span><strong id="dv2-third-space-count">—</strong><small>重点渠道销售节点</small></article>
@@ -174,7 +174,7 @@
 
           <footer class="dv2-footer"><span><i></i><b id="public-sync-state">等待同步</b></span><span>业务数据截止：<b id="public-data-cutoff">—</b></span><span>响应生成：<b id="public-generated-at">—</b></span><span>SSE 实时更新 · 断线时每 30 秒轮询</span></footer>
 
-          <dialog id="dv2-chart-dialog" class="dv2-chart-dialog"><header><div><small>数据详情</small><h3 id="dv2-dialog-title">数据图表</h3></div><button id="dv2-dialog-close" type="button" aria-label="关闭图表">关闭</button></header><div id="dv2-dialog-chart" class="dv2-dialog-chart"></div></dialog>
+          <dialog id="dv2-chart-dialog" class="dv2-chart-dialog" aria-labelledby="dv2-dialog-title"><header><div><small>数据详情</small><h3 id="dv2-dialog-title">数据图表</h3></div><button id="dv2-dialog-close" type="button" aria-label="关闭图表">关闭</button></header><section id="dv2-demand-dialog-summary" class="dv2-demand-dialog-summary" hidden aria-label="园区需求量周期汇总"></section><div id="dv2-dialog-chart" class="dv2-dialog-chart" role="img" aria-label="数据图表"></div></dialog>
           <dialog id="dv2-algorithm-dialog" class="dv2-chart-dialog dv2-algorithm-dialog"><header><div><small>业务化分配结论</small><h3 id="dv2-algorithm-dialog-title">协同运算方案</h3></div><button id="dv2-algorithm-dialog-close" type="button" aria-label="关闭协同运算方案">关闭</button></header><div id="dv2-algorithm-dialog-content" class="dv2-algorithm-dialog-content"></div></dialog>
         </div>
       </section>
@@ -183,9 +183,9 @@
   <dialog id="e01-resource-dialog" class="e01-resource-dialog"><header><div><small>登录态业务详情</small><h3 id="e01-resource-dialog-title">记录详情</h3></div><button id="e01-resource-dialog-close" type="button" aria-label="关闭记录详情">关闭</button></header><div id="e01-resource-dialog-content" class="e01-resource-dialog-content"></div></dialog>
   <dialog id="showcase-data-dialog" class="showcase-data-dialog"><header><div><small>固定案例</small><h3>数据说明</h3></div><button id="showcase-data-dialog-close" type="button" aria-label="关闭数据说明">关闭</button></header><div><p>数据为系统固定演示数据。</p><p>日期每日滚动。</p><p>数据不进入真实经营统计。</p></div></dialog>
   <script src="runtime-config.js"></script>
-  <script src="api.js?v=20260815-fixed-showcase-1"></script>
-  <script src="scripts.js?v=20260815-fixed-showcase-1"></script>
+  <script src="api.js?v=20260815-demand-summary-1"></script>
+  <script src="scripts.js?v=20260815-demand-summary-1"></script>
   <script src="vendor/echarts/echarts.min.js"></script>
-  <script type="module" src="dashboard-v2.js?v=20260815-fixed-showcase-1"></script>
+  <script type="module" src="dashboard-v2.js?v=20260815-demand-summary-1"></script>
 </body>
 </html>

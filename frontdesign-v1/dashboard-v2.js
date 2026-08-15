@@ -3,18 +3,17 @@ import {
   COLORS,
   channelValues,
   dashboardPalette,
+  demandDisplaySummary,
   demandSeries,
   formatCurrency,
   formatCnyAmount,
   formatDate,
   formatNumber,
   formatPercent,
-  formatUnit,
   operationTrendSeries,
   responseError,
   safeEnvelopeData,
-  sortDemandTotals,
-} from './dashboard-format.js?v=20260814-dashboard-presentation-5';
+} from './dashboard-format.js?v=20260815-demand-summary-1';
 import {
   applyDashboardMapDictionaries,
   basemapVisibilityPatch,
@@ -29,11 +28,11 @@ import {
   overviewMapViewport,
   routeFocusViewport,
   selectChangchunRoutes,
-} from './dashboard-map.js?v=20260814-dashboard-presentation-5';
-import { createSeamlessLoop } from './dashboard-loop.js?v=20260814-dashboard-presentation-5';
-import { VOICE_STATES, VoiceQuestionController } from './dashboard-voice.js?v=20260814-dashboard-presentation-5';
-import { adaptDashboardSnapshot, applyDashboardDictionaries } from './dashboard-adapter.js?v=20260814-dashboard-presentation-5';
-import { eventTargets, RealtimeCoordinator } from './dashboard-realtime.js?v=20260814-dashboard-presentation-5';
+} from './dashboard-map.js?v=20260815-demand-summary-1';
+import { createSeamlessLoop } from './dashboard-loop.js?v=20260815-demand-summary-1';
+import { VOICE_STATES, VoiceQuestionController } from './dashboard-voice.js?v=20260815-demand-summary-1';
+import { adaptDashboardSnapshot, applyDashboardDictionaries } from './dashboard-adapter.js?v=20260815-demand-summary-1';
+import { eventTargets, RealtimeCoordinator } from './dashboard-realtime.js?v=20260815-demand-summary-1';
 
 const echarts = window.echarts;
 const API = window.API;
@@ -89,6 +88,7 @@ const state = {
   pendingEventTargets: new Set(),
   theme: 'night',
   dialogContent: null,
+  demandDialogTrigger: null,
 };
 let realtimeCoordinator = null;
 
@@ -309,12 +309,40 @@ function renderHeadline(snapshot) {
     ? formatCnyAmount(snapshot.headline.sales_amount)
     : `币种不支持（${snapshot.currency || '空值'}）`;
   byId('dv2-third-space-count').textContent = formatNumber(snapshot.third_spaces.length);
-  const totals = sortDemandTotals(snapshot.headline.demand_totals);
-  byId('dv2-demand-totals').innerHTML = totals.length
-    ? totals.map((item) => `<b>${htmlEscape(formatNumber(item.quantity, 2))} ${htmlEscape(formatUnit(item.unit))}</b>`).join('')
-    : '<b>暂无需求</b>';
+  const summary = demandDisplaySummary(snapshot.headline?.demand_totals, { primaryUnit: '公斤' });
+  const primaryValue = byId('dv2-demand-primary-value');
+  const primaryUnit = byId('dv2-demand-primary-unit');
+  const primaryMeta = byId('dv2-demand-primary-meta');
+  const openButton = byId('dv2-demand-open');
+  if (primaryValue) primaryValue.textContent = summary.primary.available ? formatNumber(summary.primary.quantity, 2) : '—';
+  if (primaryUnit) primaryUnit.textContent = '公斤';
+  if (primaryMeta) {
+    primaryMeta.textContent = summary.all.length === 0
+      ? '当前周期暂无需求数据'
+      : summary.primary.available
+        ? (summary.secondaryCount ? `公斤 · 另有 ${summary.secondaryCount} 种单位` : '仅公斤需求')
+        : `当前周期暂无公斤需求 · 另有 ${summary.secondaryCount} 种单位`;
+  }
+  if (openButton) openButton.disabled = summary.all.length === 0;
   byId('public-data-cutoff').textContent = formatSnapshotTime(snapshot.data_cutoff, snapshot.data_cutoff_note || '暂无业务数据');
   byId('public-generated-at').textContent = formatSnapshotTime(snapshot.generated_at, '响应时间未知');
+}
+
+function renderDemandDialog(snapshot) {
+  const dialog = byId('dv2-chart-dialog');
+  const summaryElement = byId('dv2-demand-dialog-summary');
+  const chartElement = byId('dv2-dialog-chart');
+  if (!dialog || !summaryElement || !chartElement) return;
+  const summary = demandDisplaySummary(snapshot?.headline?.demand_totals, { primaryUnit: '公斤' });
+  const periodLabel = { '7d': '7 日', '30d': '30 日', month: '本月' }[state.period] || state.period;
+  const cutoff = formatSnapshotTime(snapshot?.data_cutoff, '暂无数据截止时间');
+  summaryElement.innerHTML = summary.all.length
+    ? `<div class="dv2-demand-dialog-period">当前周期：${htmlEscape(periodLabel)} · 数据截止：${htmlEscape(cutoff)}</div><dl>${summary.all.map((item) => `<div class="dv2-demand-dialog-item"><dt>${htmlEscape(item.unit)}${item.unit === '公斤' ? '<small>主要单位</small>' : ''}</dt><dd>${htmlEscape(formatNumber(item.quantity, 2))}</dd></div>`).join('')}</dl><p>各单位独立统计，不跨单位相加。</p>`
+    : '<div class="dv2-empty">当前周期暂无需求数据</div>';
+  summaryElement.hidden = false;
+  dialog.classList.add('is-demand');
+  chartElement.setAttribute('aria-label', `${periodLabel}每日分单位需求趋势图`);
+  renderDemandChart(snapshot || { daily_trend: [] }, 'dv2-dialog-chart');
 }
 
 function renderDemandChart(snapshot, target = 'dv2-demand-chart', palette = screenPalette()) {
@@ -806,6 +834,7 @@ function renderSnapshot(snapshot) {
   renderQuality(snapshot);
   renderMap(snapshot);
   renderShowcase(snapshot.algorithm_showcase);
+  renderStoredDialog();
   byId('public-sync-state').textContent = state.source === 'demo' ? '本地演示快照' : '数据同步正常';
 }
 
@@ -858,6 +887,9 @@ function renderAssistantChart(chartSpec, { remember = true } = {}) {
   if (!['bar', 'line', 'donut', 'route'].includes(kind)) return;
   if (remember) state.dialogContent = { type: 'assistant', chartSpec };
   const dialog = byId('dv2-chart-dialog');
+  dialog?.classList.remove('is-demand');
+  const demandSummary = byId('dv2-demand-dialog-summary');
+  if (demandSummary) demandSummary.hidden = true;
   byId('dv2-dialog-title').textContent = chartSpec.title;
   if (!dialog.open) dialog.showModal();
   const chart = initChart('dv2-dialog-chart');
@@ -890,11 +922,22 @@ function renderAssistantChart(chartSpec, { remember = true } = {}) {
   requestAnimationFrame(() => { chart.resize(); chart.setOption(option, true); });
 }
 
+function openDemandDialog(trigger = byId('dv2-demand-open')) {
+  if (!state.snapshot || !demandDisplaySummary(state.snapshot.headline?.demand_totals).all.length) return;
+  const dialog = byId('dv2-chart-dialog');
+  if (!dialog) return;
+  state.demandDialogTrigger = trigger instanceof HTMLElement ? trigger : byId('dv2-demand-open');
+  state.dialogContent = { type: 'demand' };
+  byId('dv2-dialog-title').textContent = '园区需求量明细';
+  if (!dialog.open) dialog.showModal();
+  requestAnimationFrame(() => renderDemandDialog(state.snapshot));
+}
+
 function renderStoredDialog() {
   const dialog = byId('dv2-chart-dialog');
   if (!dialog?.open || !state.dialogContent) return;
   if (state.dialogContent.type === 'demand') {
-    renderDemandChart(state.snapshot || { daily_trend: [] }, 'dv2-dialog-chart');
+    renderDemandDialog(state.snapshot || { daily_trend: [] });
     return;
   }
   renderAssistantChart(state.dialogContent.chartSpec, { remember: false });
@@ -1139,16 +1182,19 @@ function bindEvents() {
     byId('dv2-assistant-input').value = button.dataset.example;
     await submitAssistantQuestion(button.dataset.example, '预设问题');
   }));
-  document.querySelector('[data-open-chart="demand"]')?.addEventListener('click', () => {
-    if (!state.snapshot) return;
-    state.dialogContent = { type: 'demand' };
-    const dialog = byId('dv2-chart-dialog');
-    byId('dv2-dialog-title').textContent = '每日分单位需求';
-    if (!dialog.open) dialog.showModal();
-    requestAnimationFrame(() => renderDemandChart(state.snapshot, 'dv2-dialog-chart'));
-  });
+  document.querySelectorAll('[data-open-chart="demand"], #dv2-demand-open').forEach((button) => button.addEventListener('click', () => openDemandDialog(button)));
   byId('dv2-dialog-close')?.addEventListener('click', () => byId('dv2-chart-dialog').close());
-  byId('dv2-chart-dialog')?.addEventListener('close', () => { state.dialogContent = null; state.rankingLoop?.refresh(); refreshInformationLoops(); });
+  byId('dv2-chart-dialog')?.addEventListener('close', () => {
+    const trigger = state.demandDialogTrigger;
+    state.dialogContent = null;
+    state.demandDialogTrigger = null;
+    byId('dv2-chart-dialog')?.classList.remove('is-demand');
+    const demandSummary = byId('dv2-demand-dialog-summary');
+    if (demandSummary) demandSummary.hidden = true;
+    state.rankingLoop?.refresh();
+    refreshInformationLoops();
+    trigger?.focus?.();
+  });
   byId('dv2-chart-dialog')?.addEventListener('click', (event) => { if (event.target === byId('dv2-chart-dialog')) event.target.close(); });
   document.querySelectorAll('#dv2-showcase-tabs [data-kind]').forEach((button) => button.addEventListener('click', () => {
     state.showcasePanel = button.dataset.kind;

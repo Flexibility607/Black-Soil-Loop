@@ -46,8 +46,7 @@ assert.equal(
 
 const html = await readFile(join(dist, 'index.html'), 'utf8');
 for (const marker of [
-  '20260815-fixed-showcase-1',
-  '20260814-dashboard-presentation-5',
+  '20260815-demand-summary-1',
   'class="dv2-panel dv2-information-panel"',
   'class="dv2-panel dv2-showcase-panel"',
   'id="dv2-algorithm-dialog"',
