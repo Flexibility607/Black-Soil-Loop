@@ -734,11 +734,10 @@ body.screen-mode.screen-day .dv2-brand-mark img {
 }
 
 .dv2-demand-primary {
-  display: flex;
-  align-items: baseline;
-  gap: 7px;
+  display: grid;
+  gap: 0;
   min-width: 0;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .dv2-demand-primary strong {
@@ -751,9 +750,11 @@ body.screen-mode.screen-day .dv2-brand-mark img {
 }
 
 .dv2-demand-primary span {
+  display: block;
   color: var(--dv2-yellow);
   font-size: 15px;
   font-weight: 600;
+  line-height: 1.15;
 }
 
 .dv2-demand-primary + small {

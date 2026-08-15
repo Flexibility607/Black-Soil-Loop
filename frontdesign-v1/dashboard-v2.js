@@ -320,7 +320,7 @@ function renderHeadline(snapshot) {
     primaryMeta.textContent = summary.all.length === 0
       ? '当前周期暂无需求数据'
       : summary.primary.available
-        ? (summary.secondaryCount ? `公斤 · 另有 ${summary.secondaryCount} 种单位` : '仅公斤需求')
+        ? (summary.secondaryCount ? `· 另有 ${summary.secondaryCount} 种单位` : '仅公斤需求')
         : `当前周期暂无公斤需求 · 另有 ${summary.secondaryCount} 种单位`;
   }
   if (openButton) openButton.disabled = summary.all.length === 0;
