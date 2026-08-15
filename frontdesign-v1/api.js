@@ -75,7 +75,16 @@
     if (!payload) return;
     accessToken = payload.access_token || accessToken;
     csrfToken = payload.csrf_token || csrfToken;
-    currentUser = payload.user || currentUser;
+    if (payload.user) {
+      currentUser = {
+        ...payload.user,
+        dataset_mode: payload.dataset_mode || payload.user.dataset_mode || 'live',
+        dataset_label: payload.dataset_label ?? payload.user.dataset_label ?? null,
+        case_version: payload.case_version ?? payload.user.case_version ?? null,
+        case_revision: payload.case_revision ?? payload.user.case_revision ?? null,
+        case_refreshed_at: payload.case_refreshed_at ?? payload.user.case_refreshed_at ?? null,
+      };
+    }
     idleTimeoutMs = Math.max(60_000, Number(payload.idle_timeout_seconds || 1800) * 1000);
     armIdleTimer();
     emitAuth(reason);
@@ -183,7 +192,7 @@
       body: JSON.stringify({ username, password }),
     }, false);
     if (result.ok) saveSession(result.json, 'login');
-    return withData(result, result.json?.user);
+    return withData(result, result.ok ? currentUser : result.json?.user);
   }
 
   async function getCurrentUser() {
@@ -191,13 +200,29 @@
     if (!accessToken && !await refreshAccessToken()) return response(false, 401, { code: 'NOT_AUTHENTICATED', message: '登录会话不存在或已过期' });
     const result = await rawRequest('/web/auth/me');
     if (result.ok) saveSession({ ...result.json, user: result.json.user }, 'me');
-    return withData(result, result.json?.user);
+    return withData(result, result.ok ? currentUser : result.json?.user);
   }
 
   async function logout() {
     if (accessToken && !demoMode) await rawRequest('/web/auth/logout', { method: 'POST', body: '{}' }, false);
     clearSession('logout');
     return response(true, 200, { data: { logged_out: true } });
+  }
+
+  async function getDemoCaseStatus() {
+    const result = await rawRequest('/web/demo-case/status', { authPolicy: 'required' });
+    return withData(result, result.json);
+  }
+
+  async function resetDemoCase(expectedCaseRevision, idempotencyKey) {
+    const result = await rawRequest('/web/demo-case/reset', {
+      method: 'POST',
+      authPolicy: 'required',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify({ expected_case_revision: expectedCaseRevision }),
+    }, false);
+    if (result.ok || result.status === 401) clearSession('showcase_reset');
+    return withData(result, result.json);
   }
 
   async function list(resource, params = {}) {
@@ -606,6 +631,7 @@
     confirmWarehousePool,
     confirmImport,
     getCurrentUser,
+    getDemoCaseStatus,
     getDashboard,
     getDictionaries,
     getPublicDictionaries,
@@ -630,6 +656,7 @@
     precheckImport,
     queryDashboardAssistant,
     request,
+    resetDemoCase,
     requestWarehousePoolAction,
     subscribeDashboardEvents,
     touchActivity,

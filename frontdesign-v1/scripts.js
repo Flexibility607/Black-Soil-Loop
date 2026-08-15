@@ -883,16 +883,50 @@ function renderAuthState(user) {
   const stateEl = document.getElementById('auth-state');
   const loginButton = document.getElementById('open-login');
   const logoutButton = document.getElementById('logout-button');
+  const datasetBadge = document.getElementById('e01-dataset-badge');
+  const dataInfoButton = document.getElementById('e01-data-info');
+  const resetButton = document.getElementById('reset-demo-case');
   if (user) {
     const role = user.role_label || VALUE_LABELS[user.role] || `未知类型（${user.role || '空值'}）`;
     stateEl.textContent = `${user.display_name || user.username} · ${role}`;
     loginButton.hidden = true;
     logoutButton.hidden = false;
+    const showcase = user.dataset_mode === 'showcase';
+    datasetBadge.hidden = !showcase;
+    dataInfoButton.hidden = !showcase;
+    if (showcase) {
+      const refreshed = user.case_refreshed_at ? new Date(user.case_refreshed_at).toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai', hour: '2-digit', minute: '2-digit', hour12: false }) : '--:--';
+      datasetBadge.textContent = `固定演示案例 · 更新至 ${refreshed}`;
+    }
+    resetButton.hidden = !(showcase && user.role === 'park_admin');
   } else {
     stateEl.textContent = '未登录';
     loginButton.hidden = false;
     logoutButton.hidden = true;
+    datasetBadge.hidden = true;
+    dataInfoButton.hidden = true;
+    resetButton.hidden = true;
   }
+}
+
+async function handleDemoCaseReset() {
+  const user = getAPI().getSession().user;
+  if (!user || user.dataset_mode !== 'showcase' || user.role !== 'park_admin') return;
+  if (!window.confirm('恢复后，固定案例将回到今日标准状态，当前演示会话会退出。是否继续？')) return;
+  const button = document.getElementById('reset-demo-case');
+  button.disabled = true;
+  const result = await getAPI().resetDemoCase(user.case_revision, newIdempotencyKey('showcase-reset'));
+  button.disabled = false;
+  if (!result.ok) {
+    setMessage(errorOf(result), 'error');
+    return;
+  }
+  closeResourceDetail();
+  Object.keys(state.resourceRows).forEach((section) => { state.resourceRows[section] = []; });
+  updateCalculationFields();
+  renderAuthState(null);
+  document.getElementById('auth-panel').hidden = false;
+  setMessage('固定案例正在恢复。完成后请重新登录。', 'success');
 }
 
 function requireAuth(result) {
@@ -1515,6 +1549,12 @@ async function initPage() {
   document.getElementById('open-login').addEventListener('click', () => { document.getElementById('auth-panel').hidden = false; });
   document.getElementById('close-login').addEventListener('click', () => { document.getElementById('auth-panel').hidden = true; });
   document.getElementById('logout-button').addEventListener('click', handleLogout);
+  document.getElementById('reset-demo-case')?.addEventListener('click', handleDemoCaseReset);
+  document.querySelectorAll('.showcase-info-trigger').forEach((button) => {
+    button.addEventListener('click', () => document.getElementById('showcase-data-dialog')?.showModal());
+  });
+  document.getElementById('showcase-data-dialog-close')?.addEventListener('click', () => document.getElementById('showcase-data-dialog')?.close());
+  document.getElementById('showcase-data-dialog')?.addEventListener('click', (event) => { if (event.target === event.currentTarget) event.currentTarget.close(); });
   document.getElementById('e01-resource-dialog-close')?.addEventListener('click', closeResourceDetail);
   document.getElementById('e01-resource-dialog')?.addEventListener('click', (event) => { if (event.target === event.currentTarget) closeResourceDetail(); });
   document.getElementById('e01-resource-dialog')?.addEventListener('close', () => { state.resourceDetail = null; });

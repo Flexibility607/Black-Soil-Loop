@@ -50,8 +50,8 @@ test('E02 保留语音入口和两个经营占比环图', async () => {
   assert.match(html, /id="dv2-sales-donut"/);
   assert.match(html, /id="dv2-mic-button"/);
   assert.match(html, /本站不保存原始录音；转写文字最长约保留 10 分钟/);
-  assert.match(html, /dashboard-v2\.js\?v=20260814-dashboard-presentation-5/);
-  assert.match(html, /api\.js\?v=20260814-dashboard-presentation-5/);
+  assert.match(html, /dashboard-v2\.js\?v=20260815-fixed-showcase-1/);
+  assert.match(html, /api\.js\?v=20260815-fixed-showcase-1/);
   assert.doesNotMatch(html, /id="public-assistant-input"/);
 });
 

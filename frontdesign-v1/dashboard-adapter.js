@@ -58,6 +58,11 @@ export function adaptDashboardSnapshot(source) {
       order_count_unit: source.order_count_unit || '单',
       public_map: source.public_map || (source.map?.schema_version === '2.0' ? source.map : null),
       algorithm_showcase: source.algorithm_showcase || null,
+      dataset_mode: source.dataset_mode || 'live',
+      dataset_label: source.dataset_label || null,
+      case_version: source.case_version || null,
+      case_revision: source.case_revision ?? null,
+      case_refreshed_at: source.case_refreshed_at || null,
     };
   }
 
@@ -178,6 +183,11 @@ export function adaptDashboardSnapshot(source) {
     order_count_unit: source.order_count_unit || '单',
     public_map: source.map?.schema_version === '2.0' ? source.map : null,
     algorithm_showcase: source.algorithm_showcase || null,
+    dataset_mode: source.dataset_mode || 'live',
+    dataset_label: source.dataset_label || null,
+    case_version: source.case_version || null,
+    case_revision: source.case_revision ?? null,
+    case_refreshed_at: source.case_refreshed_at || null,
     headline: {
       preorder_count: number(summary.preorder_count),
       demand_totals: demandTotals(demandRows),

@@ -278,11 +278,27 @@ async function ensureMap(mode = 'changchun') {
 function setSource(source, message) {
   const sourceEl = byId('dv2-source-state');
   const demoBadge = byId('dv2-demo-badge');
+  const dataInfoButton = byId('dv2-data-info');
   if (sourceEl) {
     sourceEl.className = `dv2-source ${source === 'demo' ? 'demo' : source === 'error' ? 'error' : 'live'}`;
     sourceEl.textContent = message;
   }
-  if (demoBadge) demoBadge.hidden = source !== 'demo';
+  if (demoBadge && source !== 'showcase') demoBadge.hidden = true;
+  if (dataInfoButton && source !== 'showcase') dataInfoButton.hidden = true;
+}
+
+function renderDatasetBadge(snapshot) {
+  const badge = byId('dv2-demo-badge');
+  const infoButton = byId('dv2-data-info');
+  if (!badge) return;
+  const showcase = snapshot?.dataset_mode === 'showcase';
+  badge.hidden = !showcase;
+  if (infoButton) infoButton.hidden = !showcase;
+  if (!showcase) return;
+  const refreshed = snapshot.case_refreshed_at
+    ? new Date(snapshot.case_refreshed_at).toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai', hour: '2-digit', minute: '2-digit', hour12: false })
+    : '--:--';
+  badge.textContent = `固定演示案例 · 更新至 ${refreshed}`;
 }
 
 function renderHeadline(snapshot) {
@@ -782,6 +798,7 @@ function startShowcaseRotation() {
 }
 
 function renderSnapshot(snapshot) {
+  renderDatasetBadge(snapshot);
   renderHeadline(snapshot);
   renderDemandChart(snapshot);
   renderMix(snapshot);
@@ -805,9 +822,9 @@ async function refresh({ force = false } = {}) {
     if (generation !== state.refreshGeneration) return;
     await ensureMap(snapshot.public_map?.schema_version === '2.0' ? 'changchun' : 'legacy');
     state.snapshot = snapshot;
-    state.source = snapshot.demo_mode || API.isMock() ? 'demo' : 'live';
+    state.source = snapshot.dataset_mode === 'showcase' ? 'showcase' : snapshot.demo_mode || API.isMock() ? 'demo' : 'live';
     state.lastSuccessfulAt = new Date();
-    setSource(state.source, state.source === 'demo' ? '演示数据' : '实时数据');
+    setSource(state.source, state.source === 'showcase' ? '数据正常' : state.source === 'demo' ? '演示数据' : '实时数据');
     renderSnapshot(snapshot);
   } catch (error) {
     if (state.snapshot) {
