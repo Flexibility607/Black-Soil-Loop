@@ -154,6 +154,9 @@ test('需求 KPI 只显示公斤主值并复用同一个明细窗口', async () 
   assert.match(dashboard, /querySelectorAll\('\[data-open-chart="demand"\], #dv2-demand-open'\)/);
   assert.match(dashboard, /function openDemandDialog\(/);
   assert.match(dashboard, /园区需求量明细/);
+  const css = await readFile(new URL('frontdesign-v1/dashboard.css', projectRoot), 'utf8');
+  assert.match(css, /\.dv2-demand-primary\s*\{[\s\S]*display:\s*flex[\s\S]*align-items:\s*baseline[\s\S]*white-space:\s*nowrap/);
+  assert.match(dashboard, /summary\.secondaryCount \? `· 另有 \$\{summary\.secondaryCount\} 种单位`/);
   assert.doesNotMatch(dashboard, /dv2-demand-totals/);
 });
 
